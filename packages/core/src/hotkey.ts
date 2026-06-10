@@ -19,8 +19,8 @@ export const MODIFIER_TOKENS = [
 
 /** Non-modifier key tokens we allow users to bind. One place to extend. */
 export const KEY_TOKENS = [
-  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-  ...'0123456789',
+  ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)),
+  ...Array.from({ length: 10 }, (_, i) => String(i)),
   ...Array.from({ length: 24 }, (_, i) => `F${i + 1}`),
   'Space',
   'Backquote',

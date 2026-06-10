@@ -15,8 +15,7 @@ const SIZE = 1024;
 const MARGIN = 100;
 const RADIUS = 185;
 
-const TOP = [0x4f, 0x46, 0xe5]; // indigo
-const BOTTOM = [0x7c, 0x3aed >> 8, 0xed]; // violet (#7c3aed)
+const TOP = [0x4f, 0x46, 0xe5]; // indigo; gradient runs to violet #7c3aed
 const BAR_COLOR = [0xff, 0xff, 0xff];
 
 const BAR_HEIGHTS = [220, 420, 620, 420, 220];

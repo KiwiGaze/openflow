@@ -12,6 +12,7 @@ export type PipelineStatus =
   | 'transcribing'
   | 'refining'
   | 'inserting'
+  | 'notice'
   | 'error';
 
 /** What kind of job the pipeline is currently running. */
@@ -156,11 +157,13 @@ export const COMMANDS = {
   stopDictation: 'stop_dictation',
   cancelDictation: 'cancel_dictation',
   startRefineSelection: 'start_refine_selection',
+  getLastResult: 'get_last_result',
   testLlm: 'test_llm',
   listOllamaModels: 'list_ollama_models',
   checkPermissions: 'check_permissions',
   requestMicrophonePermission: 'request_microphone_permission',
   promptAccessibilityPermission: 'prompt_accessibility_permission',
   openAccessibilitySettings: 'open_accessibility_settings',
+  openMicrophoneSettings: 'open_microphone_settings',
   getAppInfo: 'get_app_info',
 } as const;
