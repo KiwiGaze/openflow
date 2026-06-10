@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build macOS bundle
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - run: pnpm install --frozen-lockfile
+      # TODO(signing): set APPLE_CERTIFICATE / APPLE_ID secrets and add the
+      # signing env to this step once a Developer ID exists. Until then the
+      # DMG is unsigned and users must right-click → Open on first launch.
+      - name: Build app
+        run: pnpm tauri build
+      - name: Checksums
+        run: shasum -a 256 apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg > checksums.txt
+      - name: Draft GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            checksums.txt

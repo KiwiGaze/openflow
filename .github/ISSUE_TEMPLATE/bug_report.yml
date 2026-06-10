@@ -1,0 +1,40 @@
+name: Bug report
+description: Something broke or behaved unexpectedly
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: target-app
+    attributes:
+      label: App you were dictating into
+      placeholder: e.g. Notes, Chrome (Gmail), iTerm2
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and chip
+      placeholder: e.g. macOS 15.5, M2 Pro
+    validations:
+      required: true
+  - type: dropdown
+    id: model
+    attributes:
+      label: Speech model
+      options:
+        [tiny.en, base.en, base, small.en, small, large-v3-turbo-q5_0, large-v3-turbo, not sure]
+  - type: dropdown
+    id: provider
+    attributes:
+      label: AI provider
+      options: [none, ollama, openai-compatible, not sure]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from `~/Library/Logs/app.openflow.desktop/` (no transcripts are logged).
+      render: text
