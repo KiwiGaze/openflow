@@ -51,7 +51,7 @@ block the app's network access entirely — dictation keeps working.
 **Build from source** (no signed releases yet — see the [roadmap](ROADMAP.md)):
 
 ```sh
-git clone https://github.com/openflow-app/openflow.git
+git clone https://github.com/KiwiGaze/openflow.git
 cd openflow
 pnpm install
 pnpm tauri build        # produces apps/desktop/src-tauri/target/release/bundle/dmg/

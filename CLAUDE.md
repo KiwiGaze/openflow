@@ -30,7 +30,7 @@ Single tests:
 
 If `cargo` is missing in non-interactive shells, use `$HOME/.cargo/bin/cargo`.
 
-The remote is `github.com/KiwiGaze/openflow`; the `github.com/openflow-app/openflow` URLs in docs and Cargo.toml are stale placeholders.
+The remote is `github.com/KiwiGaze/openflow`.
 
 ## Architecture
 

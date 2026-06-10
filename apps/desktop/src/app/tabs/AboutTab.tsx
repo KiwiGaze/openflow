@@ -25,7 +25,7 @@ export function AboutTab(): JSX.Element {
             <dt>Data folder (models)</dt>
             <dd className="mono">{info.dataDir}</dd>
             <dt>Source code</dt>
-            <dd className="mono">github.com/openflow-app/openflow</dd>
+            <dd className="mono">github.com/KiwiGaze/openflow</dd>
           </dl>
         )}
       </section>
