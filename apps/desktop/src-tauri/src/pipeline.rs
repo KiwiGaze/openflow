@@ -479,7 +479,8 @@ impl Pipeline {
         let wanted_paste = settings.insert_method == InsertMethod::Paste;
         if wanted_paste && outcome == InsertOutcome::CopiedToClipboard {
             return Ok(ProcessOutcome::Notice(
-                "copied to clipboard — grant Accessibility to paste automatically".into(),
+                "Copied to clipboard — press ⌘V to paste (grant Accessibility to auto-paste)"
+                    .into(),
             ));
         }
         Ok(ProcessOutcome::Inserted)
