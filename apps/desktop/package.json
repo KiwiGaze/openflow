@@ -6,9 +6,9 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev:vite": "vite",
-    "build:vite": "vite build",
-    "build": "vite build",
+    "dev:vite": "pnpm --filter @openflow/core build && vite",
+    "build:vite": "pnpm --filter @openflow/core build && vite build",
+    "build": "pnpm run build:vite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "tauri": "tauri"
