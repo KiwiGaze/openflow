@@ -65,11 +65,20 @@ struct OllamaModel {
     name: String,
 }
 
-/// `http://host:11434` → `http://host:11434/v1/chat/completions`;
-/// a base that already ends in `/v1` is used as-is.
+/// Joins the user's endpoint root with `/chat/completions`.
+///
+/// A bare origin gets the conventional `/v1` inserted
+/// (`http://host:11434` → `http://host:11434/v1/chat/completions`).
+/// Any explicit path is trusted as-is: version segments differ per
+/// provider (`/v1`, `/openai/v1`, `/api/coding/paas/v4`, `/v1beta/openai`),
+/// so guessing beyond the path the user gave produces 404s.
 pub fn chat_completions_url(base_url: &str) -> String {
     let base = base_url.trim().trim_end_matches('/');
-    if base.ends_with("/v1") {
+    let has_path = base
+        .split_once("://")
+        .map(|(_, rest)| rest.contains('/'))
+        .unwrap_or(false);
+    if has_path {
         format!("{base}/chat/completions")
     } else {
         format!("{base}/v1/chat/completions")
@@ -262,7 +271,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn url_builder_handles_v1_suffix() {
+    fn url_builder_inserts_v1_only_for_bare_origins() {
         assert_eq!(
             chat_completions_url("http://localhost:11434"),
             "http://localhost:11434/v1/chat/completions"
@@ -272,12 +281,30 @@ mod tests {
             "http://localhost:11434/v1/chat/completions"
         );
         assert_eq!(
+            chat_completions_url("https://api.openai.com"),
+            "https://api.openai.com/v1/chat/completions"
+        );
+    }
+
+    #[test]
+    fn url_builder_trusts_an_explicit_path() {
+        assert_eq!(
             chat_completions_url("https://api.groq.com/openai/v1"),
             "https://api.groq.com/openai/v1/chat/completions"
         );
         assert_eq!(
             chat_completions_url("http://localhost:1234/v1/"),
             "http://localhost:1234/v1/chat/completions"
+        );
+        // Version segments are not always `/v1`: z.ai uses `/v4`,
+        // Gemini's OpenAI compatibility layer uses `/v1beta/openai`.
+        assert_eq!(
+            chat_completions_url("https://api.z.ai/api/coding/paas/v4"),
+            "https://api.z.ai/api/coding/paas/v4/chat/completions"
+        );
+        assert_eq!(
+            chat_completions_url("https://generativelanguage.googleapis.com/v1beta/openai"),
+            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
         );
     }
 
