@@ -1,0 +1,29 @@
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Rust
+target/
+
+# Tauri
+apps/desktop/src-tauri/gen/
+
+# Whisper models (downloaded at runtime, never committed)
+*.ggml
+ggml-*.bin
+
+# OS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Env / local
+*.local
+.env
+.env.*

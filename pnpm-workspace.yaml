@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Supply-chain guard: refuse package versions published less than 24h ago.
+# Requires pnpm >= 10.16; older pnpm versions ignore this setting.
+minimumReleaseAge: 1440
