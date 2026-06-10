@@ -1,0 +1,130 @@
+// Prevents an extra console window on Windows in release builds.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod audio;
+mod commands;
+mod error;
+mod hud;
+mod llm;
+mod models;
+mod modes;
+mod output;
+mod permissions;
+mod pipeline;
+mod resample;
+mod settings;
+mod shortcuts;
+mod state;
+mod stt;
+mod text;
+mod tray;
+
+use std::sync::Arc;
+
+use tauri::Manager;
+
+use crate::state::AppState;
+
+fn main() {
+    tauri::Builder::default()
+        // Must be first: a second launch focuses the existing instance.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::show_settings_window(app);
+        }))
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .setup(|app| {
+            // Menu-bar app: no Dock icon until a window is opened.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            let handle = app.handle().clone();
+            let config_dir = app.path().app_config_dir()?;
+            let data_dir = app.path().app_data_dir()?;
+
+            let settings = Arc::new(settings::SettingsManager::load(&config_dir));
+            let models = Arc::new(models::ModelManager::new(data_dir.join("models")));
+            let stt = Arc::new(stt::SttEngine::new());
+            let llm = Arc::new(llm::LlmClient::new());
+            let audio = Arc::new(audio::AudioSystem::spawn());
+            let output = Arc::new(output::OutputSystem::spawn());
+            let pipeline = pipeline::Pipeline::new(
+                handle.clone(),
+                Arc::clone(&audio),
+                Arc::clone(&stt),
+                Arc::clone(&llm),
+                Arc::clone(&output),
+                Arc::clone(&settings),
+                Arc::clone(&models),
+            );
+
+            app.manage(AppState {
+                settings: Arc::clone(&settings),
+                models,
+                stt,
+                llm,
+                output,
+                pipeline,
+            });
+
+            hud::init(&handle)?;
+            tray::build(&handle)?;
+
+            if let Err(err) = shortcuts::apply(&handle, &settings.get()) {
+                // Not fatal: the settings UI reports and lets the user rebind.
+                log::warn!("hotkey registration failed: {err}");
+            }
+
+            if !settings.get().onboarding_completed {
+                tray::show_settings_window(&handle);
+            }
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Closing the settings window hides it; the app lives in the
+            // menu bar until quit from the tray.
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    #[cfg(target_os = "macos")]
+                    let _ = window
+                        .app_handle()
+                        .set_activation_policy(tauri::ActivationPolicy::Accessory);
+                }
+            }
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::get_settings,
+            commands::save_settings,
+            commands::list_models,
+            commands::download_model,
+            commands::cancel_model_download,
+            commands::delete_model,
+            commands::get_pipeline_state,
+            commands::start_dictation,
+            commands::stop_dictation,
+            commands::cancel_dictation,
+            commands::start_refine_selection,
+            commands::get_last_result,
+            commands::test_llm,
+            commands::list_ollama_models,
+            commands::check_permissions,
+            commands::request_microphone_permission,
+            commands::prompt_accessibility_permission,
+            commands::open_accessibility_settings,
+            commands::open_microphone_settings,
+            commands::get_app_info,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running OpenFlow");
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "IPC capabilities for the OpenFlow settings window and HUD overlay.",
+  "windows": ["main", "hud"],
+  "permissions": ["core:default"]
+}
