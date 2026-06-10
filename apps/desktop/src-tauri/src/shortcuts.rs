@@ -54,8 +54,11 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
 
 fn dispatch(app: &AppHandle, job: Job, state: ShortcutState) {
     let pipeline = app.state::<AppState>().pipeline.clone();
-    match state {
+    // The hotkey handler runs on the main thread. Starting a refine job
+    // blocks on the output worker (selection capture), which round-trips
+    // keystrokes through the main thread — handling it inline would deadlock.
+    tauri::async_runtime::spawn_blocking(move || match state {
         ShortcutState::Pressed => pipeline.on_hotkey_pressed(job),
         ShortcutState::Released => pipeline.on_hotkey_released(job),
-    }
+    });
 }

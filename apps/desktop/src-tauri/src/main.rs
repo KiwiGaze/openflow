@@ -56,7 +56,7 @@ fn main() {
             let stt = Arc::new(stt::SttEngine::new());
             let llm = Arc::new(llm::LlmClient::new());
             let audio = Arc::new(audio::AudioSystem::spawn());
-            let output = Arc::new(output::OutputSystem::spawn());
+            let output = Arc::new(output::OutputSystem::spawn(handle.clone()));
             let pipeline = pipeline::Pipeline::new(
                 handle.clone(),
                 Arc::clone(&audio),

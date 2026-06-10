@@ -1,14 +1,18 @@
 //! Clipboard and keystroke output on a dedicated worker thread.
 //!
-//! CGEvent posting (enigo) has thread-affinity constraints that clash with
-//! async executors, so a single OS thread owns both the `Enigo` handle and
-//! the clipboard, and the app talks to it over a channel.
+//! The worker owns the clipboard and the settle delays, and the app talks to
+//! it over a channel. Keystroke synthesis itself runs on the main thread:
+//! enigo resolves `Key::Unicode` to a keycode through the TIS keyboard-layout
+//! APIs, which macOS aborts with `dispatch_assert_queue` on any other thread.
+//! Callers of [`OutputSystem`] must therefore never block the main thread
+//! while waiting on the worker.
 
 use std::sync::mpsc::{self, Sender, SyncSender};
 use std::time::Duration;
 
 use arboard::Clipboard;
 use enigo::{Direction, Enigo, Key, Keyboard, Settings as EnigoSettings};
+use tauri::AppHandle;
 
 use crate::error::{AppError, AppResult};
 use crate::permissions;
@@ -30,6 +34,9 @@ const SELECTION_PROBE: &str = "\u{200B}openflow-selection-probe\u{200B}";
 const KEYSTROKE_SETTLE: Duration = Duration::from_millis(140);
 /// Time between writing the clipboard and sending Cmd+V.
 const CLIPBOARD_SETTLE: Duration = Duration::from_millis(60);
+/// Upper bound for the main run loop to service a keystroke request; a busy
+/// main thread degrades to an error instead of hanging the pipeline.
+const KEYSTROKE_DISPATCH_TIMEOUT: Duration = Duration::from_secs(2);
 
 enum OutputCmd {
     Insert {
@@ -48,11 +55,11 @@ pub struct OutputSystem {
 }
 
 impl OutputSystem {
-    pub fn spawn() -> Self {
+    pub fn spawn(app: AppHandle) -> Self {
         let (tx, rx) = mpsc::channel::<OutputCmd>();
         std::thread::Builder::new()
             .name("openflow-output".into())
-            .spawn(move || worker(rx))
+            .spawn(move || worker(app, rx))
             .expect("failed to spawn output thread");
         Self { tx }
     }
@@ -89,21 +96,27 @@ impl OutputSystem {
 }
 
 struct Worker {
-    enigo: Option<Enigo>,
+    app: AppHandle,
     clipboard: Option<Clipboard>,
 }
 
-impl Worker {
-    fn enigo(&mut self) -> AppResult<&mut Enigo> {
-        if self.enigo.is_none() {
-            self.enigo =
-                Some(Enigo::new(&EnigoSettings::default()).map_err(|e| {
-                    AppError::Output(format!("keyboard synthesis unavailable: {e}"))
-                })?);
-        }
-        Ok(self.enigo.as_mut().expect("just set"))
-    }
+/// Presses Cmd+<letter>. Must run on the main thread: enigo maps
+/// `Key::Unicode` to a keycode through the TIS keyboard-layout APIs, which
+/// trap (`dispatch_assert_queue`) on any other thread. The short-lived
+/// `Enigo` also releases Cmd on drop if the sequence fails halfway.
+fn press_cmd_shortcut(letter: char) -> AppResult<()> {
+    let mut enigo = Enigo::new(&EnigoSettings::default())
+        .map_err(|e| AppError::Output(format!("keyboard synthesis unavailable: {e}")))?;
+    let fail = |e: enigo::InputError| AppError::Output(format!("keystroke failed: {e}"));
+    enigo.key(Key::Meta, Direction::Press).map_err(fail)?;
+    enigo
+        .key(Key::Unicode(letter), Direction::Click)
+        .map_err(fail)?;
+    enigo.key(Key::Meta, Direction::Release).map_err(fail)?;
+    Ok(())
+}
 
+impl Worker {
     fn clipboard(&mut self) -> AppResult<&mut Clipboard> {
         if self.clipboard.is_none() {
             self.clipboard = Some(
@@ -114,15 +127,15 @@ impl Worker {
         Ok(self.clipboard.as_mut().expect("just set"))
     }
 
-    fn send_shortcut(&mut self, letter: char) -> AppResult<()> {
-        let enigo = self.enigo()?;
-        let fail = |e: enigo::InputError| AppError::Output(format!("keystroke failed: {e}"));
-        enigo.key(Key::Meta, Direction::Press).map_err(fail)?;
-        enigo
-            .key(Key::Unicode(letter), Direction::Click)
-            .map_err(fail)?;
-        enigo.key(Key::Meta, Direction::Release).map_err(fail)?;
-        Ok(())
+    fn send_shortcut(&self, letter: char) -> AppResult<()> {
+        let (respond, wait) = mpsc::sync_channel(1);
+        self.app
+            .run_on_main_thread(move || {
+                let _ = respond.send(press_cmd_shortcut(letter));
+            })
+            .map_err(|e| AppError::Output(format!("keystroke dispatch failed: {e}")))?;
+        wait.recv_timeout(KEYSTROKE_DISPATCH_TIMEOUT)
+            .map_err(|_| AppError::Output("main thread did not respond to keystroke".into()))?
     }
 
     fn insert(
@@ -187,9 +200,9 @@ impl Worker {
     }
 }
 
-fn worker(rx: mpsc::Receiver<OutputCmd>) {
+fn worker(app: AppHandle, rx: mpsc::Receiver<OutputCmd>) {
     let mut state = Worker {
-        enigo: None,
+        app,
         clipboard: None,
     };
     while let Ok(cmd) = rx.recv() {

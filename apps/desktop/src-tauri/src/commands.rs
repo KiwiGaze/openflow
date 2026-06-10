@@ -126,8 +126,14 @@ pub fn cancel_dictation(state: State<'_, AppState>) {
 }
 
 #[tauri::command]
-pub fn start_refine_selection(state: State<'_, AppState>) -> AppResult<()> {
-    state.pipeline.start(Job::RefineSelection)
+pub async fn start_refine_selection(state: State<'_, AppState>) -> AppResult<()> {
+    // Sync commands run on the main thread, but starting a refine job blocks
+    // on the output worker (selection capture), which round-trips keystrokes
+    // through the main thread — running it inline would deadlock.
+    let pipeline = state.pipeline.clone();
+    tauri::async_runtime::spawn_blocking(move || pipeline.start(Job::RefineSelection))
+        .await
+        .map_err(|e| AppError::State(format!("refine task failed: {e}")))?
 }
 
 #[tauri::command]
