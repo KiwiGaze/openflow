@@ -7,6 +7,7 @@ import {
   EVENTS,
   type AppInfo,
   type DownloadProgress,
+  type FrontmostApp,
   type HistoryEntry,
   type LlmProfile,
   type LlmTestResult,
@@ -33,6 +34,7 @@ export const ipc = {
   startRefineSelection: (): Promise<void> => invoke(COMMANDS.startRefineSelection),
   startPolishSelection: (): Promise<void> => invoke(COMMANDS.startPolishSelection),
   getLastResult: (): Promise<TranscriptionResult | null> => invoke(COMMANDS.getLastResult),
+  getLastDictationApp: (): Promise<FrontmostApp | null> => invoke(COMMANDS.getLastDictationApp),
   getHistory: (): Promise<HistoryEntry[]> => invoke(COMMANDS.getHistory),
   clearHistory: (): Promise<void> => invoke(COMMANDS.clearHistory),
   reprocessHistory: (text: string, modeId: string): Promise<string> =>

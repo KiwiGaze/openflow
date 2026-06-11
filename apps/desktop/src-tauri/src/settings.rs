@@ -88,6 +88,15 @@ pub struct DictionaryEntry {
     pub to: String,
 }
 
+/// A per-app rule (07 §9): dictating while `bundle_id` is frontmost uses
+/// `mode_id` for that job only, like a mode hotkey — the active mode is unchanged.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppRule {
+    pub bundle_id: String,
+    pub mode_id: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -124,6 +133,8 @@ pub struct Settings {
     /// Opt-in (default off): keep a local, searchable log of past dictations.
     /// Off preserves the no-transcript-persistence privacy default.
     pub history_enabled: bool,
+    /// Per-app rules: dictate in a chosen mode when an app is frontmost (07 §9).
+    pub app_rules: Vec<AppRule>,
     pub onboarding_completed: bool,
 }
 
@@ -152,6 +163,7 @@ impl Default for Settings {
             dictation_count: 0,
             last_tip_shown_at: String::new(),
             history_enabled: false,
+            app_rules: Vec::new(),
             onboarding_completed: false,
         }
     }

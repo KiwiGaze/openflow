@@ -99,6 +99,18 @@ export interface DictionaryEntry {
   to: string;
 }
 
+/** A per-app rule: dictate in `modeId` when the app `bundleId` is frontmost. */
+export interface AppRule {
+  bundleId: string;
+  modeId: string;
+}
+
+/** A frontmost application's identity, for building app rules. */
+export interface FrontmostApp {
+  bundleId: string;
+  name: string;
+}
+
 export interface Settings {
   /** Schema version for forward migrations. */
   version: number;
@@ -124,6 +136,8 @@ export interface Settings {
   appearance: Appearance;
   /** Opt-in: keep a local, searchable log of past dictations (default off). */
   historyEnabled: boolean;
+  /** Per-app rules: dictate in a chosen mode when an app is frontmost. */
+  appRules: AppRule[];
   /** Master switch for one-time feature tips. */
   tipsEnabled: boolean;
   /** Tip ids already shown; never re-shown. */
@@ -220,6 +234,7 @@ export const COMMANDS = {
   startRefineSelection: 'start_refine_selection',
   startPolishSelection: 'start_polish_selection',
   getLastResult: 'get_last_result',
+  getLastDictationApp: 'get_last_dictation_app',
   getHistory: 'get_history',
   clearHistory: 'clear_history',
   reprocessHistory: 'reprocess_history',

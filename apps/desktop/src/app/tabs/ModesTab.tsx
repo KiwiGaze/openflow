@@ -13,6 +13,7 @@ import {
 import type { SettingsApi } from '../hooks.js';
 import { useLlmProfiles, useModels } from '../hooks.js';
 import { ipc } from '../ipc.js';
+import { AppRules } from '../components/AppRules.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
@@ -465,6 +466,8 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
           )}
         </section>
       )}
+
+      <AppRules api={api} />
     </div>
   );
 }

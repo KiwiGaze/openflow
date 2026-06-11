@@ -1,6 +1,7 @@
 // Prevents an extra console window on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod apps;
 mod audio;
 mod commands;
 mod error;
@@ -128,6 +129,7 @@ fn main() {
             commands::start_refine_selection,
             commands::start_polish_selection,
             commands::get_last_result,
+            commands::get_last_dictation_app,
             commands::get_history,
             commands::clear_history,
             commands::reprocess_history,

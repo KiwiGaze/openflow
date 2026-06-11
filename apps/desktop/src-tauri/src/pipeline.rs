@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
+use crate::apps;
 use crate::audio::AudioSystem;
 use crate::error::{AppError, AppResult};
 use crate::history::HistoryStore;
@@ -107,6 +108,9 @@ pub struct Pipeline {
     session: Mutex<Option<Session>>,
     generation: AtomicU64,
     last_result: Mutex<Option<TranscriptionResult>>,
+    /// Frontmost app `(bundle_id, name)` at the last dictation — lets the App
+    /// rules UI offer "add a rule for the app you just dictated into".
+    last_app: Mutex<Option<(String, String)>>,
 }
 
 impl Pipeline {
@@ -141,7 +145,15 @@ impl Pipeline {
             session: Mutex::new(None),
             generation: AtomicU64::new(0),
             last_result: Mutex::new(None),
+            last_app: Mutex::new(None),
         })
+    }
+
+    pub fn last_app(&self) -> Option<(String, String)> {
+        self.last_app
+            .lock()
+            .expect("pipeline state poisoned")
+            .clone()
     }
 
     pub fn state(&self) -> PipelineState {
@@ -259,6 +271,26 @@ impl Pipeline {
         }
 
         let settings = self.settings.get();
+
+        // Per-app rules (07 §9): for a plain dictation (no explicit mode hotkey),
+        // a frontmost-app rule supplies a one-shot mode override, exactly like a
+        // hotkey. Explicit overrides win; a detection failure just means no rule.
+        let mode_override = match mode_override {
+            Some(id) => Some(id),
+            None if job == Job::Dictation => match apps::frontmost_app() {
+                Some((bundle_id, name)) => {
+                    *self.last_app.lock().expect("pipeline state poisoned") =
+                        Some((bundle_id.clone(), name));
+                    settings
+                        .app_rules
+                        .iter()
+                        .find(|r| r.bundle_id == bundle_id)
+                        .map(|r| r.mode_id.clone())
+                }
+                None => None,
+            },
+            None => None,
+        };
 
         if !self.models.is_installed(&settings.stt_model_id) {
             return Err(AppError::Model(

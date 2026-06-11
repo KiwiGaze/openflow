@@ -33,6 +33,7 @@ const base: Settings = {
   launchAtLogin: false,
   appearance: 'system',
   historyEnabled: false,
+  appRules: [],
   tipsEnabled: true,
   tipsSeen: [],
   dictationCount: 0,

@@ -184,6 +184,23 @@ pub fn get_last_result(state: State<'_, AppState>) -> Option<TranscriptionResult
     state.pipeline.last_result()
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FrontmostApp {
+    pub bundle_id: String,
+    pub name: String,
+}
+
+/// The app OpenFlow last dictated into — lets the App rules UI offer a one-click
+/// rule for it without the user hunting for a bundle id. None until first use.
+#[tauri::command]
+pub fn get_last_dictation_app(state: State<'_, AppState>) -> Option<FrontmostApp> {
+    state
+        .pipeline
+        .last_app()
+        .map(|(bundle_id, name)| FrontmostApp { bundle_id, name })
+}
+
 #[tauri::command]
 pub fn get_history(state: State<'_, AppState>) -> Vec<crate::history::HistoryEntry> {
     state.history.list()
