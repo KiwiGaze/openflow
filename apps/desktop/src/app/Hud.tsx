@@ -8,7 +8,12 @@ import { barScales, hudGlyph, hudLabel, hudVisible } from './hudState.js';
  * content fades in and out with pipeline state instead.
  */
 export function Hud(): JSX.Element {
-  const [state, setState] = useState<PipelineState>({ status: 'idle', job: null, message: null });
+  const [state, setState] = useState<PipelineState>({
+    status: 'idle',
+    job: null,
+    message: null,
+    hudTip: null,
+  });
   const [level, setLevel] = useState(0);
 
   useEffect(() => {
@@ -47,8 +52,11 @@ export function Hud(): JSX.Element {
           {glyph}
         </span>
       )}
-      <span className="hud-label" aria-live="polite" aria-atomic="true">
-        {hudLabel(state)}
+      <span className="hud-textcol">
+        <span className="hud-label" aria-live="polite" aria-atomic="true">
+          {hudLabel(state)}
+        </span>
+        {state.hudTip && <span className="hud-tip">{state.hudTip}</span>}
       </span>
     </div>
   );

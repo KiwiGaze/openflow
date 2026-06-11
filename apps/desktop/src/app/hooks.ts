@@ -58,7 +58,12 @@ export function useSettings(): SettingsApi | null {
 }
 
 export function usePipeline(): { state: PipelineState; lastResult: TranscriptionResult | null } {
-  const [state, setState] = useState<PipelineState>({ status: 'idle', job: null, message: null });
+  const [state, setState] = useState<PipelineState>({
+    status: 'idle',
+    job: null,
+    message: null,
+    hudTip: null,
+  });
   const [lastResult, setLastResult] = useState<TranscriptionResult | null>(null);
 
   useEffect(() => {

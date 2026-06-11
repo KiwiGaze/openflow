@@ -5,7 +5,7 @@
 //! progress events to the webviews, and guards against stale work with a
 //! generation counter — cancelling simply bumps the generation.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -72,6 +72,9 @@ pub struct PipelineState {
     pub status: Status,
     pub job: Option<Job>,
     pub message: Option<String>,
+    /// A one-time educational tip shown on the success flash (05 §2.3); set only
+    /// when entering `Inserted`, otherwise None.
+    pub hud_tip: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -114,6 +117,8 @@ pub struct Pipeline {
     /// Frontmost app `(bundle_id, name)` at the last dictation — lets the App
     /// rules UI offer "add a rule for the app you just dictated into".
     last_app: Mutex<Option<(String, String)>>,
+    /// At most one HUD educational tip per app session (05 §2.1).
+    tip_shown_session: AtomicBool,
 }
 
 impl Pipeline {
@@ -145,12 +150,14 @@ impl Pipeline {
                 status: Status::Idle,
                 job: None,
                 message: None,
+                hud_tip: None,
             }),
             state_seq: AtomicU64::new(0),
             session: Mutex::new(None),
             generation: AtomicU64::new(0),
             last_result: Mutex::new(None),
             last_app: Mutex::new(None),
+            tip_shown_session: AtomicBool::new(false),
         })
     }
 
@@ -177,6 +184,7 @@ impl Pipeline {
             status,
             job,
             message,
+            hud_tip: None,
         };
         *self.state.lock().expect("pipeline state poisoned") = state.clone();
         let seq = self.state_seq.fetch_add(1, Ordering::SeqCst) + 1;
@@ -196,10 +204,19 @@ impl Pipeline {
         });
     }
 
-    /// Confirmation flash: ✓ + a preview of the inserted text, then idle.
-    /// The webview ellipsizes; the state-seq guard lets a newer job pre-empt.
-    fn set_success(self: &Arc<Self>, preview: String) {
-        let seq = self.set_state(Status::Inserted, None, Some(preview));
+    /// Confirmation flash: ✓ + a preview of the inserted text (and maybe a
+    /// one-time tip), then idle. The webview ellipsizes; the state-seq guard
+    /// lets a newer job pre-empt.
+    fn set_success(self: &Arc<Self>, preview: String, hud_tip: Option<String>) {
+        let state = PipelineState {
+            status: Status::Inserted,
+            job: None,
+            message: Some(preview),
+            hud_tip,
+        };
+        *self.state.lock().expect("pipeline state poisoned") = state.clone();
+        let seq = self.state_seq.fetch_add(1, Ordering::SeqCst) + 1;
+        let _ = self.app.emit(PIPELINE_STATE_EVENT, &state);
         let pipeline = Arc::clone(self);
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(SUCCESS_FLASH_TTL).await;
@@ -207,6 +224,48 @@ impl Pipeline {
                 pipeline.set_state(Status::Idle, None, None);
             }
         });
+    }
+
+    /// The HUD tip to ride a successful dictation (tip.latch — teach hands-free
+    /// at the 3rd hold-dictation), or None. Marks it seen so it shows once.
+    fn dictation_hud_tip(&self) -> Option<String> {
+        if self.tip_shown_session.load(Ordering::SeqCst) {
+            return None;
+        }
+        let s = self.settings.get();
+        if !s.tips_enabled || s.tips_seen.iter().any(|t| t == "tip.latch") {
+            return None;
+        }
+        if s.dictation_hotkey_behavior != HotkeyBehavior::Hold || s.dictation_count != 3 {
+            return None;
+        }
+        self.mark_tip_shown("tip.latch", s);
+        Some("Tip: tap the hotkey instead of holding to go hands-free.".into())
+    }
+
+    /// The HUD tip to ride a successful rewrite (tip.polish — teach the polish
+    /// hotkey), or None. Marks it seen so it shows once.
+    fn refine_hud_tip(&self) -> Option<String> {
+        if self.tip_shown_session.load(Ordering::SeqCst) {
+            return None;
+        }
+        let s = self.settings.get();
+        if !s.tips_enabled || s.tips_seen.iter().any(|t| t == "tip.polish") {
+            return None;
+        }
+        if s.polish_hotkey.is_empty() || s.active_llm_profile_id.is_empty() {
+            return None;
+        }
+        self.mark_tip_shown("tip.polish", s);
+        Some("Tip: tap your polish hotkey to fix grammar without recording.".into())
+    }
+
+    fn mark_tip_shown(&self, id: &str, mut settings: Settings) {
+        self.tip_shown_session.store(true, Ordering::SeqCst);
+        settings.tips_seen.push(id.to_string());
+        if let Ok(saved) = self.settings.set(settings) {
+            let _ = self.app.emit("settings-changed", &saved);
+        }
     }
 
     // ---- Hotkey entry points -------------------------------------------
@@ -402,8 +461,8 @@ impl Pipeline {
                 return; // cancelled mid-flight; a newer job owns the UI now
             }
             match result {
-                Ok(ProcessOutcome::Inserted(preview)) => {
-                    pipeline.set_success(preview);
+                Ok(ProcessOutcome::Inserted(preview, hud_tip)) => {
+                    pipeline.set_success(preview, hud_tip);
                 }
                 Ok(ProcessOutcome::Notice(message)) => {
                     pipeline.set_transient(Status::Notice, message);
@@ -490,8 +549,8 @@ impl Pipeline {
                 return; // cancelled mid-flight; a newer job owns the UI now
             }
             match result {
-                Ok(ProcessOutcome::Inserted(preview)) => {
-                    pipeline.set_success(preview);
+                Ok(ProcessOutcome::Inserted(preview, hud_tip)) => {
+                    pipeline.set_success(preview, hud_tip);
                 }
                 Ok(ProcessOutcome::Notice(message)) => {
                     pipeline.set_transient(Status::Notice, message);
@@ -797,7 +856,14 @@ impl Pipeline {
         if let Some(notice) = notice {
             return Ok(ProcessOutcome::Notice(notice));
         }
-        Ok(outcome)
+        // A clean insert may carry a one-time HUD tip; a clipboard-fallback
+        // Notice does not.
+        Ok(match outcome {
+            ProcessOutcome::Inserted(preview, _) => {
+                ProcessOutcome::Inserted(preview, self.dictation_hud_tip())
+            }
+            other => other,
+        })
     }
 
     async fn finish_refine(
@@ -820,7 +886,13 @@ impl Pipeline {
         // selection with something other than what they asked for is worse
         // than doing nothing.
         let rewritten = self.llm.chat(&profile, &system, &user).await?;
-        self.insert(settings, &instruction, rewritten, "refine", true, started)
+        let outcome = self.insert(settings, &instruction, rewritten, "refine", true, started)?;
+        Ok(match outcome {
+            ProcessOutcome::Inserted(preview, _) => {
+                ProcessOutcome::Inserted(preview, self.refine_hud_tip())
+            }
+            other => other,
+        })
     }
 
     async fn finish_polish(
@@ -867,7 +939,7 @@ impl Pipeline {
 
         match outcome {
             InsertOutcome::Pasted | InsertOutcome::CopiedToClipboard(CopyReason::ChosenMethod) => {
-                Ok(ProcessOutcome::Inserted(result.text.clone()))
+                Ok(ProcessOutcome::Inserted(result.text.clone(), None))
             }
             InsertOutcome::CopiedToClipboard(CopyReason::NoAccessibility) => {
                 Ok(ProcessOutcome::Notice(
@@ -913,8 +985,9 @@ fn is_known_language(lang: &str) -> bool {
 }
 
 enum ProcessOutcome {
-    /// Inserted cleanly; carries the text for the success flash.
-    Inserted(String),
+    /// Inserted cleanly; carries the text for the success flash and an optional
+    /// one-time HUD tip.
+    Inserted(String, Option<String>),
     Notice(String),
 }
 

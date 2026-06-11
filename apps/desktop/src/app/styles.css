@@ -961,9 +961,24 @@ button:focus-visible {
   color: var(--hud-ok);
 }
 
+.hud-textcol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .hud-label {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* One-time educational tip under the success preview (05 §2.3). */
+.hud-tip {
+  font-size: 11px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hud-spinner {

@@ -25,6 +25,8 @@ export interface PipelineState {
   job: PipelineJob | null;
   /** Human-readable detail, set when status is `error`. */
   message: string | null;
+  /** One-time educational tip shown on the success flash; null otherwise. */
+  hudTip: string | null;
 }
 
 /** Hold the hotkey to talk, or tap once to start and again to stop. */

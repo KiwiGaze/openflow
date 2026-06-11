@@ -1,5 +1,8 @@
 import type { PipelineState } from '@openflow/core';
 
+/** The pipeline fields these label helpers read (the tip renders separately). */
+type HudState = Pick<PipelineState, 'status' | 'job' | 'message'>;
+
 /** Longest inserted-text preview shown in the success flash. */
 const MAX_PREVIEW = 48;
 
@@ -9,7 +12,7 @@ function ellipsize(text: string, max = MAX_PREVIEW): string {
 }
 
 /** Text shown in the HUD pill for each pipeline state. */
-export function hudLabel(state: PipelineState): string {
+export function hudLabel(state: HudState): string {
   switch (state.status) {
     case 'recording':
       if (state.job === 'refineSelection') return 'Listening for instruction…';
@@ -37,7 +40,7 @@ export function hudLabel(state: PipelineState): string {
  * Leading severity glyph so meaning survives without color (UX-34). It is
  * `aria-hidden`; the label text carries the meaning for assistive tech.
  */
-export function hudGlyph(state: PipelineState): string {
+export function hudGlyph(state: HudState): string {
   switch (state.status) {
     case 'inserted':
       return '✓';
@@ -50,7 +53,7 @@ export function hudGlyph(state: PipelineState): string {
   }
 }
 
-export function hudVisible(state: PipelineState): boolean {
+export function hudVisible(state: HudState): boolean {
   return state.status !== 'idle';
 }
 
