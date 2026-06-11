@@ -21,6 +21,7 @@ const base: Settings = {
   dictationHotkeyBehavior: 'hold',
   refineHotkey: 'Alt+Shift+Space',
   polishHotkey: 'Alt+Shift+P',
+  changeOverlayHotkey: 'Alt+O',
   refineAfterDictation: true,
   activeLlmProfileId: '',
   activeModeId: 'standard',
