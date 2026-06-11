@@ -15,6 +15,11 @@ use crate::error::{AppError, AppResult};
 
 pub const STT_PROFILE_VERSION: u32 = 1;
 
+/// `Settings::stt_model_id` prefix marking a cloud engine: `cloud:<profile-id>`.
+/// Anything else is an on-device whisper model id. Mirrored as
+/// `CLOUD_STT_PREFIX` in `@openflow/core` — update both together.
+pub const CLOUD_STT_PREFIX: &str = "cloud:";
+
 /// Which client transcribes. Only `openaiAudio` (the generic multipart client
 /// covering whisper-server / Faster-Whisper / OpenAI / Groq) ships now;
 /// Deepgram/AssemblyAI are P3 bespoke clients (08 §7).
@@ -58,11 +63,13 @@ impl Default for SttProfile {
 }
 
 /// Ids double as filename stems; reject anything that could leave the dir.
+/// Keep in sync with `profiles::safe_id`.
 fn safe_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 128
         && !id.contains('/')
         && !id.contains('\\')
+        && !id.contains('\0')
         && !id.contains("..")
         && id != "."
 }
@@ -189,4 +196,27 @@ fn scan(dir: &Path) -> Vec<SttProfile> {
     }
     profiles.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.id.cmp(&b.id)));
     profiles
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample(id: &str) -> SttProfile {
+        SttProfile {
+            id: id.to_string(),
+            name: "Test engine".into(),
+            ..SttProfile::default()
+        }
+    }
+
+    #[test]
+    fn rejects_ids_that_could_escape_the_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = SttProfileManager::new(dir.path().join("stt-profiles"));
+        for id in ["", ".", "..", "../evil", "a/b", "a\\b", "a\0b"] {
+            assert!(manager.save(sample(id)).is_err(), "id {id:?} was accepted");
+            assert!(manager.delete(id).is_err(), "id {id:?} was accepted");
+        }
+    }
 }

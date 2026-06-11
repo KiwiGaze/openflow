@@ -26,6 +26,16 @@ export function isLocalEndpoint(url: string): boolean {
   }
 }
 
+/**
+ * True when `from` already matches an entry's "heard as" text
+ * (case-insensitive). Shared by the editor validation and the suggestion
+ * accept flow so the duplicate rule cannot drift.
+ */
+export function hasDictionaryEntry(from: string, existing: readonly DictionaryEntry[]): boolean {
+  const needle = from.trim().toLowerCase();
+  return existing.some((e) => e.from.trim().toLowerCase() === needle);
+}
+
 /** Returns an error message, or null when the entry is valid. */
 export function validateDictionaryEntry(
   entry: DictionaryEntry,
@@ -39,8 +49,7 @@ export function validateDictionaryEntry(
   if (from.toLowerCase() === to.toLowerCase()) {
     return 'Replacement is identical to the heard text.';
   }
-  const duplicate = existing.some((e) => e.from.trim().toLowerCase() === from.toLowerCase());
-  if (duplicate) return `“${from}” is already in the dictionary.`;
+  if (hasDictionaryEntry(from, existing)) return `“${from}” is already in the dictionary.`;
   return null;
 }
 

@@ -80,6 +80,10 @@ impl OutputSystem {
         Self { tx }
     }
 
+    /// Pastes (or copies) `text` into the frontmost app and blocks until the
+    /// worker replies. Never call on the main thread: the paste round-trips
+    /// keystrokes through it and would deadlock — offload first, as
+    /// `commands::start_refine_selection` does.
     pub fn insert(
         &self,
         text: String,
@@ -101,6 +105,7 @@ impl OutputSystem {
 
     /// Writes text to the clipboard via the worker that owns the clipboard
     /// handle. Does not paste — used by the changes overlay's Copy button.
+    /// Blocks until the worker replies.
     pub fn copy_text(&self, text: String) -> AppResult<()> {
         let (respond, wait) = mpsc::sync_channel(1);
         self.tx
@@ -111,7 +116,9 @@ impl OutputSystem {
     }
 
     /// Returns the currently selected text in the frontmost app, or `None`
-    /// when nothing is selected. Uses the Cmd+C clipboard round-trip.
+    /// when nothing is selected. Uses the Cmd+C clipboard round-trip, so the
+    /// same main-thread rule as [`OutputSystem::insert`] applies: calling this
+    /// on the main thread deadlocks.
     pub fn capture_selection(&self) -> AppResult<Option<String>> {
         let (respond, wait) = mpsc::sync_channel(1);
         self.tx

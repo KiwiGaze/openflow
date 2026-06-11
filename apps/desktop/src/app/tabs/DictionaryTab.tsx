@@ -1,5 +1,10 @@
 import { useRef, useState, type JSX } from 'react';
-import { dictionaryToCsv, parseDictionaryCsv, validateDictionaryEntry } from '@openflow/core';
+import {
+  dictionaryToCsv,
+  hasDictionaryEntry,
+  parseDictionaryCsv,
+  validateDictionaryEntry,
+} from '@openflow/core';
 import { useDictionarySuggestions } from '../hooks.js';
 import type { SettingsApi } from '../hooks.js';
 import { ipc } from '../ipc.js';
@@ -58,10 +63,7 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
   // manual add, so guard against creating a duplicate entry.
   const accept = (term: string): void => {
     const trimmed = term.trim();
-    const exists = settings.dictionary.some(
-      (e) => e.from.trim().toLowerCase() === trimmed.toLowerCase(),
-    );
-    if (exists) {
+    if (hasDictionaryEntry(trimmed, settings.dictionary)) {
       refresh();
       return;
     }

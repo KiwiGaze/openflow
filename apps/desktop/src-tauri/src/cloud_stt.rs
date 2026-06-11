@@ -6,11 +6,16 @@
 //! after the per-profile consent gate is confirmed (see `pipeline.rs`); this
 //! module performs the upload but never decides whether it is allowed.
 
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use crate::error::{AppError, AppResult};
 use crate::resample::WHISPER_SAMPLE_RATE;
 use crate::stt_profiles::SttProfile;
+
+/// One client for every upload: reuses connections and TLS sessions instead of
+/// re-handshaking per dictation. Timeouts stay per-request (profile-defined).
+static HTTP: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
 /// Encodes 16 kHz mono `f32` samples as a 16-bit PCM WAV in-process (08 §8).
 fn encode_wav(samples: &[f32]) -> Vec<u8> {
@@ -69,8 +74,7 @@ pub async fn transcribe(
         form = form.text("prompt", prompt.to_string());
     }
 
-    let client = reqwest::Client::new();
-    let mut req = client
+    let mut req = HTTP
         .post(&url)
         .multipart(form)
         .timeout(Duration::from_secs(profile.timeout_secs.max(5)));

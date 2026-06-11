@@ -177,9 +177,9 @@ fn main() {
         .expect("error while building OpenFlow")
         .run(|app, event| {
             // Quit ends in libc exit() (⌘Q via -[NSApplication terminate:],
-            // tray quit via process::exit), which never drops Rust state.
-            // ggml's Metal teardown then aborts on still-resident whisper
-            // buffers, so free the context while drops still run.
+            // tray quit via app.exit(0) → process exit), which never drops
+            // Rust state. ggml's Metal teardown then aborts on still-resident
+            // whisper buffers, so free the context while drops still run.
             if let tauri::RunEvent::Exit = event {
                 log::info!("unloading whisper context before exit");
                 app.state::<AppState>().stt.unload();

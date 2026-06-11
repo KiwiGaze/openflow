@@ -5,9 +5,11 @@ import {
   isLocalEndpoint,
   isValidBaseUrl,
   LLM_PRESETS,
+  LLM_PROFILE_VERSION,
   type LlmProfile,
   type LlmTestResult,
   normalizeBaseUrl,
+  OLLAMA_PRESET,
   presetForProfile,
 } from '@openflow/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
@@ -16,6 +18,10 @@ import { ipc } from '../ipc.js';
 import { Callout } from '../components/Callout.js';
 import { Row } from '../components/Row.js';
 import { SttEngines } from '../components/SttEngines.js';
+
+// Only a change that could alter connectivity invalidates a test result;
+// editing the name or timeout keeps the green check (UX-33).
+const CONNECTIVITY_KEYS = ['baseUrl', 'apiKey', 'model'] as const;
 
 export function ModelsTab({
   api,
@@ -38,10 +44,6 @@ export function ModelsTab({
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
   const currentPreset = selected ? presetForProfile(selected.presetId, selected.provider) : null;
-
-  // Only a change that could alter connectivity invalidates a test result;
-  // editing the name or timeout keeps the green check (UX-33).
-  const CONNECTIVITY_KEYS = ['baseUrl', 'apiKey', 'model'] as const;
 
   // Test results and Ollama listings belong to one profile; drop them on switch.
   const selectProfile = (id: string | null): void => {
@@ -77,15 +79,15 @@ export function ModelsTab({
 
   const addProfile = (): void => {
     const profile: LlmProfile = {
-      version: 1,
+      version: LLM_PROFILE_VERSION,
       id: crypto.randomUUID(),
       name: 'New profile',
-      provider: 'ollama',
-      baseUrl: 'http://localhost:11434',
+      provider: OLLAMA_PRESET.kind,
+      baseUrl: OLLAMA_PRESET.baseUrl,
       apiKey: '',
-      model: 'qwen2.5:3b',
+      model: OLLAMA_PRESET.modelSuggestion,
       timeoutSecs: 30,
-      presetId: 'ollama',
+      presetId: OLLAMA_PRESET.id,
     };
     selectProfile(profile.id);
     void save(profile).then(() => {
@@ -130,7 +132,7 @@ export function ModelsTab({
   // a storm. Removes the last manual step from the biggest single upgrade.
   const [ollamaDetected, setOllamaDetected] = useState<string[] | null>(null);
   useEffect(() => {
-    void ipc.listOllamaModels('http://localhost:11434').then(
+    void ipc.listOllamaModels(OLLAMA_PRESET.baseUrl).then(
       (found) => {
         setOllamaDetected(found);
       },
@@ -142,15 +144,15 @@ export function ModelsTab({
 
   const addOllamaProfile = (): void => {
     const profile: LlmProfile = {
-      version: 1,
+      version: LLM_PROFILE_VERSION,
       id: crypto.randomUUID(),
       name: 'Ollama (local)',
-      provider: 'ollama',
-      baseUrl: 'http://localhost:11434',
+      provider: OLLAMA_PRESET.kind,
+      baseUrl: OLLAMA_PRESET.baseUrl,
       apiKey: '',
-      model: ollamaDetected?.[0] ?? 'qwen2.5:3b',
+      model: ollamaDetected?.[0] ?? OLLAMA_PRESET.modelSuggestion,
       timeoutSecs: 30,
-      presetId: 'ollama',
+      presetId: OLLAMA_PRESET.id,
     };
     setSelectedId(profile.id);
     void save(profile).then(() => {

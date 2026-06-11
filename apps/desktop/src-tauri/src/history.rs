@@ -107,7 +107,9 @@ impl HistoryStore {
 
     fn persist(&self) -> std::io::Result<()> {
         let entries = self.list();
-        let json = serde_json::to_string_pretty(&entries).unwrap_or_else(|_| "[]".into());
+        // Propagate instead of writing a fallback: an "[]" on serialize failure
+        // would atomically replace the file and silently erase all history.
+        let json = serde_json::to_string_pretty(&entries).map_err(std::io::Error::other)?;
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
         }

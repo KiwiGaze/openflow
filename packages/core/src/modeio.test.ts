@@ -74,6 +74,16 @@ describe('parseModeImport', () => {
       expect(r.mode.language).toBeNull();
     }
   });
+
+  it('round-trips the auto-detect language', () => {
+    const r = parseModeImport(
+      '{"schema":"openflow.mode/1","mode":{"name":"X","prompt":"do it","language":"auto"}}',
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.mode.language).toBe('auto');
+    }
+  });
 });
 
 describe('slugifyMode / uniqueModeName', () => {

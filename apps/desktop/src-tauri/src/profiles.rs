@@ -63,6 +63,7 @@ impl Default for LlmProfile {
 }
 
 /// Ids double as filename stems; reject anything that could leave the dir.
+/// Keep in sync with `stt_profiles::safe_id`.
 fn safe_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 128

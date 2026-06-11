@@ -1,5 +1,40 @@
 import type { LlmProviderKind } from './types.js';
 
+/** A provider prefill for the cloud/remote STT engine editor (08 §2). */
+export interface SttPreset {
+  /** Stored on the profile as `presetId`; display-only, never changes behavior. */
+  id: string;
+  label: string;
+  /** Prefilled base URL; the user may edit it freely. Empty for `custom`. */
+  baseUrl: string;
+  /** Suggested model — a prefill, never locked. Empty = user fills. */
+  model: string;
+}
+
+/** What the STT quick-add button creates before the user edits anything. */
+export const DEFAULT_STT_PRESET: SttPreset = {
+  id: 'groqStt',
+  label: 'Groq',
+  baseUrl: 'https://api.groq.com/openai/v1',
+  model: 'whisper-large-v3',
+};
+
+/**
+ * Provider prefills over the one OpenAI-audio multipart client. Like
+ * `LLM_PRESETS`, a preset is display + prefill, not a code path.
+ */
+export const STT_PRESETS: SttPreset[] = [
+  DEFAULT_STT_PRESET,
+  { id: 'openaiStt', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'whisper-1' },
+  {
+    id: 'whisperServer',
+    label: 'Local whisper-server',
+    baseUrl: 'http://localhost:8080/v1',
+    model: 'whisper-1',
+  },
+  { id: 'custom', label: 'Custom (OpenAI-audio)', baseUrl: '', model: '' },
+];
+
 export interface LlmPreset {
   /** Stored on the profile as `presetId`; display-only, never changes behavior. */
   id: string;
@@ -34,16 +69,19 @@ const CUSTOM_PRESET: LlmPreset = {
  * Locality (local/cloud) is derived from the base-URL host, never from the
  * preset. Model ids drift; these are suggestions the user can change.
  */
+/** The default local provider; the quick-add path constructs profiles from it. */
+export const OLLAMA_PRESET: LlmPreset = {
+  id: 'ollama',
+  displayName: 'Ollama',
+  baseUrl: 'http://localhost:11434',
+  kind: 'ollama',
+  needsKey: false,
+  modelSuggestion: 'qwen2.5:3b',
+  caveat: 'Local. Use “List installed models” to pick one.',
+};
+
 export const LLM_PRESETS: LlmPreset[] = [
-  {
-    id: 'ollama',
-    displayName: 'Ollama',
-    baseUrl: 'http://localhost:11434',
-    kind: 'ollama',
-    needsKey: false,
-    modelSuggestion: 'qwen2.5:3b',
-    caveat: 'Local. Use “List installed models” to pick one.',
-  },
+  OLLAMA_PRESET,
   {
     id: 'lmstudio',
     displayName: 'LM Studio',

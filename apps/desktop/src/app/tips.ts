@@ -1,4 +1,5 @@
 import type { Settings } from '@openflow/core';
+import type { TabId } from './App.js';
 
 export interface Tip {
   id: string;
@@ -7,7 +8,7 @@ export interface Tip {
   copy: string;
   actionLabel: string;
   /** Tab to switch to when the action is taken. */
-  actionTab: string;
+  actionTab: TabId;
   predicate: (s: Settings) => boolean;
 }
 
