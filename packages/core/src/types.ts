@@ -31,6 +31,9 @@ export type HotkeyBehavior = 'hold' | 'toggle';
 /** `paste` simulates Cmd+V into the active app; `clipboard` only copies. */
 export type InsertMethod = 'paste' | 'clipboard';
 
+/** Window theme. `system` follows macOS; `light`/`dark` force it for OpenFlow. */
+export type Appearance = 'system' | 'light' | 'dark';
+
 export type LlmProviderKind = 'ollama' | 'openaiCompatible';
 
 /**
@@ -95,6 +98,8 @@ export interface Settings {
   insertMethod: InsertMethod;
   restoreClipboard: boolean;
   launchAtLogin: boolean;
+  /** Window theme override; `system` defers to macOS. */
+  appearance: Appearance;
   onboardingCompleted: boolean;
 }
 

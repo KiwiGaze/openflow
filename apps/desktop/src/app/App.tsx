@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { useModels, useSettings } from './hooks.js';
 import { Onboarding } from './Onboarding.js';
 import { AboutTab } from './tabs/AboutTab.js';
@@ -21,6 +21,12 @@ export function App(): JSX.Element {
   const api = useSettings();
   const modelsApi = useModels();
   const [tab, setTab] = useState<TabId>('general');
+
+  // Apply the theme override before content paints; `system` defers to the
+  // OS via the CSS media query, so the dataset attribute is a no-op there.
+  useEffect(() => {
+    document.documentElement.dataset.theme = api?.settings.appearance ?? 'system';
+  }, [api?.settings.appearance]);
 
   if (!api) {
     return <div className="splash">OpenFlow</div>;

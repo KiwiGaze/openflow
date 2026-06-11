@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import {
+  type Appearance,
   formatBytes,
   formatProgress,
   type HotkeyBehavior,
@@ -182,6 +183,16 @@ export function GeneralTab({
             onChange={(checked) => void update({ launchAtLogin: checked })}
             label="Launch at login"
           />
+        </Row>
+        <Row title="Appearance" hint="Match macOS, or force light or dark for OpenFlow's windows.">
+          <select
+            value={settings.appearance}
+            onChange={(e) => void update({ appearance: e.target.value as Appearance })}
+          >
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
         </Row>
       </section>
 

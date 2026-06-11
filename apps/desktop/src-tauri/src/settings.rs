@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 use crate::modes;
 
-pub const SETTINGS_VERSION: u32 = 2;
+pub const SETTINGS_VERSION: u32 = 3;
 pub const MAX_RECORDING_SECS: u64 = 300;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -20,6 +20,16 @@ pub const MAX_RECORDING_SECS: u64 = 300;
 pub enum HotkeyBehavior {
     Hold,
     Toggle,
+}
+
+/// Window theme. `System` follows macOS; `Light`/`Dark` force it for OpenFlow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Appearance {
+    #[default]
+    System,
+    Light,
+    Dark,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,6 +93,7 @@ pub struct Settings {
     pub insert_method: InsertMethod,
     pub restore_clipboard: bool,
     pub launch_at_login: bool,
+    pub appearance: Appearance,
     pub onboarding_completed: bool,
 }
 
@@ -105,6 +116,7 @@ impl Default for Settings {
             insert_method: InsertMethod::Paste,
             restore_clipboard: true,
             launch_at_login: false,
+            appearance: Appearance::System,
             onboarding_completed: false,
         }
     }
@@ -292,6 +304,7 @@ mod tests {
         assert!(json.contains("\"refineAfterDictation\":true"));
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"insertMethod\":\"paste\""));
+        assert!(json.contains("\"appearance\":\"system\""));
         // The v1 LLM block is deserialize-only; it must never be written.
         assert!(!json.contains("\"llm\""));
     }
