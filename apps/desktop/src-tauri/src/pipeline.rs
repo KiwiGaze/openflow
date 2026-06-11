@@ -192,6 +192,8 @@ impl Pipeline {
         *self.state.lock().expect("pipeline state poisoned") = state.clone();
         let seq = self.state_seq.fetch_add(1, Ordering::SeqCst) + 1;
         let _ = self.app.emit(PIPELINE_STATE_EVENT, &state);
+        // Mirror the live-mic state into the menu bar (privacy signal).
+        crate::tray::set_recording(&self.app, matches!(status, Status::Recording));
         seq
     }
 

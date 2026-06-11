@@ -22,6 +22,14 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Shows a dot beside the menu-bar icon while the mic is live — a privacy/trust
+/// signal that you can always see when OpenFlow is listening (P2-7).
+pub fn set_recording(app: &AppHandle, recording: bool) {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_title(Some(if recording { "●" } else { "" }));
+    }
+}
+
 /// Rebuilds the menu after settings changes (modes added/renamed/activated).
 pub fn rebuild_menu(app: &AppHandle) -> tauri::Result<()> {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
