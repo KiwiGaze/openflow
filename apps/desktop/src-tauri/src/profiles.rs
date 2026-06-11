@@ -68,6 +68,7 @@ fn safe_id(id: &str) -> bool {
         && id.len() <= 128
         && !id.contains('/')
         && !id.contains('\\')
+        && !id.contains('\0')
         && !id.contains("..")
         && id != "."
 }
@@ -135,10 +136,24 @@ impl ProfileManager {
             .map_err(|e| AppError::Settings(e.to_string()))?;
         let path = self.path_for(&profile.id);
         let tmp = path.with_extension("json.tmp");
-        fs::write(&tmp, json)?;
+        {
+            use std::io::Write;
+            let mut opts = fs::OpenOptions::new();
+            opts.write(true).create(true).truncate(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                // Keys must never sit on disk umask-wide, even between
+                // create and a later chmod.
+                opts.mode(0o600);
+            }
+            opts.open(&tmp)?.write_all(json.as_bytes())?;
+        }
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
+            // mode() applies only on create; a tmp left by a crash keeps
+            // its old permissions through the truncating open.
             fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600))?;
         }
         fs::rename(&tmp, &path)?;
@@ -249,8 +264,8 @@ pub fn reconcile(settings: &SettingsManager, profiles: &ProfileManager) {
                     return;
                 }
             }
+            log::info!("migrated v1 LLM settings into the profiles directory");
         }
-        log::info!("migrated v1 LLM settings into the profiles directory");
     }
 
     if !next.active_llm_profile_id.is_empty() && profiles.get(&next.active_llm_profile_id).is_none()
@@ -339,7 +354,7 @@ mod tests {
     fn rejects_ids_that_could_escape_the_directory() {
         let dir = tempfile::tempdir().unwrap();
         let manager = ProfileManager::new(dir.path().join("profiles"));
-        for id in ["", ".", "..", "../evil", "a/b", "a\\b"] {
+        for id in ["", ".", "..", "../evil", "a/b", "a\\b", "a\0b"] {
             assert!(manager.save(sample(id)).is_err(), "id {id:?} was accepted");
             assert!(manager.delete(id).is_err(), "id {id:?} was accepted");
         }
@@ -361,6 +376,24 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let manager = ProfileManager::new(dir.path().join("profiles"));
+        manager.save(sample("a")).unwrap();
+        let mode = fs::metadata(manager.dir().join("a.json"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_tightens_a_stale_loose_tmp_file() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let manager = ProfileManager::new(dir.path().join("profiles"));
+        fs::create_dir_all(manager.dir()).unwrap();
+        let tmp = manager.dir().join("a.json.tmp");
+        fs::write(&tmp, "left by a crash").unwrap();
+        fs::set_permissions(&tmp, fs::Permissions::from_mode(0o644)).unwrap();
         manager.save(sample("a")).unwrap();
         let mode = fs::metadata(manager.dir().join("a.json"))
             .unwrap()

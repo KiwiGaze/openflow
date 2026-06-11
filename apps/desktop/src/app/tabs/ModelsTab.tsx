@@ -43,6 +43,14 @@ export function ModelsTab({
   // editing the name or timeout keeps the green check (UX-33).
   const CONNECTIVITY_KEYS = ['baseUrl', 'apiKey', 'model'] as const;
 
+  // Test results and Ollama listings belong to one profile; drop them on switch.
+  const selectProfile = (id: string | null): void => {
+    setSelectedId(id);
+    setTestResult(null);
+    setOllamaModels(null);
+    setListError(null);
+  };
+
   const patch = (next: Partial<LlmProfile>): void => {
     if (!selected) return;
     if (CONNECTIVITY_KEYS.some((k) => k in next)) setTestResult(null);
@@ -79,7 +87,7 @@ export function ModelsTab({
       timeoutSecs: 30,
       presetId: 'ollama',
     };
-    setSelectedId(profile.id);
+    selectProfile(profile.id);
     void save(profile).then(() => {
       // The first profile is what the user came for: select it for refinement.
       if (settings.activeLlmProfileId === '') void update({ activeLlmProfileId: profile.id });
@@ -87,7 +95,7 @@ export function ModelsTab({
   };
 
   const deleteProfile = (id: string): void => {
-    if (selectedId === id) setSelectedId(null);
+    if (selectedId === id) selectProfile(null);
     // Deleting the active profile clears the selection backend-side.
     void remove(id);
   };
@@ -263,8 +271,18 @@ export function ModelsTab({
             <div
               key={profile.id}
               className={`mode-row ${selectedId === profile.id ? 'mode-selected' : ''}`}
+              role="button"
+              tabIndex={0}
               onClick={() => {
-                setSelectedId(profile.id);
+                selectProfile(profile.id);
+              }}
+              onKeyDown={(e) => {
+                // Keys on the nested radio bubble up here; leave those alone.
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  selectProfile(profile.id);
+                }
               }}
             >
               <label

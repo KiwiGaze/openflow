@@ -1,7 +1,7 @@
 //! Tauri IPC commands. Names map 1:1 to `COMMANDS` in `@openflow/core`.
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::{AppError, AppResult};
 use crate::llm::LlmTestResult;
@@ -59,6 +59,7 @@ pub fn save_settings(
     let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
         || previous.refine_hotkey != saved.refine_hotkey
         || previous.polish_hotkey != saved.polish_hotkey
+        || previous.change_overlay_hotkey != saved.change_overlay_hotkey
         || mode_hotkeys(&previous) != mode_hotkeys(&saved);
     if hotkeys_changed {
         if let Err(message) = shortcuts::apply(&app, &saved) {
@@ -68,6 +69,7 @@ pub fn save_settings(
             reverted.dictation_hotkey = previous.dictation_hotkey.clone();
             reverted.refine_hotkey = previous.refine_hotkey.clone();
             reverted.polish_hotkey = previous.polish_hotkey.clone();
+            reverted.change_overlay_hotkey = previous.change_overlay_hotkey.clone();
             for mode in &mut reverted.modes {
                 mode.hotkey = previous
                     .modes
@@ -239,6 +241,22 @@ pub async fn reprocess_history(
     match state.profiles.active(&settings.active_llm_profile_id) {
         Some(profile) => state.llm.chat(&profile, &system, &text).await,
         None => Ok(text::apply_rules_cleanup(&text)),
+    }
+}
+
+/// Copies text to the clipboard for the changes overlay's Copy button. Routed
+/// through the output worker, which owns the single clipboard handle.
+#[tauri::command]
+pub fn copy_text(state: State<'_, AppState>, text: String) -> AppResult<()> {
+    state.output.copy_text(text)
+}
+
+/// Toggles the changes overlay between click-through (hidden) and interactive
+/// (visible), so the always-present panel never eats clicks while faded out.
+#[tauri::command]
+pub fn set_changes_interactive(app: AppHandle, interactive: bool) {
+    if let Some(window) = app.get_webview_window(crate::changes::CHANGES_LABEL) {
+        let _ = window.set_ignore_cursor_events(!interactive);
     }
 }
 

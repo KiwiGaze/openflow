@@ -40,6 +40,9 @@ export const ipc = {
   clearHistory: (): Promise<void> => invoke(COMMANDS.clearHistory),
   reprocessHistory: (text: string, modeId: string): Promise<string> =>
     invoke(COMMANDS.reprocessHistory, { text, modeId }),
+  copyText: (text: string): Promise<void> => invoke(COMMANDS.copyText, { text }),
+  setChangesInteractive: (interactive: boolean): Promise<void> =>
+    invoke(COMMANDS.setChangesInteractive, { interactive }),
   testLlm: (profile: LlmProfile): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { profile }),
   testMode: (prompt: string, sample: string, transforms: boolean): Promise<string> =>
     invoke(COMMANDS.testMode, { prompt, sample, transforms }),
@@ -89,6 +92,10 @@ export const events = {
     }),
   onResult: (cb: (result: TranscriptionResult) => void): Promise<UnlistenFn> =>
     listen<TranscriptionResult>(EVENTS.result, (e) => {
+      cb(e.payload);
+    }),
+  onChangesToggle: (cb: (result: TranscriptionResult) => void): Promise<UnlistenFn> =>
+    listen<TranscriptionResult>(EVENTS.changesToggle, (e) => {
       cb(e.payload);
     }),
 };

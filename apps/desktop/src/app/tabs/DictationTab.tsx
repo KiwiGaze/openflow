@@ -65,6 +65,16 @@ export function DictationTab({
             onChange={(accelerator) => void update({ refineHotkey: accelerator })}
           />
         </Row>
+        <Row
+          title="See changes"
+          hint="Reveal a word-level diff of the last cleanup, polish, or rewrite. Empty disables it."
+        >
+          <HotkeyRecorder
+            value={settings.changeOverlayHotkey}
+            label="See changes"
+            onChange={(accelerator) => void update({ changeOverlayHotkey: accelerator })}
+          />
+        </Row>
         <p className="row-hint">Press Esc while recording to cancel.</p>
       </section>
 

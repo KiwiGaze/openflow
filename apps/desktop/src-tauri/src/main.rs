@@ -3,6 +3,7 @@
 
 mod apps;
 mod audio;
+mod changes;
 mod cloud_stt;
 mod commands;
 mod error;
@@ -96,6 +97,7 @@ fn main() {
             });
 
             hud::init(&handle)?;
+            changes::init(&handle)?;
             tray::build(&handle)?;
 
             if let Err(err) = shortcuts::apply(&handle, &settings.get()) {
@@ -140,6 +142,8 @@ fn main() {
             commands::get_history,
             commands::clear_history,
             commands::reprocess_history,
+            commands::copy_text,
+            commands::set_changes_interactive,
             commands::test_llm,
             commands::test_mode,
             commands::list_llm_profiles,

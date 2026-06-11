@@ -80,6 +80,8 @@ Automated tests cover the logic; these flows need a human:
 11. Settings: change hotkey to a taken combo (e.g. `Cmd+Space`) → clear error, old hotkey kept.
 12. Refine tab: create a second profile, switch the active radio between them mid-session →
     next polish uses the newly selected profile; _Show in Finder_ opens `<app-data>/profiles/`.
+13. Put another app (Safari, an editor) in macOS full-screen, then hold `⌥Space` → the HUD pill
+    shows over the full-screen app and the text still pastes into that app.
 
 ## Repository layout
 

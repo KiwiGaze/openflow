@@ -60,6 +60,10 @@ enum OutputCmd {
     CaptureSelection {
         respond: SyncSender<AppResult<Option<String>>>,
     },
+    CopyText {
+        text: String,
+        respond: SyncSender<AppResult<()>>,
+    },
 }
 
 pub struct OutputSystem {
@@ -90,6 +94,17 @@ impl OutputSystem {
                 restore_clipboard,
                 respond,
             })
+            .map_err(|_| AppError::Output("output thread is gone".into()))?;
+        wait.recv()
+            .map_err(|_| AppError::Output("output thread did not respond".into()))?
+    }
+
+    /// Writes text to the clipboard via the worker that owns the clipboard
+    /// handle. Does not paste — used by the changes overlay's Copy button.
+    pub fn copy_text(&self, text: String) -> AppResult<()> {
+        let (respond, wait) = mpsc::sync_channel(1);
+        self.tx
+            .send(OutputCmd::CopyText { text, respond })
             .map_err(|_| AppError::Output("output thread is gone".into()))?;
         wait.recv()
             .map_err(|_| AppError::Output("output thread did not respond".into()))?
@@ -208,6 +223,12 @@ impl Worker {
         Ok(InsertOutcome::Pasted)
     }
 
+    fn copy_text(&mut self, text: &str) -> AppResult<()> {
+        self.clipboard()?
+            .set_text(text)
+            .map_err(|e| AppError::Output(format!("could not write clipboard: {e}")))
+    }
+
     fn capture_selection(&mut self) -> AppResult<Option<String>> {
         if !permissions::accessibility_trusted(false) {
             return Err(AppError::Output(
@@ -254,6 +275,9 @@ fn worker(app: AppHandle, rx: mpsc::Receiver<OutputCmd>) {
             }
             OutputCmd::CaptureSelection { respond } => {
                 let _ = respond.send(state.capture_selection());
+            }
+            OutputCmd::CopyText { text, respond } => {
+                let _ = respond.send(state.copy_text(&text));
             }
         }
     }

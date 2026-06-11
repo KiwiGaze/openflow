@@ -39,10 +39,27 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         }
     }
 
-    // Every accelerator — the three globals and every mode hotkey — must be
-    // pairwise distinct (07 §4). Compare by reference so the originals survive
-    // for registration below.
+    // The see-changes hotkey is optional: an empty string disables it.
+    let changes = if settings.change_overlay_hotkey.trim().is_empty() {
+        None
+    } else {
+        Some(
+            Shortcut::from_str(&settings.change_overlay_hotkey).map_err(|e| {
+                format!(
+                    "see-changes hotkey “{}”: {e}",
+                    settings.change_overlay_hotkey
+                )
+            })?,
+        )
+    };
+
+    // Every accelerator — the globals, the optional see-changes hotkey, and
+    // every mode hotkey — must be pairwise distinct (07 §4). Compare by
+    // reference so the originals survive for registration below.
     let mut all: Vec<&Shortcut> = vec![&dictation, &refine, &polish];
+    if let Some(changes) = changes.as_ref() {
+        all.push(changes);
+    }
     all.extend(mode_hotkeys.iter().map(|(_, sc)| sc));
     for i in 0..all.len() {
         for j in (i + 1)..all.len() {
@@ -77,6 +94,22 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         return Err(format!("polish hotkey “{}”: {e}", settings.polish_hotkey));
     }
 
+    // See-changes is a tap: only Pressed matters, and it does no clipboard or
+    // keystroke work, so it can run inline on the hotkey thread.
+    if let Some(changes) = changes {
+        if let Err(e) = shortcuts.on_shortcut(changes, move |app, _shortcut, event| {
+            if event.state() == ShortcutState::Pressed {
+                crate::changes::request_toggle(app);
+            }
+        }) {
+            let _ = shortcuts.unregister_all();
+            return Err(format!(
+                "see-changes hotkey “{}”: {e}",
+                settings.change_overlay_hotkey
+            ));
+        }
+    }
+
     // Per-mode hotkeys: one-shot dictation in that mode.
     for (mode_id, shortcut) in mode_hotkeys {
         if let Err(e) = shortcuts.on_shortcut(shortcut, move |app, _shortcut, event| {
@@ -88,10 +121,11 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     }
 
     log::info!(
-        "hotkeys registered: dictation={} rewrite={} polish={} mode-hotkeys={}",
+        "hotkeys registered: dictation={} rewrite={} polish={} see-changes={} mode-hotkeys={}",
         settings.dictation_hotkey,
         settings.refine_hotkey,
         settings.polish_hotkey,
+        settings.change_overlay_hotkey,
         settings.modes.iter().filter(|m| m.hotkey.is_some()).count()
     );
     Ok(())

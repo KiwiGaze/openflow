@@ -41,6 +41,25 @@
         "shadow": false,
         "focus": false,
         "visibleOnAllWorkspaces": true
+      },
+      {
+        "label": "changes",
+        "title": "OpenFlow Changes",
+        "url": "changes.html",
+        "width": 540,
+        "height": 340,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "shadow": false,
+        "focus": false,
+        "visibleOnAllWorkspaces": true
       }
     ],
     "security": {

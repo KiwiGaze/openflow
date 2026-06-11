@@ -81,6 +81,10 @@ pub struct PipelineState {
 #[serde(rename_all = "camelCase")]
 pub struct TranscriptionResult {
     pub raw: String,
+    /// The "before" the change-overlay diffs against: the transcript for
+    /// dictation, the original selection for polish/rewrite. Equals `raw`
+    /// except for rewrite, where `raw` is the spoken instruction.
+    pub original: String,
     pub text: String,
     pub mode_id: String,
     pub refined: bool,
@@ -868,6 +872,7 @@ impl Pipeline {
         let outcome = self.insert(
             settings,
             &transcript,
+            &transcript,
             final_text,
             &mode.id,
             refined,
@@ -925,7 +930,15 @@ impl Pipeline {
         // selection with something other than what they asked for is worse
         // than doing nothing.
         let rewritten = self.llm.chat(&profile, &system, &user).await?;
-        let outcome = self.insert(settings, &instruction, rewritten, "refine", true, started)?;
+        let outcome = self.insert(
+            settings,
+            &instruction,
+            &selection,
+            rewritten,
+            "refine",
+            true,
+            started,
+        )?;
         Ok(match outcome {
             ProcessOutcome::Inserted(preview, _) => {
                 ProcessOutcome::Inserted(preview, self.refine_hud_tip())
@@ -947,13 +960,17 @@ impl Pipeline {
         // Like rewrite: no fallback — wrong text over the user's selection is
         // worse than nothing.
         let polished = self.llm.chat(profile, &system, &user).await?;
-        self.insert(settings, &selection, polished, "polish", true, started)
+        self.insert(
+            settings, &selection, &selection, polished, "polish", true, started,
+        )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn insert(
         self: &Arc<Self>,
         settings: &Settings,
         raw: &str,
+        original: &str,
         final_text: String,
         mode_id: &str,
         refined: bool,
@@ -968,6 +985,7 @@ impl Pipeline {
 
         let result = TranscriptionResult {
             raw: raw.to_string(),
+            original: original.to_string(),
             text: final_text,
             mode_id: mode_id.to_string(),
             refined,
