@@ -7,7 +7,9 @@
 //! Callers of [`OutputSystem`] must therefore never block the main thread
 //! while waiting on the worker.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender, SyncSender};
+use std::sync::Arc;
 use std::time::Duration;
 
 use arboard::Clipboard;
@@ -129,13 +131,28 @@ impl Worker {
 
     fn send_shortcut(&self, letter: char) -> AppResult<()> {
         let (respond, wait) = mpsc::sync_channel(1);
+        // Once we stop waiting (timeout), the closure may still be queued on the
+        // main thread. Gate it so a timed-out request becomes a no-op instead of
+        // firing a stray ⌘V/⌘C after the paste/capture flow has already unwound.
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let cancelled_main = Arc::clone(&cancelled);
         self.app
             .run_on_main_thread(move || {
+                if cancelled_main.load(Ordering::Acquire) {
+                    return;
+                }
                 let _ = respond.send(press_cmd_shortcut(letter));
             })
             .map_err(|e| AppError::Output(format!("keystroke dispatch failed: {e}")))?;
-        wait.recv_timeout(KEYSTROKE_DISPATCH_TIMEOUT)
-            .map_err(|_| AppError::Output("main thread did not respond to keystroke".into()))?
+        match wait.recv_timeout(KEYSTROKE_DISPATCH_TIMEOUT) {
+            Ok(result) => result,
+            Err(_) => {
+                cancelled.store(true, Ordering::Release);
+                Err(AppError::Output(
+                    "main thread did not respond to keystroke".into(),
+                ))
+            }
+        }
     }
 
     fn insert(
