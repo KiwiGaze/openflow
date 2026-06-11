@@ -43,7 +43,13 @@ impl HistoryStore {
                     // Don't clobber a corrupt-but-present log: the next append()
                     // would overwrite it. Preserve it so transcripts aren't lost.
                     log::warn!("history.json unreadable ({err}); preserving as .corrupt");
-                    let _ = fs::rename(&path, path.with_extension("json.corrupt"));
+                    if let Err(rename_err) = fs::rename(&path, path.with_extension("json.corrupt"))
+                    {
+                        // Rename failed → the corrupt file is still in place and
+                        // the next append() will overwrite it. Make that loss
+                        // visible instead of silent.
+                        log::warn!("could not preserve corrupt history.json: {rename_err}");
+                    }
                     Vec::new()
                 }
             },
