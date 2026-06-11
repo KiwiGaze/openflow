@@ -78,15 +78,15 @@ export function ModelsTab({
     void save(next);
   };
 
-  const addProfile = (): void => {
+  const addProfile = (opts?: { name?: string; model?: string | undefined }): void => {
     const profile: LlmProfile = {
       version: LLM_PROFILE_VERSION,
       id: crypto.randomUUID(),
-      name: 'New profile',
+      name: opts?.name ?? 'New profile',
       provider: OLLAMA_PRESET.kind,
       baseUrl: OLLAMA_PRESET.baseUrl,
       apiKey: '',
-      model: OLLAMA_PRESET.modelSuggestion,
+      model: opts?.model ?? OLLAMA_PRESET.modelSuggestion,
       timeoutSecs: 30,
       presetId: OLLAMA_PRESET.id,
     };
@@ -142,24 +142,6 @@ export function ModelsTab({
       },
     );
   }, []);
-
-  const addOllamaProfile = (): void => {
-    const profile: LlmProfile = {
-      version: LLM_PROFILE_VERSION,
-      id: crypto.randomUUID(),
-      name: 'Ollama (local)',
-      provider: OLLAMA_PRESET.kind,
-      baseUrl: OLLAMA_PRESET.baseUrl,
-      apiKey: '',
-      model: ollamaDetected?.[0] ?? OLLAMA_PRESET.modelSuggestion,
-      timeoutSecs: 30,
-      presetId: OLLAMA_PRESET.id,
-    };
-    setSelectedId(profile.id);
-    void save(profile).then(() => {
-      if (settings.activeLlmProfileId === '') void update({ activeLlmProfileId: profile.id });
-    });
-  };
 
   return (
     <div className="tab-body">
@@ -251,7 +233,15 @@ export function ModelsTab({
           </p>
         )}
         {profiles.length === 0 && ollamaDetected && ollamaDetected.length > 0 && (
-          <Callout variant="info" action={{ label: 'Add Ollama', onClick: addOllamaProfile }}>
+          <Callout
+            variant="info"
+            action={{
+              label: 'Add Ollama',
+              onClick: () => {
+                addProfile({ name: 'Ollama (local)', model: ollamaDetected[0] });
+              },
+            }}
+          >
             Ollama is running locally with {ollamaDetected.length} model
             {ollamaDetected.length === 1 ? '' : 's'}. Add it for on-device AI polish — nothing
             leaves your Mac.
@@ -311,7 +301,12 @@ export function ModelsTab({
           <button className="btn btn-quiet" onClick={() => void ipc.revealLlmProfiles()}>
             Show in Finder
           </button>
-          <button className="btn" onClick={addProfile}>
+          <button
+            className="btn"
+            onClick={() => {
+              addProfile();
+            }}
+          >
             New profile
           </button>
         </div>
