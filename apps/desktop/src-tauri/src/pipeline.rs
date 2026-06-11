@@ -20,7 +20,7 @@ use crate::history::HistoryStore;
 use crate::hud;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
-use crate::modes::{self, CODE_MODE_ID, LITERAL_MODE_ID};
+use crate::modes;
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
 use crate::settings::{
@@ -348,8 +348,7 @@ impl Pipeline {
                     .lock()
                     .expect("pipeline state poisoned")
                     .as_ref()
-                    .map(|s| s.job == job)
-                    .unwrap_or(false);
+                    .is_some_and(|s| s.job == job);
                 if same_job {
                     self.finish();
                 }
@@ -547,19 +546,25 @@ impl Pipeline {
             if pipeline.generation.load(Ordering::SeqCst) != generation {
                 return; // cancelled mid-flight; a newer job owns the UI now
             }
-            match result {
-                Ok(ProcessOutcome::Inserted(preview, hud_tip)) => {
-                    pipeline.set_success(preview, hud_tip);
-                }
-                Ok(ProcessOutcome::Notice(message)) => {
-                    pipeline.set_transient(Status::Notice, message);
-                }
-                Err(err) => {
-                    log::warn!("job failed: {err}");
-                    pipeline.set_transient(Status::Error, err.user_message());
-                }
-            }
+            pipeline.publish_outcome(result);
         });
+    }
+
+    /// Renders a finished job's outcome as HUD state. Callers must re-check
+    /// the generation first — publishing is the final step of every job.
+    fn publish_outcome(self: &Arc<Self>, result: AppResult<ProcessOutcome>) {
+        match result {
+            Ok(ProcessOutcome::Inserted(preview, hud_tip)) => {
+                self.set_success(preview, hud_tip);
+            }
+            Ok(ProcessOutcome::Notice(message)) => {
+                self.set_transient(Status::Notice, message);
+            }
+            Err(err) => {
+                log::warn!("job failed: {err}");
+                self.set_transient(Status::Error, err.user_message());
+            }
+        }
     }
 
     pub fn cancel(self: &Arc<Self>) {
@@ -689,18 +694,7 @@ impl Pipeline {
             if pipeline.generation.load(Ordering::SeqCst) != generation {
                 return; // cancelled mid-flight; a newer job owns the UI now
             }
-            match result {
-                Ok(ProcessOutcome::Inserted(preview, hud_tip)) => {
-                    pipeline.set_success(preview, hud_tip);
-                }
-                Ok(ProcessOutcome::Notice(message)) => {
-                    pipeline.set_transient(Status::Notice, message);
-                }
-                Err(err) => {
-                    log::warn!("job failed: {err}");
-                    pipeline.set_transient(Status::Error, err.user_message());
-                }
-            }
+            pipeline.publish_outcome(result);
         });
     }
 
@@ -976,13 +970,8 @@ impl Pipeline {
                     text::apply_rules_cleanup(&transcript)
                 }
             }
-        } else if mode.id == LITERAL_MODE_ID {
-            transcript.clone()
-        } else if mode.id == CODE_MODE_ID {
-            // Deterministic: the whole utterance becomes one identifier.
-            text::apply_code_identifier(&transcript)
         } else {
-            text::apply_rules_cleanup(&transcript)
+            modes::no_ai_output(&mode.id, &transcript)
         };
 
         // Snippets expand on the final text only: dictation-only, verbatim,

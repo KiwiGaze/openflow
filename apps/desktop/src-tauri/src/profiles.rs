@@ -119,6 +119,16 @@ impl ProfileManager {
         }
     }
 
+    /// Resolves the profile a job should use: a non-empty override id that
+    /// exists wins, else the active profile. Dangling overrides fall back
+    /// silently — the dictation pipeline surfaces its own notice for them.
+    pub fn resolve(&self, override_id: Option<&str>, active_id: &str) -> Option<LlmProfile> {
+        override_id
+            .filter(|id| !id.is_empty())
+            .and_then(|id| self.get(id))
+            .or_else(|| self.active(active_id))
+    }
+
     /// Upserts a profile atomically (temp + rename) with 0600 permissions —
     /// profile files can hold API keys. Returns the fresh list.
     pub fn save(&self, mut profile: LlmProfile) -> AppResult<Vec<LlmProfile>> {

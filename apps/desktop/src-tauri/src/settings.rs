@@ -10,6 +10,7 @@ use std::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
+use crate::models::DEFAULT_STT_MODEL_ID;
 use crate::modes;
 
 pub const SETTINGS_VERSION: u32 = 3;
@@ -169,7 +170,8 @@ pub struct Settings {
     pub tips_seen: Vec<String>,
     /// Successful dictations ever — the only tip-system counter (never a log).
     pub dictation_count: u64,
-    /// ISO date (`YYYY-MM-DD`) of the last tip shown; enforces ≤ 1 tip/day.
+    /// ISO date (`YYYY-MM-DD`) of the last tip shown. Read and written by the
+    /// settings webview, which caps its tips at one per day.
     pub last_tip_shown_at: String,
     /// Opt-in (default off): keep a local, searchable log of past dictations.
     /// Off preserves the no-transcript-persistence privacy default.
@@ -201,7 +203,7 @@ impl Default for Settings {
             dictionary: Vec::new(),
             snippets: Vec::new(),
             transforms: Vec::new(),
-            stt_model_id: "base.en".into(),
+            stt_model_id: DEFAULT_STT_MODEL_ID.into(),
             language: "auto".into(),
             llm: None,
             insert_method: InsertMethod::Paste,
@@ -297,8 +299,9 @@ impl SettingsManager {
         // Defer the rewrite while a v1 LLM block is present: persisting now
         // would erase it (the field is deserialize-only) before
         // `profiles::reconcile` migrates it into a profile file.
-        if manager.get().llm.is_none() {
-            if let Err(err) = manager.persist() {
+        let loaded = manager.get();
+        if loaded.llm.is_none() {
+            if let Err(err) = manager.persist(&loaded) {
                 log::warn!("could not persist settings on load: {err}");
             }
         }
@@ -315,7 +318,7 @@ impl SettingsManager {
             let mut guard = self.current.write().expect("settings lock poisoned");
             *guard = settings.clone();
         }
-        self.persist()?;
+        self.persist(&settings)?;
         Ok(settings)
     }
 
@@ -325,9 +328,8 @@ impl SettingsManager {
 
     /// Atomic write: serialize to a sibling temp file, then rename over the
     /// target so a crash can never leave a half-written settings file.
-    fn persist(&self) -> AppResult<()> {
-        let settings = self.get();
-        let json = serde_json::to_string_pretty(&settings)
+    fn persist(&self, settings: &Settings) -> AppResult<()> {
+        let json = serde_json::to_string_pretty(settings)
             .map_err(|e| AppError::Settings(e.to_string()))?;
         if let Some(dir) = self.path.parent() {
             fs::create_dir_all(dir)?;

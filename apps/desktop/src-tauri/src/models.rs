@@ -26,6 +26,11 @@ pub struct ModelSpec {
     pub description: &'static str,
 }
 
+/// The starter on-device model: `Settings::default()` begins here and a
+/// deleted active cloud engine falls back here. The onboarding webview
+/// mirrors this id as `DEFAULT_MODEL`.
+pub const DEFAULT_STT_MODEL_ID: &str = "base.en";
+
 /// Approximate sizes are shown in the UI; the download trusts Content-Length.
 pub const REGISTRY: &[ModelSpec] = &[
     ModelSpec {

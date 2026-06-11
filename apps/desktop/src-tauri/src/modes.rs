@@ -1,6 +1,7 @@
 //! Built-in modes and prompt construction for the LLM refinement step.
 
 use crate::settings::{DictionaryEntry, Mode};
+use crate::text;
 
 pub const STANDARD_MODE_ID: &str = "standard";
 pub const EMAIL_MODE_ID: &str = "email";
@@ -131,6 +132,21 @@ pub fn preview_system_prompt(
         ));
     }
     out
+}
+
+/// Returns a mode's text without AI refinement: Literal passes the transcript
+/// through untouched, Code deterministically turns the whole utterance into
+/// one identifier, every other mode gets the rules-based cleanup. The one
+/// place the mode-id → cleanup decision lives, so live dictation and history
+/// reprocessing cannot disagree.
+pub fn no_ai_output(mode_id: &str, text: &str) -> String {
+    if mode_id == LITERAL_MODE_ID {
+        text.to_string()
+    } else if mode_id == CODE_MODE_ID {
+        text::apply_code_identifier(text)
+    } else {
+        text::apply_rules_cleanup(text)
+    }
 }
 
 pub const DEFAULT_REFINE_INSTRUCTION: &str =

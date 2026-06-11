@@ -230,7 +230,7 @@ export interface Settings {
   tipsSeen: string[];
   /** Successful dictations ever — the only tip counter (never a log). */
   dictationCount: number;
-  /** ISO date (`YYYY-MM-DD`) of the last tip shown; enforces ≤ 1 tip/day. */
+  /** ISO date (`YYYY-MM-DD`) of the last tip shown. Read and written by the settings webview, which caps its tips at one per day. */
   lastTipShownAt: string;
   /** Keep a Dock icon (vs menu-bar-only). */
   showInDock: boolean;
