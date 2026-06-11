@@ -35,9 +35,20 @@ pub fn save_settings(
     let previous = state.settings.get();
     let saved = state.settings.set(settings)?;
 
+    // Transforms carry hotkeys too, but the handler resolves the instruction by
+    // id at trigger time — so only a changed id↔hotkey binding needs a
+    // re-register, not an instruction or name edit (which save on every
+    // keystroke).
+    let bindings = |s: &Settings| -> Vec<(String, String)> {
+        s.transforms
+            .iter()
+            .map(|t| (t.id.clone(), t.hotkey.clone()))
+            .collect()
+    };
     let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
         || previous.refine_hotkey != saved.refine_hotkey
-        || previous.polish_hotkey != saved.polish_hotkey;
+        || previous.polish_hotkey != saved.polish_hotkey
+        || bindings(&previous) != bindings(&saved);
     if hotkeys_changed {
         if let Err(message) = shortcuts::apply(&app, &saved) {
             // Roll the hotkeys back to the last working set.
@@ -45,6 +56,7 @@ pub fn save_settings(
             reverted.dictation_hotkey = previous.dictation_hotkey.clone();
             reverted.refine_hotkey = previous.refine_hotkey.clone();
             reverted.polish_hotkey = previous.polish_hotkey.clone();
+            reverted.transforms = previous.transforms.clone();
             let restored = state.settings.set(reverted)?;
             let _ = shortcuts::apply(&app, &restored);
             let _ = app.emit("settings-changed", &restored);

@@ -16,7 +16,7 @@ export type PipelineStatus =
   | 'error';
 
 /** What kind of job the pipeline is currently running. */
-export type PipelineJob = 'dictation' | 'refineSelection' | 'polishSelection';
+export type PipelineJob = 'dictation' | 'refineSelection' | 'polishSelection' | 'transform';
 
 export interface PipelineState {
   status: PipelineStatus;
@@ -91,6 +91,21 @@ export interface Snippet {
   wholeUtterance: boolean;
 }
 
+/**
+ * A named, one-tap text operation applied to the current selection — a saved
+ * Rewrite instruction with its own hotkey. Polish is the built-in default of
+ * the same shape.
+ */
+export interface Transform {
+  /** Stable identity (a UUID); the hotkey resolves the instruction by this. */
+  id: string;
+  name: string;
+  /** Instruction sent to the active profile alongside the selection. */
+  instruction: string;
+  /** Accelerator that applies it; empty = not yet bound (can't fire). */
+  hotkey: string;
+}
+
 export interface Settings {
   /** Schema version for forward migrations. */
   version: number;
@@ -107,6 +122,8 @@ export interface Settings {
   dictionary: DictionaryEntry[];
   /** Spoken shorthands expanded into longer blocks on insert (dictation only). */
   snippets: Snippet[];
+  /** Named, hotkey-bound text operations applied to a selection. */
+  transforms: Transform[];
   /** Whisper model id from the model registry, e.g. `base.en`. */
   sttModelId: string;
   /** ISO 639-1 code or `auto`. */

@@ -14,9 +14,10 @@ use crate::pipeline::Job;
 use crate::settings::Settings;
 use crate::state::AppState;
 
-/// (Re-)registers all three hotkeys from settings. Returns a user-readable
-/// error when an accelerator cannot be parsed or registered (e.g. taken by
-/// another app), leaving no partial registrations behind.
+/// (Re-)registers every hotkey from settings — the three fixed ones plus each
+/// bound transform. Returns a user-readable error when an accelerator cannot be
+/// parsed or registered (e.g. taken by another app) or two collide, leaving no
+/// partial registrations behind.
 pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     let shortcuts = app.global_shortcut();
     shortcuts
@@ -29,8 +30,28 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         .map_err(|e| format!("rewrite hotkey “{}”: {e}", settings.refine_hotkey))?;
     let polish = Shortcut::from_str(&settings.polish_hotkey)
         .map_err(|e| format!("polish hotkey “{}”: {e}", settings.polish_hotkey))?;
-    if dictation == refine || dictation == polish || refine == polish {
-        return Err("the dictation, rewrite, and polish hotkeys must all be different".into());
+
+    // Transforms with a bound hotkey; unbound ones exist but never register.
+    let mut transforms: Vec<(String, Shortcut)> = Vec::new();
+    for t in &settings.transforms {
+        if t.hotkey.trim().is_empty() {
+            continue;
+        }
+        let sc = Shortcut::from_str(&t.hotkey)
+            .map_err(|e| format!("transform “{}” hotkey “{}”: {e}", t.name, t.hotkey))?;
+        transforms.push((t.id.clone(), sc));
+    }
+
+    // Every hotkey must be pairwise distinct (Shortcut is Copy, so collecting
+    // them here leaves the originals usable for registration below).
+    let mut all: Vec<Shortcut> = vec![dictation, refine, polish];
+    all.extend(transforms.iter().map(|(_, sc)| *sc));
+    for i in 0..all.len() {
+        for j in (i + 1)..all.len() {
+            if all[i] == all[j] {
+                return Err("two hotkeys are the same — every hotkey must be different".into());
+            }
+        }
     }
 
     shortcuts
@@ -58,11 +79,31 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         return Err(format!("polish hotkey “{}”: {e}", settings.polish_hotkey));
     }
 
+    // Each transform is a tap like polish; the handler resolves the instruction
+    // by id at trigger time, so edits don't require re-binding.
+    for (id, sc) in transforms {
+        if let Err(e) = shortcuts.on_shortcut(sc, move |app, _shortcut, event| {
+            if event.state() == ShortcutState::Pressed {
+                let pipeline = app.state::<AppState>().pipeline.clone();
+                let id = id.clone();
+                tauri::async_runtime::spawn_blocking(move || pipeline.run_transform(&id));
+            }
+        }) {
+            let _ = shortcuts.unregister_all();
+            return Err(format!("a transform hotkey could not be registered: {e}"));
+        }
+    }
+
     log::info!(
-        "hotkeys registered: dictation={} rewrite={} polish={}",
+        "hotkeys registered: dictation={} rewrite={} polish={} transforms={}",
         settings.dictation_hotkey,
         settings.refine_hotkey,
-        settings.polish_hotkey
+        settings.polish_hotkey,
+        settings
+            .transforms
+            .iter()
+            .filter(|t| !t.hotkey.trim().is_empty())
+            .count(),
     );
     Ok(())
 }

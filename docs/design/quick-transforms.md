@@ -1,6 +1,8 @@
 # Quick transforms — Polish, generalized
 
-Status: exploration. A brainstorm sketch, not a committed spec.
+Status: **shipped** (settings v3). Began as a brainstorm sketch; this doc now records what was
+built, with the original reasoning intact. Preview and a deterministic register (below) remain
+follow-ups.
 
 ## Why
 
@@ -63,25 +65,32 @@ Edit transform
 **Preview** runs the instruction against a short sample using the active AI profile (rules
 fallback when offline), so an author sees what a transform does before trusting it on real text.
 
-## How it fits
+## How it fits (as built)
 
-Almost free, because the machinery exists. `pipeline.rs` already runs the Polish flow
-(`Job::PolishSelection`): capture selection → refine with an instruction → insert. A transform
-is the same job parameterised by `transformId`:
+Almost free, because the machinery existed. `polish()` was generalized into one private
+`refine_selection(job, instruction, mode_id, hud_label)` that captures the selection and refines
+it with a given instruction; `polish()` is now just `refine_selection(PolishSelection, "", …)`
+and a transform is `refine_selection(Transform, t.instruction, …)`. The selection-capture →
+`selection_system_prompt()` → insert chain is reused verbatim, so the no-fallback rule and the
+generation/cancel contract are identical for all three selection jobs.
 
-```rust
-// pipeline.rs
-Job::Transform(String)      // the transform id; instruction looked up at job start
-
-// the refine call already takes an instruction string — pass the transform's,
-// reusing selection_system_prompt() and the replace → caret → clipboard insert chain verbatim
-```
+`Job::Transform` is a **payload-less** (Copy) variant — the enum stays Copy. The hotkey handler
+captures only the transform **id**; `run_transform(id)` looks the instruction up in current
+settings at trigger time, so editing a transform takes effect with no re-binding, and a transform
+deleted between keypress and dispatch is a silent no-op. The transform's name rides in the
+pipeline-state `message`, so the HUD reads "Concise…" rather than a generic label. An **empty
+instruction is valid** — it falls back to the Polish default — which is why a freshly created
+transform is usable immediately and is kept by `normalize()` (only blank-_name_ rows are dropped).
 
 Data model: `transforms: Vec<Transform> { id, name, instruction, hotkey }` in `settings.json`
-(camelCase mirror). Hotkeys register through the same path as the other three and join the same
-**N-way pairwise-distinct** check, with the same small cap (≤ 5) the per-mode-hotkey idea uses,
-so the keyboard surface stays sane. `commands.rs` gains `start_transform(id)`; everything else
-is reuse.
+(camelCase mirror), schema **v3**. `shortcuts::apply` now registers the three fixed hotkeys plus
+each **bound** transform (empty hotkey = unregistered draft) and runs an **all-pairs
+pairwise-distinct** check across the whole set, rolling back cleanly on any failure.
+`save_settings` re-registers only when an id↔hotkey **binding** changes, so name/instruction edits
+(which save on every keystroke) don't churn the global shortcuts. No new IPC command — transforms
+fire from their own global hotkey, never from the UI or tray (clicking the menu bar would change
+the frontmost app). UI: a Transforms gallery in the Refine tab with one-click templates, inline
+editing, and the shared `HotkeyRecorder`.
 
 ## A lighter cousin: deterministic register
 

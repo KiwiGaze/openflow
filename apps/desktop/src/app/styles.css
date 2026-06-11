@@ -541,6 +541,46 @@ button:focus-visible,
   padding: 1px 5px;
 }
 
+/* ---- Transforms ---- */
+
+.transform-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.transform-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transform-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transform-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.transform-instruction {
+  resize: vertical;
+  min-height: 48px;
+  font-size: 13px;
+}
+
+.transform-templates {
+  flex-wrap: wrap;
+}
+
 /* ---- Misc ---- */
 
 .result-text {

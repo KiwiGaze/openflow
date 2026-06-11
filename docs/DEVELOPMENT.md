@@ -85,6 +85,9 @@ Automated tests cover the logic; these flows need a human:
 14. Settings → Snippets: add `my email → me@example.com` (inline) → dictate "send it to my email"
     → the address is inserted in place. Add a "spoken alone" snippet and confirm it expands only
     when said by itself, not mid-sentence.
+15. Settings → Refine → Transforms: add the "Concise" template, assign a hotkey, select a wordy
+    sentence in any app, press it → the selection is rewritten; the HUD reads "Concise…". Assign
+    a hotkey already taken by dictation → clear error, the change is rolled back.
 
 ## Repository layout
 

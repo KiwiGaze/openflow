@@ -75,6 +75,23 @@ pub struct Snippet {
     pub whole_utterance: bool,
 }
 
+/// A named, one-tap text operation applied to the current selection — a saved
+/// Rewrite instruction with its own hotkey. Polish is the built-in default of
+/// the same shape; a transform just carries a user-chosen instruction.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Transform {
+    /// Stable identity (a UUID from the UI); the hotkey handler looks the
+    /// instruction up by this so edits take effect without re-binding.
+    pub id: String,
+    pub name: String,
+    /// Instruction sent to the active profile alongside the selection.
+    pub instruction: String,
+    /// Accelerator that applies it to the selection; empty = not yet bound
+    /// (the transform exists but can't fire until the user assigns a key).
+    pub hotkey: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -91,6 +108,7 @@ pub struct Settings {
     pub modes: Vec<Mode>,
     pub dictionary: Vec<DictionaryEntry>,
     pub snippets: Vec<Snippet>,
+    pub transforms: Vec<Transform>,
     pub stt_model_id: String,
     pub language: String,
     /// v1 migration only — see `profiles::reconcile`.
@@ -116,6 +134,7 @@ impl Default for Settings {
             modes: modes::built_in_modes(),
             dictionary: Vec::new(),
             snippets: Vec::new(),
+            transforms: Vec::new(),
             stt_model_id: "base.en".into(),
             language: "auto".into(),
             llm: None,
@@ -151,6 +170,9 @@ impl Settings {
             .retain(|e| !e.from.trim().is_empty() && !e.to.trim().is_empty());
         self.snippets
             .retain(|s| !s.trigger.trim().is_empty() && !s.expansion.is_empty());
+        // A transform needs a name; an empty instruction is a valid draft (it
+        // falls back to the Polish default until the user fills it in).
+        self.transforms.retain(|t| !t.name.trim().is_empty());
         self.version = SETTINGS_VERSION;
     }
 }
@@ -345,6 +367,39 @@ mod tests {
         let reloaded = SettingsManager::load(&dir).get();
         assert_eq!(reloaded.snippets.len(), 1);
         assert!(reloaded.snippets[0].whole_utterance);
+    }
+
+    #[test]
+    fn normalize_drops_blank_name_transforms_but_keeps_instruction_drafts() {
+        let dir = temp_dir("transforms");
+        let manager = SettingsManager::load(&dir);
+        let mut s = manager.get();
+        s.transforms = vec![
+            Transform {
+                id: "a".into(),
+                name: "Concise".into(),
+                instruction: "Tighten the wording.".into(),
+                hotkey: "Alt+1".into(),
+            },
+            // A named draft with no instruction yet is kept (acts like Polish).
+            Transform {
+                id: "b".into(),
+                name: "Draft".into(),
+                instruction: String::new(),
+                hotkey: String::new(),
+            },
+            // No name → dropped.
+            Transform {
+                id: "c".into(),
+                name: "  ".into(),
+                instruction: "orphaned".into(),
+                hotkey: String::new(),
+            },
+        ];
+        let fixed = manager.set(s).unwrap();
+        assert_eq!(fixed.transforms.len(), 2);
+        assert!(fixed.transforms.iter().any(|t| t.name == "Draft"));
+        assert!(!fixed.transforms.iter().any(|t| t.id == "c"));
     }
 
     #[test]
