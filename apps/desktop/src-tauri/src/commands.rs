@@ -68,11 +68,30 @@ pub fn save_settings(
         sync_autostart(&app, saved.launch_at_login);
     }
 
+    if previous.show_in_dock != saved.show_in_dock {
+        apply_dock_policy(&app, saved.show_in_dock);
+    }
+
     if let Err(err) = tray::rebuild_menu(&app) {
         log::warn!("tray rebuild failed: {err}");
     }
     let _ = app.emit("settings-changed", &saved);
     Ok(saved)
+}
+
+/// Regular keeps a Dock icon; Accessory is menu-bar-only. No-op off macOS.
+pub fn apply_dock_policy(app: &AppHandle, show_in_dock: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        let policy = if show_in_dock {
+            tauri::ActivationPolicy::Regular
+        } else {
+            tauri::ActivationPolicy::Accessory
+        };
+        let _ = app.set_activation_policy(policy);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, show_in_dock);
 }
 
 fn sync_autostart(app: &AppHandle, enabled: bool) {

@@ -1,6 +1,11 @@
 # The small stuff — sound, focus, presence, language
 
-Status: exploration. A brainstorm sketch, not a committed spec.
+Status: **partially shipped**. "Show in Dock" is built (a `showInDock` setting that switches the
+macOS activation policy between Regular and Accessory, applied at startup, on save, and on window
+close). The rest — start/stop sounds, focus ducking, completion notifications, and UI
+localization — remain deliberate follow-ups: each needs new infrastructure (audio playback, the
+notification plugin + capability, an audio-session API, or an i18n string-table track) that
+warrants its own focused change rather than riding this one.
 
 ## Why
 

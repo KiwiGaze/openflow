@@ -117,6 +117,8 @@ pub struct Settings {
     pub insert_method: InsertMethod,
     pub restore_clipboard: bool,
     pub launch_at_login: bool,
+    /// Keep a Dock icon (Regular activation). Off = menu-bar-only (Accessory).
+    pub show_in_dock: bool,
     pub onboarding_completed: bool,
 }
 
@@ -141,6 +143,7 @@ impl Default for Settings {
             insert_method: InsertMethod::Paste,
             restore_clipboard: true,
             launch_at_login: false,
+            show_in_dock: false,
             onboarding_completed: false,
         }
     }
@@ -334,6 +337,7 @@ mod tests {
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"insertMethod\":\"paste\""));
         assert!(json.contains("\"snippets\":[]"));
+        assert!(json.contains("\"showInDock\":false"));
         // The v1 LLM block is deserialize-only; it must never be written.
         assert!(!json.contains("\"llm\""));
     }

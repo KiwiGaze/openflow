@@ -142,6 +142,8 @@ export interface Settings {
   insertMethod: InsertMethod;
   restoreClipboard: boolean;
   launchAtLogin: boolean;
+  /** Keep a Dock icon (vs menu-bar-only). */
+  showInDock: boolean;
   onboardingCompleted: boolean;
 }
 
