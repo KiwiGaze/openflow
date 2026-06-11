@@ -1,10 +1,13 @@
 // Prevents an extra console window on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod apps;
 mod audio;
 mod changes;
+mod cloud_stt;
 mod commands;
 mod error;
+mod history;
 mod hud;
 mod llm;
 mod models;
@@ -19,6 +22,7 @@ mod shortcuts;
 mod state;
 mod stats;
 mod stt;
+mod stt_profiles;
 mod suggestions;
 mod text;
 mod tray;
@@ -61,6 +65,10 @@ fn main() {
             // dangling active-profile pointer.
             profiles::reconcile(&settings, &profiles);
             let models = Arc::new(models::ModelManager::new(data_dir.join("models")));
+            let history = Arc::new(history::HistoryStore::load(&data_dir));
+            let stt_profiles = Arc::new(stt_profiles::SttProfileManager::new(
+                data_dir.join("stt-profiles"),
+            ));
             let stt = Arc::new(stt::SttEngine::new());
             let llm = Arc::new(llm::LlmClient::new());
             let audio = Arc::new(audio::AudioSystem::spawn());
@@ -74,6 +82,8 @@ fn main() {
                 Arc::clone(&settings),
                 Arc::clone(&models),
                 Arc::clone(&profiles),
+                Arc::clone(&history),
+                Arc::clone(&stt_profiles),
             );
 
             app.manage(AppState {
@@ -84,6 +94,8 @@ fn main() {
                 llm,
                 output,
                 pipeline,
+                history,
+                stt_profiles,
             });
 
             hud::init(&handle)?;
@@ -132,16 +144,27 @@ fn main() {
             commands::start_refine_selection,
             commands::start_polish_selection,
             commands::get_last_result,
+            commands::get_last_dictation_app,
+            commands::get_history,
+            commands::clear_history,
+            commands::reprocess_history,
             commands::get_insights,
             commands::list_dictionary_suggestions,
             commands::dismiss_dictionary_suggestion,
             commands::copy_text,
             commands::set_changes_interactive,
             commands::test_llm,
+            commands::test_mode,
             commands::list_llm_profiles,
             commands::save_llm_profile,
             commands::delete_llm_profile,
             commands::reveal_llm_profiles,
+            commands::list_stt_profiles,
+            commands::save_stt_profile,
+            commands::delete_stt_profile,
+            commands::reveal_stt_profiles,
+            commands::export_mode,
+            commands::export_dictionary,
             commands::list_ollama_models,
             commands::check_permissions,
             commands::request_microphone_permission,

@@ -1,14 +1,19 @@
 import { useEffect, useState, type JSX } from 'react';
 import type { PipelineState } from '@openflow/core';
 import { events, subscribe } from './ipc.js';
-import { barScales, hudLabel, hudVisible } from './hudState.js';
+import { barScales, hudGlyph, hudLabel, hudVisible } from './hudState.js';
 
 /**
  * The always-running overlay. The window itself never hides (see hud.rs);
  * content fades in and out with pipeline state instead.
  */
 export function Hud(): JSX.Element {
-  const [state, setState] = useState<PipelineState>({ status: 'idle', job: null, message: null });
+  const [state, setState] = useState<PipelineState>({
+    status: 'idle',
+    job: null,
+    message: null,
+    hudTip: null,
+  });
   const [level, setLevel] = useState(0);
 
   useEffect(() => {
@@ -27,6 +32,7 @@ export function Hud(): JSX.Element {
   const recording = state.status === 'recording';
   const busy =
     state.status === 'transcribing' || state.status === 'refining' || state.status === 'inserting';
+  const glyph = hudGlyph(state);
 
   return (
     <div className={`hud-pill ${visible ? 'hud-visible' : ''} hud-${state.status}`}>
@@ -38,7 +44,20 @@ export function Hud(): JSX.Element {
         </div>
       )}
       {busy && <span className="hud-spinner" aria-hidden />}
-      <span className="hud-label">{hudLabel(state)}</span>
+      {glyph && (
+        <span
+          className={`hud-glyph ${state.status === 'inserted' ? 'hud-glyph-ok' : ''}`}
+          aria-hidden
+        >
+          {glyph}
+        </span>
+      )}
+      <span className="hud-textcol">
+        <span className="hud-label" aria-live="polite" aria-atomic="true">
+          {hudLabel(state)}
+        </span>
+        {state.hudTip && <span className="hud-tip">{state.hudTip}</span>}
+      </span>
     </div>
   );
 }

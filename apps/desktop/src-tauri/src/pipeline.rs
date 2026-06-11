@@ -5,24 +5,29 @@
 //! progress events to the webviews, and guards against stale work with a
 //! generation counter — cancelling simply bumps the generation.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
+use crate::apps;
 use crate::audio::AudioSystem;
+use crate::cloud_stt;
 use crate::error::{AppError, AppResult};
+use crate::history::HistoryStore;
 use crate::hud;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
 use crate::modes::{self, CODE_MODE_ID, LITERAL_MODE_ID};
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
-use crate::settings::{HotkeyBehavior, Settings, SettingsManager, MAX_RECORDING_SECS};
+use crate::settings::{HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS};
+use crate::shortcuts;
 use crate::stats::{word_count, Insights, Stats};
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
+use crate::stt_profiles::SttProfileManager;
 use crate::suggestions::{DictionarySuggestion, Suggestions};
 use crate::text;
 
@@ -37,6 +42,9 @@ const TAP_THRESHOLD: Duration = Duration::from_millis(350);
 /// How long error/notice states stay visible before auto-clearing.
 const TRANSIENT_STATE_TTL: Duration = Duration::from_secs(4);
 
+/// How long the success flash (✓ + inserted text) lingers before idle.
+const SUCCESS_FLASH_TTL: Duration = Duration::from_millis(1500);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Status {
@@ -45,6 +53,8 @@ pub enum Status {
     Transcribing,
     Refining,
     Inserting,
+    /// Brief success flash (✓ + inserted text) before fading back to idle.
+    Inserted,
     Notice,
     Error,
 }
@@ -67,6 +77,9 @@ pub struct PipelineState {
     pub status: Status,
     pub job: Option<Job>,
     pub message: Option<String>,
+    /// A one-time educational tip shown on the success flash (05 §2.3); set only
+    /// when entering `Inserted`, otherwise None.
+    pub hud_tip: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -89,6 +102,9 @@ struct Session {
     started: Instant,
     /// Captured before recording starts (refine job only).
     selection: Option<String>,
+    /// Mode id from a per-mode hotkey, used for this job only without changing
+    /// the persistent active mode (one-shot, 07 §4). None = use the active mode.
+    mode_override: Option<String>,
 }
 
 pub struct Pipeline {
@@ -100,11 +116,20 @@ pub struct Pipeline {
     settings: Arc<SettingsManager>,
     models: Arc<ModelManager>,
     profiles: Arc<ProfileManager>,
+    history: Arc<HistoryStore>,
+    stt_profiles: Arc<SttProfileManager>,
     state: Mutex<PipelineState>,
     state_seq: AtomicU64,
     session: Mutex<Option<Session>>,
     generation: AtomicU64,
     last_result: Mutex<Option<TranscriptionResult>>,
+    /// Frontmost app `(bundle_id, name)` at the last dictation — lets the App
+    /// rules UI offer "add a rule for the app you just dictated into".
+    last_app: Mutex<Option<(String, String)>>,
+    /// At most one HUD educational tip per app session (05 §2.1).
+    tip_shown_session: AtomicBool,
+    /// Consecutive empty dictations — drives the one-time accuracy tip (05 §2.3).
+    empty_streak: AtomicU64,
     /// Session-only usage aggregates for the Insights view (in-RAM, never
     /// persisted or transmitted).
     stats: Stats,
@@ -124,6 +149,8 @@ impl Pipeline {
         settings: Arc<SettingsManager>,
         models: Arc<ModelManager>,
         profiles: Arc<ProfileManager>,
+        history: Arc<HistoryStore>,
+        stt_profiles: Arc<SttProfileManager>,
     ) -> Arc<Self> {
         Arc::new(Self {
             app,
@@ -134,18 +161,31 @@ impl Pipeline {
             settings,
             models,
             profiles,
+            history,
+            stt_profiles,
             state: Mutex::new(PipelineState {
                 status: Status::Idle,
                 job: None,
                 message: None,
+                hud_tip: None,
             }),
             state_seq: AtomicU64::new(0),
             session: Mutex::new(None),
             generation: AtomicU64::new(0),
             last_result: Mutex::new(None),
+            last_app: Mutex::new(None),
+            tip_shown_session: AtomicBool::new(false),
+            empty_streak: AtomicU64::new(0),
             stats: Stats::new(),
             suggestions: Suggestions::new(),
         })
+    }
+
+    pub fn last_app(&self) -> Option<(String, String)> {
+        self.last_app
+            .lock()
+            .expect("pipeline state poisoned")
+            .clone()
     }
 
     /// Snapshot of this session's usage aggregates for the Insights view.
@@ -183,10 +223,13 @@ impl Pipeline {
             status,
             job,
             message,
+            hud_tip: None,
         };
         *self.state.lock().expect("pipeline state poisoned") = state.clone();
         let seq = self.state_seq.fetch_add(1, Ordering::SeqCst) + 1;
         let _ = self.app.emit(PIPELINE_STATE_EVENT, &state);
+        // Mirror the live-mic state into the menu bar (privacy signal).
+        crate::tray::set_recording(&self.app, matches!(status, Status::Recording));
         seq
     }
 
@@ -202,9 +245,98 @@ impl Pipeline {
         });
     }
 
+    /// Confirmation flash: ✓ + a preview of the inserted text (and maybe a
+    /// one-time tip), then idle. The webview ellipsizes; the state-seq guard
+    /// lets a newer job pre-empt.
+    fn set_success(self: &Arc<Self>, preview: String, hud_tip: Option<String>) {
+        let state = PipelineState {
+            status: Status::Inserted,
+            job: None,
+            message: Some(preview),
+            hud_tip,
+        };
+        *self.state.lock().expect("pipeline state poisoned") = state.clone();
+        let seq = self.state_seq.fetch_add(1, Ordering::SeqCst) + 1;
+        let _ = self.app.emit(PIPELINE_STATE_EVENT, &state);
+        let pipeline = Arc::clone(self);
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(SUCCESS_FLASH_TTL).await;
+            if pipeline.state_seq.load(Ordering::SeqCst) == seq {
+                pipeline.set_state(Status::Idle, None, None);
+            }
+        });
+    }
+
+    /// The HUD tip to ride a successful dictation (tip.latch — teach hands-free
+    /// at the 3rd hold-dictation), or None. Marks it seen so it shows once.
+    fn dictation_hud_tip(&self) -> Option<String> {
+        if self.tip_shown_session.load(Ordering::SeqCst) {
+            return None;
+        }
+        let s = self.settings.get();
+        if !s.tips_enabled || s.tips_seen.iter().any(|t| t == "tip.latch") {
+            return None;
+        }
+        if s.dictation_hotkey_behavior != HotkeyBehavior::Hold || s.dictation_count != 3 {
+            return None;
+        }
+        self.mark_tip_shown("tip.latch", s);
+        Some("Tip: tap the hotkey instead of holding to go hands-free.".into())
+    }
+
+    /// The HUD tip to ride a successful rewrite (tip.polish — teach the polish
+    /// hotkey), or None. Marks it seen so it shows once.
+    fn refine_hud_tip(&self) -> Option<String> {
+        if self.tip_shown_session.load(Ordering::SeqCst) {
+            return None;
+        }
+        let s = self.settings.get();
+        if !s.tips_enabled || s.tips_seen.iter().any(|t| t == "tip.polish") {
+            return None;
+        }
+        if s.polish_hotkey.is_empty() || s.active_llm_profile_id.is_empty() {
+            return None;
+        }
+        self.mark_tip_shown("tip.polish", s);
+        Some("Tip: tap your polish hotkey to fix grammar without recording.".into())
+    }
+
+    fn mark_tip_shown(&self, id: &str, mut settings: Settings) {
+        self.tip_shown_session.store(true, Ordering::SeqCst);
+        settings.tips_seen.push(id.to_string());
+        if let Ok(saved) = self.settings.set(settings) {
+            let _ = self.app.emit("settings-changed", &saved);
+        }
+    }
+
+    /// The "didn't catch that" notice, upgraded once to suggest a larger model
+    /// after two consecutive empty dictations (tip.accuracy, 05 §2.3). Unlike
+    /// the flash tips this rides a Notice, so it is independent of the
+    /// per-session flash cap; `tips_seen` still bounds it to once ever.
+    fn empty_dictation_notice(&self, streak: u64) -> String {
+        const BASE: &str = "Didn't catch that — try again.";
+        if streak < 2 {
+            return BASE.into();
+        }
+        let mut s = self.settings.get();
+        if !s.tips_enabled
+            || s.tips_seen.iter().any(|t| t == "tip.accuracy")
+            || s.stt_model_id.contains("large")
+            || s.stt_model_id.starts_with("cloud:")
+        {
+            return BASE.into();
+        }
+        s.tips_seen.push("tip.accuracy".into());
+        if let Ok(saved) = self.settings.set(s) {
+            let _ = self.app.emit("settings-changed", &saved);
+        }
+        "Didn't catch that. A larger speech model often helps — switch it in Settings → Models."
+            .into()
+    }
+
     // ---- Hotkey entry points -------------------------------------------
 
-    pub fn on_hotkey_pressed(self: &Arc<Self>, job: Job) {
+    pub fn on_hotkey_pressed(self: &Arc<Self>, job: Job, mode_override: Option<String>) {
         let status = self.state().status;
         match status {
             Status::Recording => {
@@ -221,8 +353,9 @@ impl Pipeline {
                 }
             }
             Status::Idle | Status::Error | Status::Notice => {
-                if let Err(err) = self.start(job) {
-                    self.set_transient(Status::Error, err.to_string());
+                if let Err(err) = self.start(job, mode_override) {
+                    log::warn!("could not start {job:?}: {err}");
+                    self.set_transient(Status::Error, err.user_message());
                 }
             }
             // Busy processing a previous utterance — ignore.
@@ -257,19 +390,62 @@ impl Pipeline {
 
     // ---- Lifecycle ------------------------------------------------------
 
-    pub fn start(self: &Arc<Self>, job: Job) -> AppResult<()> {
+    pub fn start(self: &Arc<Self>, job: Job, mode_override: Option<String>) -> AppResult<()> {
         {
             let state = self.state();
             if !matches!(state.status, Status::Idle | Status::Error | Status::Notice) {
-                return Err(AppError::State("busy — try again in a moment".into()));
+                return Err(AppError::State(
+                    "Still finishing the last one — try again in a moment.".into(),
+                ));
             }
         }
 
         let settings = self.settings.get();
 
-        if !self.models.is_installed(&settings.stt_model_id) {
+        // Per-app rules (07 §9): for a plain dictation (no explicit mode hotkey),
+        // a frontmost-app rule supplies a one-shot mode override, exactly like a
+        // hotkey. Explicit overrides win; a detection failure just means no rule.
+        let mode_override = match mode_override {
+            Some(id) => Some(id),
+            None if job == Job::Dictation => match apps::frontmost_app() {
+                Some((bundle_id, name)) => {
+                    *self.last_app.lock().expect("pipeline state poisoned") =
+                        Some((bundle_id.clone(), name));
+                    settings
+                        .app_rules
+                        .iter()
+                        .find(|r| r.bundle_id == bundle_id)
+                        .map(|r| r.mode_id.clone())
+                }
+                None => {
+                    // Detection failed: clear the stale app so the "add a rule"
+                    // flow can't target whatever was frontmost last time.
+                    *self.last_app.lock().expect("pipeline state poisoned") = None;
+                    None
+                }
+            },
+            None => None,
+        };
+
+        // Preflight the model this job will actually use: a dictation mode can
+        // override the speech model (07 §3), so checking the global default
+        // would wrongly block a valid per-mode override. A cloud engine needs
+        // no local model.
+        let effective_stt = if job == Job::Dictation {
+            let mode = mode_override
+                .as_ref()
+                .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
+                .unwrap_or_else(|| settings.active_mode());
+            match &mode.stt_model_id {
+                Some(id) if self.stt_model_valid(&settings, id) => id.clone(),
+                _ => settings.stt_model_id.clone(),
+            }
+        } else {
+            settings.stt_model_id.clone()
+        };
+        if !effective_stt.starts_with("cloud:") && !self.models.is_installed(&effective_stt) {
             return Err(AppError::Model(
-                "speech model not downloaded yet — open Settings to install it".into(),
+                "No speech model yet — open Settings to download one.".into(),
             ));
         }
 
@@ -280,17 +456,31 @@ impl Pipeline {
                 .is_none()
             {
                 return Err(AppError::Llm(
-                    "rewriting needs an AI profile — add one in Settings".into(),
+                    "Rewrite needs an AI profile — add one in Settings.".into(),
                 ));
             }
             match self.output.capture_selection()? {
                 Some(text) => Some(text),
                 None => {
                     return Err(AppError::State(
-                        "select some text first, then hold the rewrite hotkey".into(),
+                        "Select some text first, then hold the rewrite hotkey.".into(),
                     ))
                 }
             }
+        } else {
+            None
+        };
+
+        // Name the mode in the listening label so the user sees which mode will
+        // write before speaking (07 §5) — the override mode for a mode hotkey,
+        // else the active mode. Rewrite is an action, not a mode.
+        let recording_label = if job == Job::Dictation {
+            let mode_name = mode_override
+                .as_ref()
+                .and_then(|id| settings.modes.iter().find(|m| &m.id == id))
+                .map(|m| m.name.clone())
+                .unwrap_or_else(|| settings.active_mode().name);
+            Some(truncate_mode_name(&mode_name))
         } else {
             None
         };
@@ -302,8 +492,11 @@ impl Pipeline {
             generation,
             started: Instant::now(),
             selection,
+            mode_override,
         });
-        self.set_state(Status::Recording, Some(job), None);
+        self.set_state(Status::Recording, Some(job), recording_label);
+        // Bind Esc so a recording started by mistake has a "never mind".
+        shortcuts::set_cancel_key(&self.app, true);
         hud::position_on_cursor_monitor(&self.app);
 
         // Level meter for the HUD while recording.
@@ -340,6 +533,8 @@ impl Pipeline {
         let Some(session) = self.session.lock().expect("pipeline state poisoned").take() else {
             return;
         };
+        // Recording is over; Esc-to-cancel is scoped to recording only.
+        shortcuts::set_cancel_key(&self.app, false);
         self.set_state(Status::Transcribing, Some(session.job), None);
 
         let pipeline = Arc::clone(self);
@@ -350,14 +545,15 @@ impl Pipeline {
                 return; // cancelled mid-flight; a newer job owns the UI now
             }
             match result {
-                Ok(ProcessOutcome::Inserted) => {
-                    pipeline.set_state(Status::Idle, None, None);
+                Ok(ProcessOutcome::Inserted(preview, hud_tip)) => {
+                    pipeline.set_success(preview, hud_tip);
                 }
                 Ok(ProcessOutcome::Notice(message)) => {
                     pipeline.set_transient(Status::Notice, message);
                 }
                 Err(err) => {
-                    pipeline.set_transient(Status::Error, err.to_string());
+                    log::warn!("job failed: {err}");
+                    pipeline.set_transient(Status::Error, err.user_message());
                 }
             }
         });
@@ -367,7 +563,20 @@ impl Pipeline {
         self.generation.fetch_add(1, Ordering::SeqCst);
         *self.session.lock().expect("pipeline state poisoned") = None;
         self.audio.cancel();
+        shortcuts::set_cancel_key(&self.app, false);
         self.set_state(Status::Idle, None, None);
+    }
+
+    /// Surfaces a transient notice in the HUD for callers outside the pipeline
+    /// (e.g. the tray acting on nothing), reusing the existing notice surface
+    /// rather than inventing another. Skipped while a job owns the HUD.
+    pub fn flash_notice(self: &Arc<Self>, message: String) {
+        if matches!(
+            self.state().status,
+            Status::Idle | Status::Notice | Status::Error | Status::Inserted
+        ) {
+            self.set_transient(Status::Notice, message);
+        }
     }
 
     /// Tap entry point: polish the current selection with the built-in
@@ -420,13 +629,13 @@ impl Pipeline {
         let settings = self.settings.get();
         let Some(profile) = self.profiles.active(&settings.active_llm_profile_id) else {
             let what = if job == Job::PolishSelection {
-                "polishing"
+                "Polishing"
             } else {
-                "this transform"
+                "This transform"
             };
             self.set_transient(
                 Status::Error,
-                format!("{what} needs an AI profile — add one in Settings"),
+                format!("{what} needs an AI profile — add one in Settings."),
             );
             return;
         };
@@ -447,12 +656,13 @@ impl Pipeline {
                 };
                 self.set_transient(
                     Status::Error,
-                    format!("select some text first, then press {key}"),
+                    format!("Select some text first, then press {key}."),
                 );
                 return;
             }
             Err(err) => {
-                self.set_transient(Status::Error, err.to_string());
+                log::warn!("polish selection capture failed: {err}");
+                self.set_transient(Status::Error, err.user_message());
                 return;
             }
         };
@@ -477,14 +687,15 @@ impl Pipeline {
                 return; // cancelled mid-flight; a newer job owns the UI now
             }
             match result {
-                Ok(ProcessOutcome::Inserted) => {
-                    pipeline.set_state(Status::Idle, None, None);
+                Ok(ProcessOutcome::Inserted(preview, hud_tip)) => {
+                    pipeline.set_success(preview, hud_tip);
                 }
                 Ok(ProcessOutcome::Notice(message)) => {
                     pipeline.set_transient(Status::Notice, message);
                 }
                 Err(err) => {
-                    pipeline.set_transient(Status::Error, err.to_string());
+                    log::warn!("job failed: {err}");
+                    pipeline.set_transient(Status::Error, err.user_message());
                 }
             }
         });
@@ -492,32 +703,101 @@ impl Pipeline {
 
     // ---- Processing -----------------------------------------------------
 
-    async fn process(self: &Arc<Self>, session: Session) -> AppResult<ProcessOutcome> {
-        let settings = self.settings.get();
-        let job = session.job;
-        let started = session.started;
+    /// Resolves a dictation mode's overrides once, at job start (07 §3). Each
+    /// field falls back `mode override (set AND valid) → global → default`; a
+    /// dangling override never fails the job — it falls through and the first
+    /// dangling field (AI profile → STT → language) yields one informational
+    /// notice that names the mode.
+    fn resolve_dictation(&self, settings: &Settings, mode: &Mode) -> ResolvedDictation {
+        let mut notice: Option<String> = None;
+        let name = truncate_mode_name(&mode.name);
 
-        // Stop capture and get 16 kHz samples (resampled on the audio thread).
-        let audio = Arc::clone(&self.audio);
-        let recorded = tauri::async_runtime::spawn_blocking(move || audio.stop())
-            .await
-            .map_err(|e| AppError::State(format!("audio join failed: {e}")))??;
+        // AI profile is only resolved when the mode wants AI and the master
+        // switch is on, so a no-AI mode never notices a dangling profile.
+        let profile = if mode.uses_llm && settings.refine_after_dictation {
+            match &mode.ai_profile_id {
+                Some(id) => self.profiles.get(id).or_else(|| {
+                    notice.get_or_insert(format!(
+                        "{name}: its AI profile is missing — used your active profile instead."
+                    ));
+                    self.profiles.active(&settings.active_llm_profile_id)
+                }),
+                None => self.profiles.active(&settings.active_llm_profile_id),
+            }
+        } else {
+            None
+        };
 
-        // Transcribe on a blocking thread; whisper inference is CPU/GPU heavy.
-        let stt = Arc::clone(&self.stt);
-        let model_id = settings.stt_model_id.clone();
+        let stt_model_id = match &mode.stt_model_id {
+            Some(id) if self.stt_model_valid(settings, id) => id.clone(),
+            Some(_) => {
+                notice.get_or_insert(format!(
+                    "{name}: its speech model isn’t available — used your default model instead."
+                ));
+                settings.stt_model_id.clone()
+            }
+            None => settings.stt_model_id.clone(),
+        };
+
+        let language = match &mode.language {
+            Some(lang) if is_known_language(lang) => lang.clone(),
+            Some(_) => {
+                notice.get_or_insert(format!(
+                    "{name}: its language setting was invalid — used your default."
+                ));
+                settings.language.clone()
+            }
+            None => settings.language.clone(),
+        };
+
+        ResolvedDictation {
+            mode: mode.clone(),
+            stt_model_id,
+            language,
+            profile,
+            notice,
+        }
+    }
+
+    /// Whether a resolved STT model id is usable: a `cloud:<profileId>` id needs
+    /// the profile present AND its consent confirmed (08 §3); a bare id needs the
+    /// whisper model installed.
+    fn stt_model_valid(&self, settings: &Settings, id: &str) -> bool {
+        match id.strip_prefix("cloud:") {
+            Some(pid) => {
+                self.stt_profiles.get(pid).is_some()
+                    && settings.confirmed_stt_profiles.iter().any(|c| c == pid)
+            }
+            None => self.models.is_installed(id),
+        }
+    }
+
+    /// An installed local whisper model to fall back to (08 §4.3) — the global
+    /// if it is local and installed, else any installed model.
+    fn installed_local_model(&self, settings: &Settings) -> Option<String> {
+        if !settings.stt_model_id.starts_with("cloud:")
+            && self.models.is_installed(&settings.stt_model_id)
+        {
+            return Some(settings.stt_model_id.clone());
+        }
+        self.models
+            .list()
+            .into_iter()
+            .find(|m| m.installed)
+            .map(|m| m.id.to_string())
+    }
+
+    /// Today's local transcription: whisper inference inside spawn_blocking.
+    async fn local_transcribe(
+        self: &Arc<Self>,
+        model_id: String,
+        samples: Vec<f32>,
+        language: String,
+        prompt: Option<String>,
+    ) -> AppResult<String> {
         let model_path = self.models.path_for(&model_id)?;
-        let language = settings.language.clone();
-        let prompt = initial_prompt_from_dictionary(&settings.dictionary);
-        log::info!(
-            "recorded {:.1}s of audio ({} samples at 16 kHz)",
-            recorded.duration.as_secs_f32(),
-            recorded.samples.len()
-        );
-        // Speech duration drives the Insights pace (words ÷ minutes spoken).
-        let record_ms = recorded.duration.as_millis() as u64;
-        let samples = recorded.samples;
-        let raw = tauri::async_runtime::spawn_blocking(move || {
+        let stt = Arc::clone(&self.stt);
+        tauri::async_runtime::spawn_blocking(move || {
             stt.transcribe(
                 &model_id,
                 &model_path,
@@ -527,17 +807,116 @@ impl Pipeline {
             )
         })
         .await
-        .map_err(|e| AppError::Stt(format!("transcription join failed: {e}")))??;
+        .map_err(|e| AppError::Stt(format!("transcription join failed: {e}")))?
+    }
+
+    async fn process(self: &Arc<Self>, session: Session) -> AppResult<ProcessOutcome> {
+        let settings = self.settings.get();
+        let job = session.job;
+        let started = session.started;
+
+        // Resolve mode overrides once, up front (dictation only). A per-mode
+        // hotkey resolves its own mode for this job only; otherwise the active
+        // mode. Rewrite uses the global speech model + language.
+        let resolved = if job == Job::Dictation {
+            let mode = session
+                .mode_override
+                .as_ref()
+                .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
+                .unwrap_or_else(|| settings.active_mode());
+            Some(self.resolve_dictation(&settings, &mode))
+        } else {
+            None
+        };
+
+        // Stop capture and get 16 kHz samples (resampled on the audio thread).
+        let audio = Arc::clone(&self.audio);
+        let recorded = tauri::async_runtime::spawn_blocking(move || audio.stop())
+            .await
+            .map_err(|e| AppError::State(format!("audio join failed: {e}")))??;
+
+        let model_id = match &resolved {
+            Some(r) => r.stt_model_id.clone(),
+            None => settings.stt_model_id.clone(),
+        };
+        let language = match &resolved {
+            Some(r) => r.language.clone(),
+            None => settings.language.clone(),
+        };
+        let prompt = initial_prompt_from_dictionary(&settings.dictionary);
+        log::info!(
+            "recorded {:.1}s of audio ({} samples at 16 kHz)",
+            recorded.duration.as_secs_f32(),
+            recorded.samples.len()
+        );
+        // Speech duration drives the Insights pace (words ÷ minutes spoken).
+        let record_ms = recorded.duration.as_millis() as u64;
+        let samples = recorded.samples;
+
+        let raw = match model_id.strip_prefix("cloud:") {
+            // Cloud STT uploads audio off the Mac. Gate: the profile must exist
+            // AND its consent be confirmed, or nothing is uploaded (08 §3).
+            Some(pid) => {
+                let confirmed = settings.confirmed_stt_profiles.iter().any(|c| c == pid);
+                match (self.stt_profiles.get(pid), confirmed) {
+                    (Some(profile), true) => {
+                        match cloud_stt::transcribe(&profile, &samples, &language, prompt.as_deref())
+                            .await
+                        {
+                            Ok(text) => text,
+                            // Failure policy (08 §4.3): fall back only toward LESS
+                            // data leaving — on-device whisper if installed, never
+                            // escalating. Output is never silently dropped.
+                            Err(err) => match self.installed_local_model(&settings) {
+                                Some(local_id) => {
+                                    log::warn!("cloud STT failed, used on-device instead: {err}");
+                                    self.local_transcribe(local_id, samples, language, prompt)
+                                        .await?
+                                }
+                                None => {
+                                    return Err(AppError::Stt(format!(
+                                        "Cloud transcription failed ({err}). Switch to the on-device model in Settings."
+                                    )))
+                                }
+                            },
+                        }
+                    }
+                    _ => {
+                        return Ok(ProcessOutcome::Notice(
+                            "Cloud transcription isn't set up — choose a speech engine in Settings → Models."
+                                .into(),
+                        ))
+                    }
+                }
+            }
+            // Local whisper.cpp — exactly today's path.
+            None => {
+                self.local_transcribe(model_id, samples, language, prompt)
+                    .await?
+            }
+        };
 
         let cleaned = text::clean_transcript(&raw);
         if cleaned.is_empty() {
-            return Ok(ProcessOutcome::Notice("didn't catch anything".into()));
+            // The accuracy tip is about dictation; an empty Rewrite instruction
+            // is a different situation, so only dictation feeds the streak.
+            let message = if job == Job::Dictation {
+                let streak = self.empty_streak.fetch_add(1, Ordering::SeqCst) + 1;
+                self.empty_dictation_notice(streak)
+            } else {
+                "Didn't catch that — try again.".into()
+            };
+            return Ok(ProcessOutcome::Notice(message));
+        }
+        if job == Job::Dictation {
+            self.empty_streak.store(0, Ordering::SeqCst);
         }
         let with_dictionary = text::apply_dictionary(&cleaned, &settings.dictionary);
 
         match job {
             Job::Dictation => {
-                self.finish_dictation(&settings, with_dictionary, started, record_ms)
+                let resolved = resolved.expect("dictation always resolves a mode");
+                self.finish_dictation(&settings, resolved, with_dictionary, started, record_ms)
                     .await
             }
             Job::RefineSelection => {
@@ -560,20 +939,20 @@ impl Pipeline {
     async fn finish_dictation(
         self: &Arc<Self>,
         settings: &Settings,
+        resolved: ResolvedDictation,
         transcript: String,
         started: Instant,
         record_ms: u64,
     ) -> AppResult<ProcessOutcome> {
         // Watch for distinctive terms worth suggesting for the dictionary.
         self.suggestions.observe(&transcript);
-        let mode = settings.active_mode();
-        // The refine toggle is the master switch; the per-mode flag still
-        // decides whether this mode wants AI at all.
-        let profile = if mode.uses_llm && settings.refine_after_dictation {
-            self.profiles.active(&settings.active_llm_profile_id)
-        } else {
-            None
-        };
+        // Mode, profile, and language were resolved once at job start (07 §3).
+        let ResolvedDictation {
+            mode,
+            profile,
+            notice,
+            ..
+        } = resolved;
 
         let mut refined = false;
         let mut llm_warning: Option<String> = None;
@@ -589,9 +968,8 @@ impl Pipeline {
                     // Never lose a dictation to a flaky provider: fall back to
                     // the rules-based cleanup and tell the user.
                     log::warn!("LLM refinement failed, falling back to rules: {err}");
-                    llm_warning = Some(format!(
-                        "AI cleanup failed ({err}) — inserted plain transcript"
-                    ));
+                    llm_warning =
+                        Some("AI cleanup unavailable — inserted the plain transcript.".into());
                     text::apply_rules_cleanup(&transcript)
                 }
             }
@@ -623,10 +1001,37 @@ impl Pipeline {
         // user (insert returns Ok even on the clipboard fallback).
         self.stats
             .record_dictation(words, record_ms, &mode.id, refined);
-        if let Some(warning) = llm_warning {
-            return Ok(ProcessOutcome::Notice(warning));
+        // Count this successful dictation — the only tip-system counter (05); a
+        // count, never a log. Emit so an open settings webview re-evaluates tips.
+        let mut counted = self.settings.get();
+        counted.dictation_count = counted.dictation_count.saturating_add(1);
+        if let Ok(saved) = self.settings.set(counted) {
+            let _ = self.app.emit("settings-changed", &saved);
         }
-        Ok(outcome)
+        // Opt-in history: log the text (never audio) when the user turned it on.
+        if settings.history_enabled {
+            if let Some(result) = self.last_result() {
+                self.history
+                    .append(result.raw, result.text, result.mode_id, result.refined);
+            }
+        }
+        // A clipboard fallback (paste failed / no Accessibility) is the
+        // highest-priority message — the user must know to press ⌘V to get
+        // their text. AI/override notes only matter once the text auto-pasted;
+        // between those two a flaky-LLM warning beats a dangling-override note.
+        match outcome {
+            ProcessOutcome::Inserted(preview, _) => {
+                if let Some(warning) = llm_warning {
+                    Ok(ProcessOutcome::Notice(warning))
+                } else if let Some(notice) = notice {
+                    Ok(ProcessOutcome::Notice(notice))
+                } else {
+                    Ok(ProcessOutcome::Inserted(preview, self.dictation_hud_tip()))
+                }
+            }
+            // Clipboard-fallback notice from insert(): surface it, never hide it.
+            clipboard_notice => Ok(clipboard_notice),
+        }
     }
 
     async fn finish_refine(
@@ -640,7 +1045,7 @@ impl Pipeline {
         // Re-resolved at use time: the profile may have changed mid-recording.
         let Some(profile) = self.profiles.active(&settings.active_llm_profile_id) else {
             return Err(AppError::Llm(
-                "rewriting needs an AI profile — add one in Settings".into(),
+                "Rewrite needs an AI profile — add one in Settings.".into(),
             ));
         };
         let system = modes::selection_system_prompt();
@@ -649,7 +1054,7 @@ impl Pipeline {
         // selection with something other than what they asked for is worse
         // than doing nothing.
         let rewritten = self.llm.chat(&profile, &system, &user).await?;
-        self.insert(
+        let outcome = self.insert(
             settings,
             &instruction,
             &selection,
@@ -657,7 +1062,13 @@ impl Pipeline {
             "refine",
             true,
             started,
-        )
+        )?;
+        Ok(match outcome {
+            ProcessOutcome::Inserted(preview, _) => {
+                ProcessOutcome::Inserted(preview, self.refine_hud_tip())
+            }
+            other => other,
+        })
     }
 
     async fn finish_selection_refine(
@@ -713,7 +1124,7 @@ impl Pipeline {
 
         match outcome {
             InsertOutcome::Pasted | InsertOutcome::CopiedToClipboard(CopyReason::ChosenMethod) => {
-                Ok(ProcessOutcome::Inserted)
+                Ok(ProcessOutcome::Inserted(result.text.clone(), None))
             }
             InsertOutcome::CopiedToClipboard(CopyReason::NoAccessibility) => {
                 Ok(ProcessOutcome::Notice(
@@ -730,7 +1141,59 @@ impl Pipeline {
     }
 }
 
+/// A dictation mode's overrides resolved against the globals (07 §3).
+struct ResolvedDictation {
+    mode: Mode,
+    stt_model_id: String,
+    language: String,
+    profile: Option<LlmProfile>,
+    /// First dangling-override notice, if any; informational, never fatal.
+    notice: Option<String>,
+}
+
+/// Mode names render up to 16 chars in the HUD and dangling notices (07 §5);
+/// the pill must not resize.
+fn truncate_mode_name(name: &str) -> String {
+    const MAX: usize = 16;
+    if name.chars().count() > MAX {
+        let head: String = name.chars().take(MAX - 1).collect();
+        format!("{head}…")
+    } else {
+        name.to_string()
+    }
+}
+
+/// A mode language override is valid if it is `auto` or a 2-letter code; a
+/// hand-edited garbage value falls back to the global language (07 §3).
+fn is_known_language(lang: &str) -> bool {
+    lang == "auto" || (lang.len() == 2 && lang.chars().all(|c| c.is_ascii_lowercase()))
+}
+
 enum ProcessOutcome {
-    Inserted,
+    /// Inserted cleanly; carries the text for the success flash and an optional
+    /// one-time HUD tip.
+    Inserted(String, Option<String>),
     Notice(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_known_language, truncate_mode_name};
+
+    #[test]
+    fn truncates_long_mode_names_to_16_chars() {
+        assert_eq!(truncate_mode_name("Notes"), "Notes");
+        let long = truncate_mode_name("Quarterly Board Update");
+        assert_eq!(long.chars().count(), 16);
+        assert!(long.ends_with('…'));
+    }
+
+    #[test]
+    fn language_override_validity() {
+        assert!(is_known_language("auto"));
+        assert!(is_known_language("de"));
+        assert!(!is_known_language("English"));
+        assert!(!is_known_language("EN"));
+        assert!(!is_known_language(""));
+    }
 }

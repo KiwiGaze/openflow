@@ -12,6 +12,8 @@ export type PipelineStatus =
   | 'transcribing'
   | 'refining'
   | 'inserting'
+  /** Brief success flash: ✓ + a preview of the inserted text. */
+  | 'inserted'
   | 'notice'
   | 'error';
 
@@ -23,6 +25,8 @@ export interface PipelineState {
   job: PipelineJob | null;
   /** Human-readable detail, set when status is `error`. */
   message: string | null;
+  /** One-time educational tip shown on the success flash; null otherwise. */
+  hudTip: string | null;
 }
 
 /** Hold the hotkey to talk, or tap once to start and again to stop. */
@@ -30,6 +34,9 @@ export type HotkeyBehavior = 'hold' | 'toggle';
 
 /** `paste` simulates Cmd+V into the active app; `clipboard` only copies. */
 export type InsertMethod = 'paste' | 'clipboard';
+
+/** Window theme. `system` follows macOS; `light`/`dark` force it for OpenFlow. */
+export type Appearance = 'system' | 'light' | 'dark';
 
 export type LlmProviderKind = 'ollama' | 'openaiCompatible';
 
@@ -51,6 +58,31 @@ export interface LlmProfile {
   /** Model name, e.g. `llama3.2:3b` or `gpt-4o-mini`. */
   model: string;
   timeoutSecs: number;
+  /**
+   * Which `LLM_PRESETS` entry the editor shows — display only. Never changes
+   * request behavior (that is `provider` + `baseUrl`); empty for legacy/custom.
+   */
+  presetId: string;
+}
+
+/** Which STT client transcribes. Only `openaiAudio` ships now (08 §2). */
+export type SttEngineKind = 'openaiAudio';
+
+/**
+ * One cloud/remote STT connection, stored as `<app-data>/stt-profiles/<id>.json`.
+ * The on-device whisper default needs no profile.
+ */
+export interface SttProfile {
+  version: number;
+  id: string;
+  name: string;
+  engine: SttEngineKind;
+  /** Display/prefill only; never changes request behavior. */
+  presetId: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  timeoutSecs: number;
 }
 
 export interface Mode {
@@ -63,8 +95,23 @@ export interface Mode {
    * transcript only (dictionary still applies).
    */
   usesLlm: boolean;
-  /** System prompt used for LLM refinement. */
+  /**
+   * When true the appended "preserve the language" default is dropped so the
+   * mode may translate/re-cast (still fenced by the invariant safety rules).
+   */
+  transforms: boolean;
+  /** System prompt used for LLM refinement (the user text only; safety rules
+   * are appended at call time). */
   prompt: string;
+  // ---- Mode v2 overrides (07); null = inherit the global setting ----
+  /** AI profile id, or null to use the active profile. */
+  aiProfileId: string | null;
+  /** Whisper model id, or null to use the global speech model. */
+  sttModelId: string | null;
+  /** ISO 639-1 code or `auto`, or null to use the global language. */
+  language: string | null;
+  /** Accelerator string (e.g. `Alt+Ctrl+N`), or null for no mode hotkey. */
+  hotkey: string | null;
 }
 
 export interface DictionaryEntry {
@@ -73,6 +120,18 @@ export interface DictionaryEntry {
   /** The replacement, e.g. "OpenFlow". When equal to `from`, the entry is a
    * pure vocabulary hint (preserve this spelling) rather than a replacement. */
   to: string;
+}
+
+/** A per-app rule: dictate in `modeId` when the app `bundleId` is frontmost. */
+export interface AppRule {
+  bundleId: string;
+  modeId: string;
+}
+
+/** A frontmost application's identity, for building app rules. */
+export interface FrontmostApp {
+  bundleId: string;
+  name: string;
 }
 
 /**
@@ -144,6 +203,22 @@ export interface Settings {
   insertMethod: InsertMethod;
   restoreClipboard: boolean;
   launchAtLogin: boolean;
+  /** Window theme override; `system` defers to macOS. */
+  appearance: Appearance;
+  /** Opt-in: keep a local, searchable log of past dictations (default off). */
+  historyEnabled: boolean;
+  /** Per-app rules: dictate in a chosen mode when an app is frontmost. */
+  appRules: AppRule[];
+  /** STT profile ids whose 'audio leaves the Mac' consent the user confirmed. */
+  confirmedSttProfiles: string[];
+  /** Master switch for one-time feature tips. */
+  tipsEnabled: boolean;
+  /** Tip ids already shown; never re-shown. */
+  tipsSeen: string[];
+  /** Successful dictations ever — the only tip counter (never a log). */
+  dictationCount: number;
+  /** ISO date (`YYYY-MM-DD`) of the last tip shown; enforces ≤ 1 tip/day. */
+  lastTipShownAt: string;
   /** Keep a Dock icon (vs menu-bar-only). */
   showInDock: boolean;
   onboardingCompleted: boolean;
@@ -185,6 +260,17 @@ export interface TranscriptionResult {
   /** Whether an LLM pass ran (false means rules-based cleanup only). */
   refined: boolean;
   durationMs: number;
+}
+
+/** One entry in the opt-in local dictation history (text only, never audio). */
+export interface HistoryEntry {
+  id: string;
+  raw: string;
+  text: string;
+  modeId: string;
+  refined: boolean;
+  /** Unix epoch milliseconds. */
+  at: number;
 }
 
 export interface ModeCount {
@@ -251,16 +337,27 @@ export const COMMANDS = {
   startRefineSelection: 'start_refine_selection',
   startPolishSelection: 'start_polish_selection',
   getLastResult: 'get_last_result',
+  getLastDictationApp: 'get_last_dictation_app',
+  getHistory: 'get_history',
+  clearHistory: 'clear_history',
+  reprocessHistory: 'reprocess_history',
   getInsights: 'get_insights',
   listDictionarySuggestions: 'list_dictionary_suggestions',
   dismissDictionarySuggestion: 'dismiss_dictionary_suggestion',
   copyText: 'copy_text',
   setChangesInteractive: 'set_changes_interactive',
   testLlm: 'test_llm',
+  testMode: 'test_mode',
   listLlmProfiles: 'list_llm_profiles',
   saveLlmProfile: 'save_llm_profile',
   deleteLlmProfile: 'delete_llm_profile',
   revealLlmProfiles: 'reveal_llm_profiles',
+  listSttProfiles: 'list_stt_profiles',
+  saveSttProfile: 'save_stt_profile',
+  deleteSttProfile: 'delete_stt_profile',
+  revealSttProfiles: 'reveal_stt_profiles',
+  exportMode: 'export_mode',
+  exportDictionary: 'export_dictionary',
   listOllamaModels: 'list_ollama_models',
   checkPermissions: 'check_permissions',
   requestMicrophonePermission: 'request_microphone_permission',

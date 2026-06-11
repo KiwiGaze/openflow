@@ -22,6 +22,14 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Shows a dot beside the menu-bar icon while the mic is live — a privacy/trust
+/// signal that you can always see when OpenFlow is listening (P2-7).
+pub fn set_recording(app: &AppHandle, recording: bool) {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_title(Some(if recording { "●" } else { "" }));
+    }
+}
+
 /// Rebuilds the menu after settings changes (modes added/renamed/activated).
 pub fn rebuild_menu(app: &AppHandle) -> tauri::Result<()> {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
@@ -35,7 +43,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let settings = state.settings.get();
 
     let menu = Menu::new(app)?;
-    let header = MenuItem::with_id(app, "header", "Mode", false, None::<&str>)?;
+    let header = MenuItem::with_id(app, "header", "Writing style", false, None::<&str>)?;
     menu.append(&header)?;
     for mode in &settings.modes {
         let item = CheckMenuItem::with_id(
@@ -48,6 +56,26 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         )?;
         menu.append(&item)?;
     }
+    // Always-visible speech locality (08 §3.3): on-device by default, or the
+    // active cloud engine with a warning glyph. Disabled — a status, not a control.
+    let speech_label = match settings.stt_model_id.strip_prefix("cloud:") {
+        Some(pid) => {
+            let name = state
+                .stt_profiles
+                .get(pid)
+                .map(|p| p.name)
+                .unwrap_or_else(|| "cloud".into());
+            format!("Speech: cloud — {name} ⚠")
+        }
+        None => "Speech: on-device".to_string(),
+    };
+    menu.append(&MenuItem::with_id(
+        app,
+        "speech-status",
+        &speech_label,
+        false,
+        None::<&str>,
+    )?)?;
     menu.append(&PredefinedMenuItem::separator(app)?)?;
     menu.append(&CheckMenuItem::with_id(
         app,
@@ -61,7 +89,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     menu.append(&MenuItem::with_id(
         app,
         "copy-last",
-        "Copy Last Result",
+        "Copy last dictation",
         true,
         None::<&str>,
     )?)?;
@@ -92,13 +120,17 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
         "refine-dictation" => toggle_refine_after_dictation(app),
         "copy-last" => {
             let state = app.state::<AppState>();
-            if let Some(result) = state.pipeline.last_result() {
-                if let Err(err) = state
-                    .output
-                    .insert(result.text, InsertMethod::Clipboard, false)
-                {
-                    log::warn!("copy last result failed: {err}");
+            match state.pipeline.last_result() {
+                Some(result) => {
+                    if let Err(err) =
+                        state
+                            .output
+                            .insert(result.text, InsertMethod::Clipboard, false)
+                    {
+                        log::warn!("copy last result failed: {err}");
+                    }
                 }
+                None => state.pipeline.flash_notice("No dictation yet.".into()),
             }
         }
         other => {

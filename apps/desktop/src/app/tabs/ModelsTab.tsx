@@ -1,51 +1,31 @@
-import { useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import {
+  formatBytes,
+  formatProgress,
   isLocalEndpoint,
   isValidBaseUrl,
-  normalizeBaseUrl,
+  LLM_PRESETS,
   type LlmProfile,
-  type LlmProviderKind,
   type LlmTestResult,
-  type Transform,
+  normalizeBaseUrl,
+  presetForProfile,
 } from '@openflow/core';
-import type { SettingsApi } from '../hooks.js';
+import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { useLlmProfiles } from '../hooks.js';
 import { ipc } from '../ipc.js';
-import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
+import { Callout } from '../components/Callout.js';
 import { Row } from '../components/Row.js';
-import { Toggle } from '../components/Toggle.js';
+import { SttEngines } from '../components/SttEngines.js';
 
-const PROVIDER_DEFAULTS: Record<LlmProviderKind, Partial<LlmProfile>> = {
-  ollama: { baseUrl: 'http://localhost:11434', model: 'qwen2.5:3b', apiKey: '' },
-  openaiCompatible: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
-};
-
-/** One-click starting points; the user assigns a hotkey afterwards. */
-const TRANSFORM_TEMPLATES: { name: string; instruction: string }[] = [
-  {
-    name: 'Concise',
-    instruction:
-      'Tighten the wording so it is as concise as possible. Keep the meaning, tone, and language. Do not add new information.',
-  },
-  {
-    name: 'Bullet points',
-    instruction:
-      'Restructure the text into short, scannable bullet points. Keep the meaning and language; do not invent details.',
-  },
-  {
-    name: 'Friendlier',
-    instruction:
-      'Rewrite in a warmer, friendlier tone. Keep the meaning and language; do not add new facts.',
-  },
-  {
-    name: 'Formal',
-    instruction:
-      'Rewrite in a polished, professional tone. Keep the meaning and language; do not add new information.',
-  },
-];
-
-export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
+export function ModelsTab({
+  api,
+  modelsApi,
+}: {
+  api: SettingsApi;
+  modelsApi: ModelsApi;
+}): JSX.Element {
   const { settings, update } = api;
+  const { models, progress, download, cancel, remove: removeModel } = modelsApi;
   const { profiles, save, remove } = useLlmProfiles();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<LlmTestResult | null>(null);
@@ -53,7 +33,15 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
   const [ollamaModels, setOllamaModels] = useState<string[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
 
+  // models is empty until the first list arrives; only warn once we know.
+  const noModelInstalled = models.length > 0 && !models.some((m) => m.installed);
+
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
+  const currentPreset = selected ? presetForProfile(selected.presetId, selected.provider) : null;
+
+  // Only a change that could alter connectivity invalidates a test result;
+  // editing the name or timeout keeps the green check (UX-33).
+  const CONNECTIVITY_KEYS = ['baseUrl', 'apiKey', 'model'] as const;
 
   // Test results and Ollama listings belong to one profile; drop them on switch.
   const selectProfile = (id: string | null): void => {
@@ -65,16 +53,26 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
 
   const patch = (next: Partial<LlmProfile>): void => {
     if (!selected) return;
-    setTestResult(null);
+    if (CONNECTIVITY_KEYS.some((k) => k in next)) setTestResult(null);
     void save({ ...selected, ...next });
   };
 
-  const switchProvider = (provider: LlmProviderKind): void => {
+  // A preset prefills the connection fields but never locks them; `custom`
+  // keeps whatever is there so a curated URL survives the switch.
+  const applyPreset = (presetId: string): void => {
     if (!selected) return;
+    const preset = LLM_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
     setTestResult(null);
     setOllamaModels(null);
     setListError(null);
-    void save({ ...selected, provider, ...PROVIDER_DEFAULTS[provider] });
+    const next: LlmProfile = { ...selected, presetId, provider: preset.kind };
+    if (preset.id !== 'custom') {
+      next.baseUrl = preset.baseUrl;
+      next.model = preset.modelSuggestion;
+    }
+    if (!preset.needsKey) next.apiKey = '';
+    void save(next);
   };
 
   const addProfile = (): void => {
@@ -87,6 +85,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
       apiKey: '',
       model: 'qwen2.5:3b',
       timeoutSecs: 30,
+      presetId: 'ollama',
     };
     selectProfile(profile.id);
     void save(profile).then(() => {
@@ -127,41 +126,118 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
 
   const urlInvalid = selected !== null && !isValidBaseUrl(selected.baseUrl);
 
-  const addTransform = (seed: { name: string; instruction: string }): void => {
-    const transform: Transform = {
+  // One probe of the default Ollama endpoint on mount — a quick-add nudge, not
+  // a storm. Removes the last manual step from the biggest single upgrade.
+  const [ollamaDetected, setOllamaDetected] = useState<string[] | null>(null);
+  useEffect(() => {
+    void ipc.listOllamaModels('http://localhost:11434').then(
+      (found) => {
+        setOllamaDetected(found);
+      },
+      () => {
+        setOllamaDetected(null);
+      },
+    );
+  }, []);
+
+  const addOllamaProfile = (): void => {
+    const profile: LlmProfile = {
+      version: 1,
       id: crypto.randomUUID(),
-      name: seed.name,
-      instruction: seed.instruction,
-      hotkey: '',
+      name: 'Ollama (local)',
+      provider: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      apiKey: '',
+      model: ollamaDetected?.[0] ?? 'qwen2.5:3b',
+      timeoutSecs: 30,
+      presetId: 'ollama',
     };
-    void update({ transforms: [...settings.transforms, transform] });
-  };
-
-  const patchTransform = (id: string, patch: Partial<Transform>): void => {
-    void update({
-      transforms: settings.transforms.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    setSelectedId(profile.id);
+    void save(profile).then(() => {
+      if (settings.activeLlmProfileId === '') void update({ activeLlmProfileId: profile.id });
     });
-  };
-
-  const removeTransform = (id: string): void => {
-    void update({ transforms: settings.transforms.filter((t) => t.id !== id) });
   };
 
   return (
     <div className="tab-body">
       <section className="card">
-        <h2>Refine</h2>
-        <Row
-          title="Refine dictation with AI"
-          hint="Polish transcripts with the active profile after transcribing."
-        >
-          <Toggle
-            checked={settings.refineAfterDictation}
-            onChange={(checked) => void update({ refineAfterDictation: checked })}
-            label="Refine dictation with AI"
-          />
-        </Row>
+        <h2>Speech recognition</h2>
+        {noModelInstalled && (
+          <Callout variant="warn">
+            No speech model installed — dictation is disabled. Download one below.
+          </Callout>
+        )}
+        <div className="model-list">
+          {models.map((model) => {
+            const p = progress[model.id];
+            const downloading = (model.downloading || (p && !p.done)) ?? false;
+            const failed = (p?.done && p.error) ?? false;
+            const active = settings.sttModelId === model.id;
+            return (
+              <div key={model.id} className={`model-row ${active ? 'model-active' : ''}`}>
+                <label className="model-pick">
+                  <input
+                    type="radio"
+                    name="stt-model"
+                    checked={active}
+                    disabled={!model.installed}
+                    onChange={() => void update({ sttModelId: model.id })}
+                  />
+                  <div>
+                    <div className="row-title">
+                      {model.displayName}
+                      {model.multilingual && <span className="badge">multilingual</span>}
+                    </div>
+                    <div className="row-hint">
+                      {formatBytes(model.sizeBytes)} — {model.description}
+                    </div>
+                    {failed && (
+                      <div className="row-hint row-hint-warn">
+                        Download failed — check your connection.
+                      </div>
+                    )}
+                  </div>
+                </label>
+                <div className="model-actions">
+                  {model.installed && !active && (
+                    <button className="btn btn-quiet" onClick={() => void removeModel(model.id)}>
+                      Delete
+                    </button>
+                  )}
+                  {model.installed && <span className="badge badge-ok">installed</span>}
+                  {!model.installed && downloading && (
+                    <>
+                      <span className="row-hint">
+                        {p ? formatProgress(p.downloadedBytes, p.totalBytes) : '…'}
+                      </span>
+                      <button
+                        className="btn btn-quiet"
+                        onClick={() => {
+                          cancel(model.id);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                  {!model.installed && !downloading && (
+                    <button
+                      className="btn"
+                      onClick={() => {
+                        download(model.id);
+                      }}
+                    >
+                      {failed ? 'Retry' : 'Download'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
+
+      <SttEngines api={api} />
 
       <section className="card">
         <h2>AI profiles</h2>
@@ -171,12 +247,20 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
             selection shortcuts — nothing leaves your Mac unless you pick a cloud endpoint.
           </p>
         )}
+        {profiles.length === 0 && ollamaDetected && ollamaDetected.length > 0 && (
+          <Callout variant="info" action={{ label: 'Add Ollama', onClick: addOllamaProfile }}>
+            Ollama is running locally with {ollamaDetected.length} model
+            {ollamaDetected.length === 1 ? '' : 's'}. Add it for on-device AI polish — nothing
+            leaves your Mac.
+          </Callout>
+        )}
         <div className="mode-list">
           <div className="mode-row">
             <label>
               <input
                 type="radio"
                 name="active-profile"
+                aria-label="No AI — rules-based cleanup only"
                 checked={settings.activeLlmProfileId === ''}
                 onChange={() => void update({ activeLlmProfileId: '' })}
               />
@@ -209,6 +293,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
                 <input
                   type="radio"
                   name="active-profile"
+                  aria-label={`Use ${profile.name}`}
                   checked={settings.activeLlmProfileId === profile.id}
                   onChange={() => void update({ activeLlmProfileId: profile.id })}
                 />
@@ -241,15 +326,18 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
               }}
             />
           </Row>
-          <Row title="Provider">
+          <Row title="Provider" hint={currentPreset?.caveat ?? ''}>
             <select
-              value={selected.provider}
+              value={currentPreset?.id ?? 'custom'}
               onChange={(e) => {
-                switchProvider(e.target.value as LlmProviderKind);
+                applyPreset(e.target.value);
               }}
             >
-              <option value="ollama">Ollama (local)</option>
-              <option value="openaiCompatible">OpenAI-compatible API (your key)</option>
+              {LLM_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.displayName}
+                </option>
+              ))}
             </select>
           </Row>
           <Row
@@ -269,7 +357,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
               }}
             />
           </Row>
-          {selected.provider === 'openaiCompatible' && (
+          {currentPreset?.needsKey && (
             <Row
               title="API key"
               hint="Stored in the profile file. Sent only to the base URL above."
@@ -289,6 +377,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
               <input
                 type="text"
                 value={selected.model}
+                placeholder={currentPreset?.modelSuggestion ?? ''}
                 onChange={(e) => {
                   patch({ model: e.target.value });
                 }}
@@ -359,85 +448,6 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
           )}
         </section>
       )}
-
-      <section className="card">
-        <h2>Transforms</h2>
-        <p className="row-hint">
-          One-tap rewrites for selected text — like Polish, but with your own instruction and
-          hotkey. Select text in any app and press the transform&rsquo;s hotkey. Needs an AI
-          profile.
-        </p>
-
-        {settings.transforms.length > 0 && (
-          <div className="transform-list">
-            {settings.transforms.map((t) => (
-              <div key={t.id} className="transform-card">
-                <div className="transform-head">
-                  <input
-                    type="text"
-                    className="transform-name"
-                    value={t.name}
-                    maxLength={40}
-                    placeholder="Name"
-                    onChange={(e) => {
-                      patchTransform(t.id, { name: e.target.value });
-                    }}
-                  />
-                  <HotkeyRecorder
-                    value={t.hotkey}
-                    onChange={(hotkey) => {
-                      patchTransform(t.id, { hotkey });
-                    }}
-                  />
-                  <button
-                    className="btn btn-quiet"
-                    onClick={() => {
-                      removeTransform(t.id);
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
-                <textarea
-                  className="transform-instruction"
-                  rows={2}
-                  maxLength={2000}
-                  value={t.instruction}
-                  placeholder="How should this rewrite the selected text? (empty acts like Polish)"
-                  onChange={(e) => {
-                    patchTransform(t.id, { instruction: e.target.value });
-                  }}
-                />
-                {t.hotkey.trim() === '' && (
-                  <p className="row-hint">Set a hotkey above to use this transform.</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="row-actions transform-templates">
-          {TRANSFORM_TEMPLATES.map((tpl) => (
-            <button
-              key={tpl.name}
-              className="btn btn-quiet"
-              onClick={() => {
-                addTransform(tpl);
-              }}
-            >
-              + {tpl.name}
-            </button>
-          ))}
-          <button
-            className="btn"
-            onClick={() => {
-              addTransform({ name: 'New transform', instruction: '' });
-            }}
-          >
-            Create your own
-          </button>
-        </div>
-      </section>
     </div>
   );
 }

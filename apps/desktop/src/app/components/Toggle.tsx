@@ -3,7 +3,8 @@ import type { JSX } from 'react';
 interface Props {
   checked: boolean;
   onChange: (checked: boolean) => void;
-  label?: string;
+  /** Required so every switch has a real accessible name (UX-30). */
+  label: string;
 }
 
 export function Toggle({ checked, onChange, label }: Props): JSX.Element {
@@ -12,7 +13,7 @@ export function Toggle({ checked, onChange, label }: Props): JSX.Element {
       type="button"
       role="switch"
       aria-checked={checked}
-      aria-label={label ?? 'toggle'}
+      aria-label={label}
       className={`toggle ${checked ? 'toggle-on' : ''}`}
       onClick={() => {
         onChange(!checked);

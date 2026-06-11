@@ -1,7 +1,8 @@
-import { useState, type JSX } from 'react';
-import { validateDictionaryEntry } from '@openflow/core';
+import { useRef, useState, type JSX } from 'react';
+import { dictionaryToCsv, parseDictionaryCsv, validateDictionaryEntry } from '@openflow/core';
 import { useDictionarySuggestions } from '../hooks.js';
 import type { SettingsApi } from '../hooks.js';
+import { ipc } from '../ipc.js';
 
 export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, save } = api;
@@ -9,6 +10,27 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+
+  const exportCsv = (): void => {
+    void ipc.exportDictionary(dictionaryToCsv(settings.dictionary));
+  };
+
+  const importCsv = async (file: File): Promise<void> => {
+    const { entries, skipped } = parseDictionaryCsv(await file.text(), settings.dictionary);
+    if (entries.length > 0) {
+      await save({ ...settings, dictionary: [...settings.dictionary, ...entries] });
+    }
+    const noun = (n: number): string => (n === 1 ? 'entry' : 'entries');
+    setImportNotice(
+      skipped === 0
+        ? `Imported ${entries.length} ${noun(entries.length)}.`
+        : `Imported ${entries.length} ${noun(entries.length)}. ${skipped} row${
+            skipped === 1 ? '' : 's'
+          } skipped (invalid or duplicate).`,
+    );
+  };
 
   const add = (): void => {
     const entry = { from: from.trim(), to: to.trim() };
@@ -124,7 +146,10 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
         {error && <p className="form-error">{error}</p>}
 
         {settings.dictionary.length === 0 ? (
-          <p className="row-hint">No entries yet.</p>
+          <p className="row-hint">
+            Nothing here yet. When a name or term gets misheard, add it — e.g. “open flow” →
+            “OpenFlow”.
+          </p>
         ) : (
           <div className="dict-list">
             {settings.dictionary.map((entry, index) => (
@@ -153,6 +178,30 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
             ))}
           </div>
         )}
+        <div className="row-actions">
+          <button
+            className="btn btn-quiet"
+            disabled={settings.dictionary.length === 0}
+            onClick={exportCsv}
+          >
+            Export CSV
+          </button>
+          <button className="btn btn-quiet" onClick={() => importInputRef.current?.click()}>
+            Import CSV
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) void importCsv(file);
+            }}
+          />
+        </div>
+        {importNotice && <p className="row-hint">{importNotice}</p>}
       </section>
     </div>
   );

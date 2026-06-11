@@ -1,32 +1,140 @@
 :root {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-  font-size: 13px;
   color-scheme: light dark;
 
+  /* ---- Color: surfaces ---- */
   --bg: #f5f5f7;
+  --bg-elevated: #ffffff; /* inset wells (result text), was bare var(--bg) */
   --panel: #ffffff;
+  --border: #d2d2d7;
+  --border-strong: #b8b8c0; /* focus targets, active model row outline */
+
+  /* ---- Color: text ---- */
   --text: #1d1d1f;
   --text-dim: #6e6e73;
-  --border: #d2d2d7;
+  --text-faint: #8e8e93; /* timestamps, disabled hint text */
+
+  /* ---- Color: accent + state ---- */
   --accent: #5b5bd6;
+  --accent-hover: #4a4ac4; /* btn-primary:hover, was filter(brightness) */
   --accent-text: #ffffff;
-  --danger: #d62b2b;
-  --ok: #1f8a4c;
+  --danger: #c4241f; /* darkened from #d62b2b for margin + dark legibility */
+  --danger-bg: #fbeaea;
+  --ok: #187a40; /* darkened from #1f8a4c so badge text clears AA on white (§4.5) */
+  --warn: #8a5a00; /* notices; AA on --panel; replaces ad-hoc amber */
+  --warn-bg: #fdf3e3;
   --chip: #e8e8ed;
+
+  /* ---- Color: HUD (fixed dark pill, both themes) ---- */
+  --hud-bg: rgb(28 28 32 / 92%);
+  --hud-bg-notice: rgb(122 90 0 / 95%);
+  --hud-bg-error: rgb(150 30 28 / 96%);
+  --hud-text: #f5f5f7;
+  --hud-bars: #9e9efc;
+  --hud-ok: #5dd28a; /* success ✓ glyph; pill bg stays --hud-bg */
+
+  /* ---- Type scale (size / weight / line-height) ---- */
+  --font-size-root: 13px;
+  --text-h1: 22px; /* onboarding titles */
+  --text-h2: 13px; /* card headers (uppercase) */
+  --text-title: 13px; /* row titles, sidebar items */
+  --text-body: 13px;
+  --text-hint: 12px; /* hints, privacy notes, form errors */
+  --text-badge: 11px; /* badges, step dots, mono */
+  --weight-regular: 400;
+  --weight-medium: 500; /* row titles */
+  --weight-semibold: 600; /* hotkey chip, dict-to */
+  --weight-bold: 700; /* sidebar brand */
+  --leading-body: 1.5;
+  --leading-tight: 1.3;
+  --tracking-h2: 0.4px; /* uppercase card headers */
+
+  /* ---- Spacing scale (4px base) ---- */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-9: 18px;
+  --space-10: 22px;
+  --space-12: 28px;
+
+  /* ---- Radius scale ---- */
+  --radius-sm: 6px; /* inputs, buttons, chips, hotkey */
+  --radius-md: 8px; /* banners, sheets */
+  --radius-lg: 10px; /* cards */
+  --radius-pill: 99px;
+
+  /* ---- Elevation ---- */
+  --shadow-knob: 0 1px 2px rgb(0 0 0 / 30%);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 4%);
+  --shadow-sheet: 0 8px 28px rgb(0 0 0 / 18%); /* template gallery / future sheets */
+  --shadow-hud: 0 6px 20px rgb(0 0 0 / 35%);
+
+  /* ---- Motion ---- */
+  --motion-fast: 0.15s;
+  --motion-hud: 0.18s;
+  --ease: ease;
+
+  font-size: var(--font-size-root);
 }
 
+/*
+ * Dark values appear twice on purpose: the [data-theme='dark'] selector (the
+ * user picking "Dark") and the media-query block ("System" while macOS is
+ * dark). CSS cannot share custom-property values across unrelated selectors
+ * without a preprocessor — keep the two lists identical when either changes.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root[data-theme='system'],
+  :root:not([data-theme]) {
     --bg: #1e1e20;
+    --bg-elevated: #242427;
     --panel: #2a2a2d;
+    --border: #3d3d41;
+    --border-strong: #54545a;
     --text: #f5f5f7;
     --text-dim: #98989d;
-    --border: #3d3d41;
+    --text-faint: #818188;
     --accent: #7c7cf0;
+    --accent-hover: #9090f4;
     --danger: #ff6961;
+    --danger-bg: #3a1e1d;
     --ok: #5dd28a;
+    --warn: #f0b65a;
+    --warn-bg: #3a2e16;
     --chip: #3a3a3e;
+    /* HUD pill keeps its fixed dark palette in both themes. */
   }
+}
+
+/* Manual override from General → Appearance wins over the media query. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  /* inherits the light :root block above — no overrides needed */
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #1e1e20;
+  --bg-elevated: #242427;
+  --panel: #2a2a2d;
+  --border: #3d3d41;
+  --border-strong: #54545a;
+  --text: #f5f5f7;
+  --text-dim: #98989d;
+  --text-faint: #818188;
+  --accent: #7c7cf0;
+  --accent-hover: #9090f4;
+  --danger: #ff6961;
+  --danger-bg: #3a1e1d;
+  --ok: #5dd28a;
+  --warn: #f0b65a;
+  --warn-bg: #3a2e16;
+  --chip: #3a3a3e;
 }
 
 * {
@@ -111,7 +219,16 @@ button:focus-visible,
   padding: 4px 10px 14px;
 }
 
+.sidebar-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
   text-align: left;
   border: none;
   background: transparent;
@@ -119,6 +236,12 @@ button:focus-visible,
   border-radius: 6px;
   cursor: pointer;
   color: var(--text);
+}
+
+.sidebar-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .sidebar-item:hover {
@@ -184,6 +307,10 @@ button:focus-visible,
   font-size: 12px;
 }
 
+.row-hint-warn {
+  color: var(--warn);
+}
+
 .row-control {
   flex-shrink: 0;
 }
@@ -238,18 +365,84 @@ button:focus-visible,
   color: var(--danger);
 }
 
+.btn-sm {
+  padding: 2px 8px;
+  font-size: var(--text-hint);
+}
+
+/* ---- Callout (09 §5.8): inline non-modal notice ---- */
+
+.callout {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-6);
+  margin-bottom: var(--space-4);
+  background: var(--panel);
+  font-size: var(--text-hint);
+}
+
+.callout-info {
+  border-left-color: var(--accent);
+}
+
+.callout-warn {
+  border-left-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.callout-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: var(--leading-tight);
+  color: var(--accent);
+}
+
+.callout-warn .callout-icon {
+  color: var(--warn);
+}
+
+.callout-body {
+  flex: 1;
+}
+
+.callout-body p {
+  margin: 0;
+}
+
+.callout-body .btn {
+  margin-top: var(--space-3);
+}
+
+.callout-dismiss {
+  flex-shrink: 0;
+  margin-top: -2px;
+}
+
 .badge {
   display: inline-block;
   background: var(--chip);
-  border-radius: 99px;
-  font-size: 11px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-badge);
   padding: 1px 8px;
   margin-left: 6px;
-  color: var(--text-dim);
+  color: var(--text); /* AA on --chip; --text-dim fell short (§4.5) */
 }
 
 .badge-ok {
   color: var(--ok);
+  font-size: var(--text-hint); /* 12px so the green clears AA body (§4.5) */
+}
+
+/* A louder badge than `cloud` — audio is categorically more sensitive (08 §3.1). */
+.badge-audio {
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--text-hint);
+  font-weight: var(--weight-medium);
 }
 
 .badge-muted {
@@ -282,9 +475,9 @@ button:focus-visible,
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+  background: var(--danger-bg);
   border: 1px solid var(--danger);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 12px;
   margin-bottom: 12px;
 }
@@ -331,6 +524,30 @@ button:focus-visible,
 }
 
 /* ---- Hotkey recorder ---- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.hotkey-recorder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.hotkey-help {
+  font-size: var(--text-hint);
+  color: var(--text-dim);
+}
 
 .hotkey-chip {
   background: var(--chip);
@@ -416,6 +633,64 @@ button:focus-visible,
 
 .mode-selected {
   background: var(--chip);
+}
+
+/* The mode name is the edit trigger — a text button, not a chunky control. */
+.mode-edit {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  padding: 0;
+}
+
+.mode-edit:hover {
+  text-decoration: underline;
+}
+
+.badge-active {
+  color: var(--ok);
+  font-size: var(--text-hint);
+}
+
+.template-gallery {
+  margin-top: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg-elevated);
+}
+
+.template-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}
+
+.template-row:first-of-type {
+  border-top: none;
+}
+
+.template-text {
+  flex: 1;
+}
+
+.advanced {
+  margin-top: var(--space-5);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+}
+
+.advanced summary {
+  cursor: pointer;
+  font-weight: var(--weight-medium);
+  font-size: var(--text-hint);
+  color: var(--text-dim);
 }
 
 .prompt-edit {
@@ -663,6 +938,22 @@ button:focus-visible,
   margin: 6px 0;
 }
 
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.history-row {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+
+.history-row:first-child {
+  border-top: none;
+}
+
 .about-list {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -757,6 +1048,32 @@ button:focus-visible,
   padding-top: 14px;
 }
 
+.youre-set-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+.tryit-field {
+  margin: var(--space-4) 0;
+}
+
+.diff-panel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.diff-panel > div {
+  flex: 1;
+}
+
+.diff-panel .dict-arrow {
+  flex: 0 0 auto;
+}
+
 /* ---- HUD ---- */
 
 .hud-body {
@@ -775,16 +1092,17 @@ button:focus-visible,
   align-items: center;
   gap: 10px;
   padding: 0 18px;
-  border-radius: 99px;
-  background: rgb(28 28 32 / 92%);
-  color: #f5f5f7;
+  border-radius: var(--radius-pill);
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  box-shadow: var(--shadow-hud);
   font-size: 13px;
   font-weight: 500;
   opacity: 0;
   transform: translateY(10px);
   transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
+    opacity var(--motion-hud) var(--ease),
+    transform var(--motion-hud) var(--ease);
   pointer-events: none;
   white-space: nowrap;
   overflow: hidden;
@@ -796,11 +1114,11 @@ button:focus-visible,
 }
 
 .hud-error {
-  background: rgb(120 24 24 / 94%);
+  background: var(--hud-bg-error);
 }
 
 .hud-notice {
-  background: rgb(112 84 16 / 94%);
+  background: var(--hud-bg-notice);
 }
 
 .hud-bars {
@@ -814,9 +1132,25 @@ button:focus-visible,
   width: 4px;
   height: 100%;
   border-radius: 2px;
-  background: #9e9efc;
+  background: var(--hud-bars);
   transform-origin: center;
   transition: transform 80ms linear;
+}
+
+.hud-glyph {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.hud-glyph-ok {
+  color: var(--hud-ok);
+}
+
+.hud-textcol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .hud-label {
@@ -824,12 +1158,21 @@ button:focus-visible,
   text-overflow: ellipsis;
 }
 
+/* One-time educational tip under the success preview (05 §2.3). */
+.hud-tip {
+  font-size: 11px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .hud-spinner {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: 2px solid rgb(255 255 255 / 25%);
-  border-top-color: #fff;
+  border-top-color: var(--hud-text);
   animation: spin 0.8s linear infinite;
   flex-shrink: 0;
 }
@@ -837,6 +1180,34 @@ button:focus-visible,
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/*
+ * Reduced motion (§4.6): the HUD still communicates via label + glyph + the
+ * success dwell, so dropping the slide/spin/pulse loses nothing functional.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .hud-pill {
+    transition: opacity var(--motion-hud) var(--ease);
+    transform: none;
+  }
+  .hud-visible {
+    transform: none;
+  }
+  .hud-bars span {
+    transition: none;
+  }
+  .hud-spinner {
+    animation: none;
+    border-top-color: transparent;
+  }
+  .hotkey-recording {
+    animation: none;
+  }
+  .toggle,
+  .toggle-knob {
+    transition: none;
   }
 }
 

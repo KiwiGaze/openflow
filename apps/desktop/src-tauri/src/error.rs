@@ -34,6 +34,25 @@ pub enum AppError {
     Tauri(#[from] tauri::Error),
 }
 
+impl AppError {
+    /// The bare message without the internal category prefix, for HUD display.
+    /// `Display` (and therefore logs) keep the `"x error:"` prefix for triage;
+    /// the user only ever sees the message itself.
+    pub fn user_message(&self) -> String {
+        match self {
+            AppError::Audio(m)
+            | AppError::Stt(m)
+            | AppError::Model(m)
+            | AppError::Llm(m)
+            | AppError::Output(m)
+            | AppError::Settings(m)
+            | AppError::State(m) => m.clone(),
+            AppError::Io(e) => e.to_string(),
+            AppError::Tauri(e) => e.to_string(),
+        }
+    }
+}
+
 /// Tauri commands serialize errors for the frontend; a plain message is all
 /// the UI needs.
 impl Serialize for AppError {

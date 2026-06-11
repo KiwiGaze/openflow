@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use crate::history::HistoryStore;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
 use crate::output::OutputSystem;
@@ -10,6 +11,7 @@ use crate::pipeline::Pipeline;
 use crate::profiles::ProfileManager;
 use crate::settings::SettingsManager;
 use crate::stt::SttEngine;
+use crate::stt_profiles::SttProfileManager;
 
 /// The audio system is owned by the pipeline; everything commands or tray
 /// handlers need lives here.
@@ -21,4 +23,6 @@ pub struct AppState {
     pub llm: Arc<LlmClient>,
     pub output: Arc<OutputSystem>,
     pub pipeline: Arc<Pipeline>,
+    pub history: Arc<HistoryStore>,
+    pub stt_profiles: Arc<SttProfileManager>,
 }

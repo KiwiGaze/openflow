@@ -1,10 +1,23 @@
 import type { PipelineState } from '@openflow/core';
 
+/** The pipeline fields these label helpers read (the tip renders separately). */
+type HudState = Pick<PipelineState, 'status' | 'job' | 'message'>;
+
+/** Longest inserted-text preview shown in the success flash. */
+const MAX_PREVIEW = 48;
+
+function ellipsize(text: string, max = MAX_PREVIEW): string {
+  const trimmed = text.trim();
+  return trimmed.length > max ? `${trimmed.slice(0, max - 1)}…` : trimmed;
+}
+
 /** Text shown in the HUD pill for each pipeline state. */
-export function hudLabel(state: PipelineState): string {
+export function hudLabel(state: HudState): string {
   switch (state.status) {
     case 'recording':
-      return state.job === 'refineSelection' ? 'Listening for instruction…' : 'Listening…';
+      if (state.job === 'refineSelection') return 'Listening for instruction…';
+      // Dictation names the active mode (07 §5); Rewrite is an action, not a mode.
+      return state.message ? `Listening — ${state.message}` : 'Listening…';
     case 'transcribing':
       return 'Transcribing…';
     case 'refining':
@@ -12,18 +25,37 @@ export function hudLabel(state: PipelineState): string {
       if (state.job === 'polishSelection') return 'Polishing selection…';
       // Transforms carry their name in the message ("Concise…").
       if (state.job === 'transform') return state.message ? `${state.message}…` : 'Transforming…';
-      return 'Polishing…';
+      return 'Cleaning up…';
     case 'inserting':
       return 'Inserting…';
+    case 'inserted':
+      return state.message ? `“${ellipsize(state.message)}”` : 'Inserted';
     case 'notice':
     case 'error':
-      return state.message ?? 'Something went wrong';
+      return state.message ?? 'Something went wrong — your text is on the clipboard';
     case 'idle':
       return '';
   }
 }
 
-export function hudVisible(state: PipelineState): boolean {
+/**
+ * Leading severity glyph so meaning survives without color (UX-34). It is
+ * `aria-hidden`; the label text carries the meaning for assistive tech.
+ */
+export function hudGlyph(state: HudState): string {
+  switch (state.status) {
+    case 'inserted':
+      return '✓';
+    case 'notice':
+      return 'ⓘ';
+    case 'error':
+      return '⚠';
+    default:
+      return '';
+  }
+}
+
+export function hudVisible(state: HudState): boolean {
   return state.status !== 'idle';
 }
 

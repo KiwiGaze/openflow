@@ -8,7 +8,7 @@
 use std::str::FromStr;
 
 use tauri::{AppHandle, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::pipeline::Job;
 use crate::settings::Settings;
@@ -30,6 +30,16 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         .map_err(|e| format!("rewrite hotkey “{}”: {e}", settings.refine_hotkey))?;
     let polish = Shortcut::from_str(&settings.polish_hotkey)
         .map_err(|e| format!("polish hotkey “{}”: {e}", settings.polish_hotkey))?;
+    // Parse every non-null mode hotkey alongside the globals.
+    let mut mode_hotkeys: Vec<(String, Shortcut)> = Vec::new();
+    for mode in &settings.modes {
+        if let Some(hk) = mode.hotkey.as_deref().filter(|h| !h.is_empty()) {
+            let shortcut = Shortcut::from_str(hk)
+                .map_err(|e| format!("mode “{}” hotkey “{hk}”: {e}", mode.name))?;
+            mode_hotkeys.push((mode.id.clone(), shortcut));
+        }
+    }
+
     // The see-changes hotkey is optional: an empty string disables it.
     let changes = if settings.change_overlay_hotkey.trim().is_empty() {
         None
@@ -56,11 +66,13 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     }
 
     // Every hotkey must be pairwise distinct — the three fixed ones, the
-    // optional see-changes key, and each bound transform. (Shortcut is Copy, so
-    // collecting them here leaves the originals usable for registration below.)
+    // optional see-changes key, each bound transform, and every mode hotkey
+    // (07 §4). (Shortcut is Copy, so collecting them here leaves the originals
+    // usable for registration below.)
     let mut all: Vec<Shortcut> = vec![dictation, refine, polish];
     all.extend(changes.iter().copied());
     all.extend(transforms.iter().map(|(_, sc)| *sc));
+    all.extend(mode_hotkeys.iter().map(|(_, sc)| *sc));
     for i in 0..all.len() {
         for j in (i + 1)..all.len() {
             if all[i] == all[j] {
@@ -125,19 +137,55 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         }
     }
 
+    // Per-mode hotkeys: one-shot dictation in that mode.
+    for (mode_id, shortcut) in mode_hotkeys {
+        if let Err(e) = shortcuts.on_shortcut(shortcut, move |app, _shortcut, event| {
+            dispatch_mode(app, mode_id.clone(), event.state());
+        }) {
+            let _ = shortcuts.unregister_all();
+            return Err(format!("could not register a mode hotkey: {e}"));
+        }
+    }
+
     log::info!(
-        "hotkeys registered: dictation={} rewrite={} polish={} transforms={} see-changes={}",
+        "hotkeys registered: dictation={} rewrite={} polish={} see-changes={} transforms={} mode-hotkeys={}",
         settings.dictation_hotkey,
         settings.refine_hotkey,
         settings.polish_hotkey,
+        settings.change_overlay_hotkey,
         settings
             .transforms
             .iter()
             .filter(|t| !t.hotkey.trim().is_empty())
             .count(),
-        settings.change_overlay_hotkey
+        settings.modes.iter().filter(|m| m.hotkey.is_some()).count()
     );
     Ok(())
+}
+
+/// Esc cancels an in-progress recording — a "never mind" for a mistaken
+/// activation (UX-12). It is bound only while recording (registered on start,
+/// dropped on finish/cancel) so Esc stays free for every other app the rest of
+/// the time. Carbon registration must happen on the main thread, so this
+/// marshals there regardless of the caller's thread; both register and
+/// unregister are idempotent (unbinding a free key is a no-op we log at debug).
+pub fn set_cancel_key(app: &AppHandle, active: bool) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let shortcuts = handle.global_shortcut();
+        let esc = Shortcut::new(None, Code::Escape);
+        if active {
+            if let Err(err) = shortcuts.on_shortcut(esc, |app, _shortcut, event| {
+                if event.state() == ShortcutState::Pressed {
+                    app.state::<AppState>().pipeline.clone().cancel();
+                }
+            }) {
+                log::warn!("could not bind Esc-to-cancel: {err}");
+            }
+        } else if let Err(err) = shortcuts.unregister(esc) {
+            log::debug!("Esc-to-cancel already unbound: {err}");
+        }
+    });
 }
 
 fn dispatch(app: &AppHandle, job: Job, state: ShortcutState) {
@@ -153,7 +201,17 @@ fn dispatch(app: &AppHandle, job: Job, state: ShortcutState) {
     // within that window — and sub-threshold taps already treat Released as a
     // no-op.
     tauri::async_runtime::spawn_blocking(move || match state {
-        ShortcutState::Pressed => pipeline.on_hotkey_pressed(job),
+        ShortcutState::Pressed => pipeline.on_hotkey_pressed(job, None),
         ShortcutState::Released => pipeline.on_hotkey_released(job),
+    });
+}
+
+/// A per-mode hotkey: dictates once in `mode_id` without changing the active
+/// mode (one-shot, 07 §4). Same record/finish flow as the plain dictation key.
+fn dispatch_mode(app: &AppHandle, mode_id: String, state: ShortcutState) {
+    let pipeline = app.state::<AppState>().pipeline.clone();
+    tauri::async_runtime::spawn_blocking(move || match state {
+        ShortcutState::Pressed => pipeline.on_hotkey_pressed(Job::Dictation, Some(mode_id)),
+        ShortcutState::Released => pipeline.on_hotkey_released(Job::Dictation),
     });
 }

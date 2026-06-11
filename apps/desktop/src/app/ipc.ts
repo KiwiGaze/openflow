@@ -8,6 +8,8 @@ import {
   type AppInfo,
   type DictionarySuggestion,
   type DownloadProgress,
+  type FrontmostApp,
+  type HistoryEntry,
   type Insights,
   type LlmProfile,
   type LlmTestResult,
@@ -15,6 +17,7 @@ import {
   type PermissionsState,
   type PipelineState,
   type Settings,
+  type SttProfile,
   type TranscriptionResult,
 } from '@openflow/core';
 
@@ -34,6 +37,11 @@ export const ipc = {
   startRefineSelection: (): Promise<void> => invoke(COMMANDS.startRefineSelection),
   startPolishSelection: (): Promise<void> => invoke(COMMANDS.startPolishSelection),
   getLastResult: (): Promise<TranscriptionResult | null> => invoke(COMMANDS.getLastResult),
+  getLastDictationApp: (): Promise<FrontmostApp | null> => invoke(COMMANDS.getLastDictationApp),
+  getHistory: (): Promise<HistoryEntry[]> => invoke(COMMANDS.getHistory),
+  clearHistory: (): Promise<void> => invoke(COMMANDS.clearHistory),
+  reprocessHistory: (text: string, modeId: string): Promise<string> =>
+    invoke(COMMANDS.reprocessHistory, { text, modeId }),
   getInsights: (): Promise<Insights> => invoke(COMMANDS.getInsights),
   listDictionarySuggestions: (): Promise<DictionarySuggestion[]> =>
     invoke(COMMANDS.listDictionarySuggestions),
@@ -43,12 +51,28 @@ export const ipc = {
   setChangesInteractive: (interactive: boolean): Promise<void> =>
     invoke(COMMANDS.setChangesInteractive, { interactive }),
   testLlm: (profile: LlmProfile): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { profile }),
+  testMode: (
+    prompt: string,
+    sample: string,
+    transforms: boolean,
+    aiProfileId: string | null,
+  ): Promise<string> => invoke(COMMANDS.testMode, { prompt, sample, transforms, aiProfileId }),
   listLlmProfiles: (): Promise<LlmProfile[]> => invoke(COMMANDS.listLlmProfiles),
   saveLlmProfile: (profile: LlmProfile): Promise<LlmProfile[]> =>
     invoke(COMMANDS.saveLlmProfile, { profile }),
   deleteLlmProfile: (id: string): Promise<LlmProfile[]> =>
     invoke(COMMANDS.deleteLlmProfile, { id }),
   revealLlmProfiles: (): Promise<void> => invoke(COMMANDS.revealLlmProfiles),
+  listSttProfiles: (): Promise<SttProfile[]> => invoke(COMMANDS.listSttProfiles),
+  saveSttProfile: (profile: SttProfile): Promise<SttProfile[]> =>
+    invoke(COMMANDS.saveSttProfile, { profile }),
+  deleteSttProfile: (id: string): Promise<SttProfile[]> =>
+    invoke(COMMANDS.deleteSttProfile, { id }),
+  revealSttProfiles: (): Promise<void> => invoke(COMMANDS.revealSttProfiles),
+  exportMode: (filename: string, contents: string): Promise<void> =>
+    invoke(COMMANDS.exportMode, { filename, contents }),
+  exportDictionary: (contents: string): Promise<void> =>
+    invoke(COMMANDS.exportDictionary, { contents }),
   listOllamaModels: (baseUrl: string): Promise<string[]> =>
     invoke(COMMANDS.listOllamaModels, { baseUrl }),
   checkPermissions: (): Promise<PermissionsState> => invoke(COMMANDS.checkPermissions),

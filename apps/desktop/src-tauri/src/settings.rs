@@ -22,6 +22,16 @@ pub enum HotkeyBehavior {
     Toggle,
 }
 
+/// Window theme. `System` follows macOS; `Light`/`Dark` force it for OpenFlow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Appearance {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum InsertMethod {
@@ -50,7 +60,25 @@ pub struct Mode {
     pub name: String,
     pub built_in: bool,
     pub uses_llm: bool,
+    /// When true the appended default "preserve the language" line is dropped,
+    /// so the mode may translate/re-cast (still fenced by SAFETY_RULES). The
+    /// invariant rules always apply. Old files default this to false.
+    #[serde(default)]
+    pub transforms: bool,
     pub prompt: String,
+    // ---- Mode v2 overrides (07); null = inherit the global setting ----
+    /// AI profile id, or null to use the globally active profile.
+    #[serde(default)]
+    pub ai_profile_id: Option<String>,
+    /// Whisper model id, or null to use the global speech model.
+    #[serde(default)]
+    pub stt_model_id: Option<String>,
+    /// ISO 639-1 code or `auto`, or null to use the global spoken language.
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Per-mode one-shot hotkey accelerator, or null for none.
+    #[serde(default)]
+    pub hotkey: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -58,6 +86,15 @@ pub struct Mode {
 pub struct DictionaryEntry {
     pub from: String,
     pub to: String,
+}
+
+/// A per-app rule (07 §9): dictating while `bundle_id` is frontmost uses
+/// `mode_id` for that job only, like a mode hotkey — the active mode is unchanged.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppRule {
+    pub bundle_id: String,
+    pub mode_id: String,
 }
 
 /// A spoken shorthand that expands into a longer block on insert. Unlike a
@@ -119,6 +156,25 @@ pub struct Settings {
     pub insert_method: InsertMethod,
     pub restore_clipboard: bool,
     pub launch_at_login: bool,
+    pub appearance: Appearance,
+    // ---- Tip system (05); all additive, defaulted via the container default ----
+    /// Master switch for one-time feature tips.
+    pub tips_enabled: bool,
+    /// Tip ids already shown; never re-shown.
+    pub tips_seen: Vec<String>,
+    /// Successful dictations ever — the only tip-system counter (never a log).
+    pub dictation_count: u64,
+    /// ISO date (`YYYY-MM-DD`) of the last tip shown; enforces ≤ 1 tip/day.
+    pub last_tip_shown_at: String,
+    /// Opt-in (default off): keep a local, searchable log of past dictations.
+    /// Off preserves the no-transcript-persistence privacy default.
+    pub history_enabled: bool,
+    /// Per-app rules: dictate in a chosen mode when an app is frontmost (07 §9).
+    pub app_rules: Vec<AppRule>,
+    /// STT profile ids whose "audio leaves the Mac" consent the user confirmed
+    /// (08 §3.2). A profile id only reaches the cloud path once it is in here;
+    /// a new endpoint/key (new id) re-confirms.
+    pub confirmed_stt_profiles: Vec<String>,
     /// Keep a Dock icon (Regular activation). Off = menu-bar-only (Accessory).
     pub show_in_dock: bool,
     pub onboarding_completed: bool,
@@ -146,6 +202,14 @@ impl Default for Settings {
             insert_method: InsertMethod::Paste,
             restore_clipboard: true,
             launch_at_login: false,
+            appearance: Appearance::System,
+            tips_enabled: true,
+            tips_seen: Vec::new(),
+            dictation_count: 0,
+            last_tip_shown_at: String::new(),
+            history_enabled: false,
+            app_rules: Vec::new(),
+            confirmed_stt_profiles: Vec::new(),
             show_in_dock: false,
             onboarding_completed: false,
         }
@@ -164,13 +228,24 @@ impl Settings {
     /// Repairs invariants instead of rejecting input: built-in modes are
     /// restored if deleted and the active mode id must point somewhere.
     fn normalize(&mut self) {
+        // Built-in modes are read-only, so refresh persisted copies in place —
+        // this is how prompt/flag changes in code (e.g. the SAFETY_RULES split)
+        // reach existing installs — and re-add any that were deleted.
         for built_in in modes::built_in_modes() {
-            if !self.modes.iter().any(|m| m.id == built_in.id) {
-                self.modes.push(built_in);
+            match self.modes.iter_mut().find(|m| m.id == built_in.id) {
+                Some(existing) => *existing = built_in,
+                None => self.modes.push(built_in),
             }
         }
         if !self.modes.iter().any(|m| m.id == self.active_mode_id) {
             self.active_mode_id = modes::STANDARD_MODE_ID.into();
+        }
+        // An empty-string mode hotkey normalizes to None so "" never reaches
+        // the registrar (built-ins carry no overrides — refreshed above).
+        for mode in &mut self.modes {
+            if mode.hotkey.as_deref() == Some("") {
+                mode.hotkey = None;
+            }
         }
         self.dictionary
             .retain(|e| !e.from.trim().is_empty() && !e.to.trim().is_empty());
@@ -342,6 +417,10 @@ mod tests {
         assert!(json.contains("\"refineAfterDictation\":true"));
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"insertMethod\":\"paste\""));
+        assert!(json.contains("\"appearance\":\"system\""));
+        assert!(json.contains("\"tipsEnabled\":true"));
+        assert!(json.contains("\"dictationCount\":0"));
+        assert!(json.contains("\"historyEnabled\":false"));
         assert!(json.contains("\"snippets\":[]"));
         assert!(json.contains("\"showInDock\":false"));
         // The v1 LLM block is deserialize-only; it must never be written.
