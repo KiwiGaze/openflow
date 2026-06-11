@@ -176,9 +176,11 @@ impl Settings {
             .retain(|e| !e.from.trim().is_empty() && !e.to.trim().is_empty());
         self.snippets
             .retain(|s| !s.trigger.trim().is_empty() && !s.expansion.is_empty());
-        // A transform needs a name; an empty instruction is a valid draft (it
-        // falls back to the Polish default until the user fills it in).
-        self.transforms.retain(|t| !t.name.trim().is_empty());
+        // Transforms are created and removed explicitly in the UI, which saves
+        // on every keystroke — so never drop one because a field is transiently
+        // blank mid-edit (that would lose its instruction and hotkey while the
+        // user renames it). Only drop structurally-invalid rows with no id.
+        self.transforms.retain(|t| !t.id.trim().is_empty());
         self.version = SETTINGS_VERSION;
     }
 }
@@ -378,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn normalize_drops_blank_name_transforms_but_keeps_instruction_drafts() {
+    fn normalize_keeps_transforms_being_edited_drops_only_idless_rows() {
         let dir = temp_dir("transforms");
         let manager = SettingsManager::load(&dir);
         let mut s = manager.get();
@@ -389,25 +391,27 @@ mod tests {
                 instruction: "Tighten the wording.".into(),
                 hotkey: "Alt+1".into(),
             },
-            // A named draft with no instruction yet is kept (acts like Polish).
+            // Mid-rename: the name is transiently blank but the instruction and
+            // hotkey must survive (a keystroke must not delete the transform).
             Transform {
                 id: "b".into(),
-                name: "Draft".into(),
-                instruction: String::new(),
-                hotkey: String::new(),
-            },
-            // No name → dropped.
-            Transform {
-                id: "c".into(),
                 name: "  ".into(),
-                instruction: "orphaned".into(),
+                instruction: "Make it friendlier.".into(),
+                hotkey: "Alt+2".into(),
+            },
+            // Structurally invalid (no id, e.g. a bad hand-edited file) → dropped.
+            Transform {
+                id: " ".into(),
+                name: "Orphan".into(),
+                instruction: "x".into(),
                 hotkey: String::new(),
             },
         ];
         let fixed = manager.set(s).unwrap();
         assert_eq!(fixed.transforms.len(), 2);
-        assert!(fixed.transforms.iter().any(|t| t.name == "Draft"));
-        assert!(!fixed.transforms.iter().any(|t| t.id == "c"));
+        let renamed = fixed.transforms.iter().find(|t| t.id == "b").unwrap();
+        assert_eq!(renamed.instruction, "Make it friendlier.");
+        assert_eq!(renamed.hotkey, "Alt+2");
     }
 
     #[test]

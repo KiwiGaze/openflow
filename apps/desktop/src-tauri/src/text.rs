@@ -216,10 +216,20 @@ enum CaseStyle {
 /// - "pascal case user service"  → `UserService`
 /// - "kebab case feature flag"   → `feature-flag`
 pub fn apply_code_identifier(text: &str) -> String {
-    let cleaned = text.trim().trim_end_matches(['.', '!', '?', ',', ';', ':']);
-    let lower = cleaned.to_lowercase();
+    let lower = text.trim().to_lowercase();
     let (style, rest) = parse_case_prefix(&lower);
-    let words: Vec<&str> = rest.split_whitespace().collect();
+    // Identifiers are alphanumeric: strip any spoken/transcribed punctuation
+    // ("get user, by id" or "user's id" must not become "getUser,ById"). Words
+    // that reduce to nothing are dropped.
+    let words: Vec<String> = rest
+        .split_whitespace()
+        .map(|w| {
+            w.chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+        })
+        .filter(|w| !w.is_empty())
+        .collect();
     join_identifier(style, &words)
 }
 
@@ -250,7 +260,7 @@ fn parse_case_prefix(lower: &str) -> (CaseStyle, &str) {
     (CaseStyle::Camel, lower)
 }
 
-fn join_identifier(style: CaseStyle, words: &[&str]) -> String {
+fn join_identifier(style: CaseStyle, words: &[String]) -> String {
     if words.is_empty() {
         return String::new();
     }
@@ -266,13 +276,7 @@ fn join_identifier(style: CaseStyle, words: &[&str]) -> String {
         CaseStyle::Camel => words
             .iter()
             .enumerate()
-            .map(|(i, w)| {
-                if i == 0 {
-                    (*w).to_string()
-                } else {
-                    capitalize(w)
-                }
-            })
+            .map(|(i, w)| if i == 0 { w.clone() } else { capitalize(w) })
             .collect::<String>(),
     }
 }
@@ -503,6 +507,17 @@ mod tests {
     fn code_identifier_handles_empty_after_keyword() {
         assert_eq!(apply_code_identifier("snake case"), "");
         assert_eq!(apply_code_identifier("   "), "");
+    }
+
+    #[test]
+    fn code_identifier_strips_transcribed_punctuation() {
+        // Commas/apostrophes from the transcriber must not leak into the name.
+        assert_eq!(apply_code_identifier("get user, by id"), "getUserById");
+        assert_eq!(apply_code_identifier("user's id"), "usersId");
+        assert_eq!(
+            apply_code_identifier("snake case first. second"),
+            "first_second"
+        );
     }
 
     #[test]
