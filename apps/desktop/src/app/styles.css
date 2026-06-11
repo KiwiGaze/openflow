@@ -349,6 +349,63 @@ button:focus-visible {
   color: var(--danger);
 }
 
+.btn-sm {
+  padding: 2px 8px;
+  font-size: var(--text-hint);
+}
+
+/* ---- Callout (09 §5.8): inline non-modal notice ---- */
+
+.callout {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-6);
+  margin-bottom: var(--space-4);
+  background: var(--panel);
+  font-size: var(--text-hint);
+}
+
+.callout-info {
+  border-left-color: var(--accent);
+}
+
+.callout-warn {
+  border-left-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.callout-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: var(--leading-tight);
+  color: var(--accent);
+}
+
+.callout-warn .callout-icon {
+  color: var(--warn);
+}
+
+.callout-body {
+  flex: 1;
+}
+
+.callout-body p {
+  margin: 0;
+}
+
+.callout-body .btn {
+  margin-top: var(--space-3);
+}
+
+.callout-dismiss {
+  flex-shrink: 0;
+  margin-top: -2px;
+}
+
 .badge {
   display: inline-block;
   background: var(--chip);
@@ -394,9 +451,9 @@ button:focus-visible {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+  background: var(--danger-bg);
   border: 1px solid var(--danger);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 12px;
   margin-bottom: 12px;
 }

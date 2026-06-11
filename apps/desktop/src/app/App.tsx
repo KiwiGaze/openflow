@@ -54,7 +54,7 @@ export function App(): JSX.Element {
       </nav>
       <main className="content">
         {api.saveError && (
-          <div className="error-banner">
+          <div className="error-banner" role="alert">
             <span>{api.saveError}</span>
             <button className="btn btn-quiet" onClick={api.dismissError}>
               Dismiss

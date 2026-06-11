@@ -8,6 +8,7 @@ import {
 } from '@openflow/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { usePipeline } from '../hooks.js';
+import { Callout } from '../components/Callout.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
@@ -39,6 +40,8 @@ export function GeneralTab({
   const { settings, update } = api;
   const { models, progress, download, cancel, remove } = modelsApi;
   const { lastResult } = usePipeline();
+  // models is empty until the first list arrives; only warn once we know.
+  const noModelInstalled = models.length > 0 && !models.some((m) => m.installed);
 
   return (
     <div className="tab-body">
@@ -89,6 +92,11 @@ export function GeneralTab({
 
       <section className="card">
         <h2>Speech recognition</h2>
+        {noModelInstalled && (
+          <Callout variant="warn">
+            No speech model installed — dictation is disabled. Download one below.
+          </Callout>
+        )}
         <div className="model-list">
           {models.map((model) => {
             const p = progress[model.id];
@@ -211,21 +219,25 @@ export function GeneralTab({
         </Row>
       </section>
 
-      {lastResult && (
-        <section className="card">
-          <h2>Last result</h2>
-          <p className="result-text">{lastResult.text}</p>
-          {lastResult.refined && lastResult.raw !== lastResult.text && (
-            <p className="row-hint">Raw transcript: {lastResult.raw}</p>
-          )}
-          <button
-            className="btn"
-            onClick={() => void navigator.clipboard.writeText(lastResult.text)}
-          >
-            Copy
-          </button>
-        </section>
-      )}
+      <section className="card">
+        <h2>Last result</h2>
+        {lastResult ? (
+          <>
+            <p className="result-text">{lastResult.text}</p>
+            {lastResult.refined && lastResult.raw !== lastResult.text && (
+              <p className="row-hint">Raw transcript: {lastResult.raw}</p>
+            )}
+            <button
+              className="btn"
+              onClick={() => void navigator.clipboard.writeText(lastResult.text)}
+            >
+              Copy
+            </button>
+          </>
+        ) : (
+          <p className="row-hint">Your last dictation will appear here.</p>
+        )}
+      </section>
     </div>
   );
 }
