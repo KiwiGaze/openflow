@@ -1,5 +1,13 @@
 import type { PipelineState } from '@openflow/core';
 
+/** Longest inserted-text preview shown in the success flash. */
+const MAX_PREVIEW = 48;
+
+function ellipsize(text: string, max = MAX_PREVIEW): string {
+  const trimmed = text.trim();
+  return trimmed.length > max ? `${trimmed.slice(0, max - 1)}…` : trimmed;
+}
+
 /** Text shown in the HUD pill for each pipeline state. */
 export function hudLabel(state: PipelineState): string {
   switch (state.status) {
@@ -13,10 +21,29 @@ export function hudLabel(state: PipelineState): string {
       return 'Cleaning up…';
     case 'inserting':
       return 'Inserting…';
+    case 'inserted':
+      return state.message ? `“${ellipsize(state.message)}”` : 'Inserted';
     case 'notice':
     case 'error':
       return state.message ?? 'Something went wrong — your text is on the clipboard';
     case 'idle':
+      return '';
+  }
+}
+
+/**
+ * Leading severity glyph so meaning survives without color (UX-34). It is
+ * `aria-hidden`; the label text carries the meaning for assistive tech.
+ */
+export function hudGlyph(state: PipelineState): string {
+  switch (state.status) {
+    case 'inserted':
+      return '✓';
+    case 'notice':
+      return 'ⓘ';
+    case 'error':
+      return '⚠';
+    default:
       return '';
   }
 }

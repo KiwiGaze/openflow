@@ -1,7 +1,7 @@
 import { useEffect, useState, type JSX } from 'react';
 import type { PipelineState } from '@openflow/core';
 import { events, subscribe } from './ipc.js';
-import { barScales, hudLabel, hudVisible } from './hudState.js';
+import { barScales, hudGlyph, hudLabel, hudVisible } from './hudState.js';
 
 /**
  * The always-running overlay. The window itself never hides (see hud.rs);
@@ -27,6 +27,7 @@ export function Hud(): JSX.Element {
   const recording = state.status === 'recording';
   const busy =
     state.status === 'transcribing' || state.status === 'refining' || state.status === 'inserting';
+  const glyph = hudGlyph(state);
 
   return (
     <div className={`hud-pill ${visible ? 'hud-visible' : ''} hud-${state.status}`}>
@@ -38,7 +39,17 @@ export function Hud(): JSX.Element {
         </div>
       )}
       {busy && <span className="hud-spinner" aria-hidden />}
-      <span className="hud-label">{hudLabel(state)}</span>
+      {glyph && (
+        <span
+          className={`hud-glyph ${state.status === 'inserted' ? 'hud-glyph-ok' : ''}`}
+          aria-hidden
+        >
+          {glyph}
+        </span>
+      )}
+      <span className="hud-label" aria-live="polite" aria-atomic="true">
+        {hudLabel(state)}
+      </span>
     </div>
   );
 }

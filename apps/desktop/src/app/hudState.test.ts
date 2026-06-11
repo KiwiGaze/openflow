@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barScales, hudLabel, hudVisible } from './hudState.js';
+import { barScales, hudGlyph, hudLabel, hudVisible } from './hudState.js';
 
 describe('hudLabel', () => {
   it('describes each stage', () => {
@@ -22,6 +22,26 @@ describe('hudLabel', () => {
     expect(hudLabel({ status: 'refining', job: 'polishSelection', message: null })).toBe(
       'Polishing selection…',
     );
+  });
+
+  it('quotes the inserted text on the success flash and ellipsizes long previews', () => {
+    expect(hudLabel({ status: 'inserted', job: null, message: 'Ship it Friday.' })).toBe(
+      '“Ship it Friday.”',
+    );
+    expect(hudLabel({ status: 'inserted', job: null, message: '' })).toBe('Inserted');
+    const long = 'a'.repeat(80);
+    const shown = hudLabel({ status: 'inserted', job: null, message: long });
+    expect(shown.length).toBeLessThan(long.length);
+    expect(shown.endsWith('…”')).toBe(true);
+  });
+});
+
+describe('hudGlyph', () => {
+  it('marks severity without relying on color', () => {
+    expect(hudGlyph({ status: 'inserted', job: null, message: 'x' })).toBe('✓');
+    expect(hudGlyph({ status: 'notice', job: null, message: 'x' })).toBe('ⓘ');
+    expect(hudGlyph({ status: 'error', job: null, message: 'x' })).toBe('⚠');
+    expect(hudGlyph({ status: 'recording', job: 'dictation', message: null })).toBe('');
   });
 });
 

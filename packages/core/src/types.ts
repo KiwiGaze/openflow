@@ -12,6 +12,8 @@ export type PipelineStatus =
   | 'transcribing'
   | 'refining'
   | 'inserting'
+  /** Brief success flash: ✓ + a preview of the inserted text. */
+  | 'inserted'
   | 'notice'
   | 'error';
 

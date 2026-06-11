@@ -35,6 +35,9 @@ const TAP_THRESHOLD: Duration = Duration::from_millis(350);
 /// How long error/notice states stay visible before auto-clearing.
 const TRANSIENT_STATE_TTL: Duration = Duration::from_secs(4);
 
+/// How long the success flash (✓ + inserted text) lingers before idle.
+const SUCCESS_FLASH_TTL: Duration = Duration::from_millis(1500);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Status {
@@ -43,6 +46,8 @@ pub enum Status {
     Transcribing,
     Refining,
     Inserting,
+    /// Brief success flash (✓ + inserted text) before fading back to idle.
+    Inserted,
     Notice,
     Error,
 }
@@ -160,6 +165,19 @@ impl Pipeline {
         let pipeline = Arc::clone(self);
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(TRANSIENT_STATE_TTL).await;
+            if pipeline.state_seq.load(Ordering::SeqCst) == seq {
+                pipeline.set_state(Status::Idle, None, None);
+            }
+        });
+    }
+
+    /// Confirmation flash: ✓ + a preview of the inserted text, then idle.
+    /// The webview ellipsizes; the state-seq guard lets a newer job pre-empt.
+    fn set_success(self: &Arc<Self>, preview: String) {
+        let seq = self.set_state(Status::Inserted, None, Some(preview));
+        let pipeline = Arc::clone(self);
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(SUCCESS_FLASH_TTL).await;
             if pipeline.state_seq.load(Ordering::SeqCst) == seq {
                 pipeline.set_state(Status::Idle, None, None);
             }
@@ -317,8 +335,8 @@ impl Pipeline {
                 return; // cancelled mid-flight; a newer job owns the UI now
             }
             match result {
-                Ok(ProcessOutcome::Inserted) => {
-                    pipeline.set_state(Status::Idle, None, None);
+                Ok(ProcessOutcome::Inserted(preview)) => {
+                    pipeline.set_success(preview);
                 }
                 Ok(ProcessOutcome::Notice(message)) => {
                     pipeline.set_transient(Status::Notice, message);
@@ -392,8 +410,8 @@ impl Pipeline {
                 return; // cancelled mid-flight; a newer job owns the UI now
             }
             match result {
-                Ok(ProcessOutcome::Inserted) => {
-                    pipeline.set_state(Status::Idle, None, None);
+                Ok(ProcessOutcome::Inserted(preview)) => {
+                    pipeline.set_success(preview);
                 }
                 Ok(ProcessOutcome::Notice(message)) => {
                     pipeline.set_transient(Status::Notice, message);
@@ -594,7 +612,7 @@ impl Pipeline {
 
         match outcome {
             InsertOutcome::Pasted | InsertOutcome::CopiedToClipboard(CopyReason::ChosenMethod) => {
-                Ok(ProcessOutcome::Inserted)
+                Ok(ProcessOutcome::Inserted(result.text.clone()))
             }
             InsertOutcome::CopiedToClipboard(CopyReason::NoAccessibility) => {
                 Ok(ProcessOutcome::Notice(
@@ -612,6 +630,7 @@ impl Pipeline {
 }
 
 enum ProcessOutcome {
-    Inserted,
+    /// Inserted cleanly; carries the text for the success flash.
+    Inserted(String),
     Notice(String),
 }
