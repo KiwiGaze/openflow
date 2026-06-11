@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { type Appearance } from '@openflow/core';
+import { type Appearance, formatAcceleratorMac } from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
@@ -51,6 +51,25 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
             Reset tips
           </button>
         </div>
+      </section>
+
+      <section className="card">
+        <h2>Keyboard shortcuts</h2>
+        <dl className="about-list">
+          <dt>Dictate</dt>
+          <dd>
+            Hold {formatAcceleratorMac(settings.dictationHotkey)} (or tap to latch hands-free; tap
+            again to stop)
+          </dd>
+          <dt>Cancel</dt>
+          <dd>Esc while recording</dd>
+          <dt>Rewrite selection</dt>
+          <dd>Hold {formatAcceleratorMac(settings.refineHotkey)}, then speak the change</dd>
+          <dt>Polish selection</dt>
+          <dd>Tap {formatAcceleratorMac(settings.polishHotkey)}</dd>
+          <dt>Copy last result</dt>
+          <dd>From the menu bar, “Copy last dictation”</dd>
+        </dl>
       </section>
     </div>
   );
