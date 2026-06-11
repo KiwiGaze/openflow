@@ -78,6 +78,12 @@ export function GeneralTab({
             onChange={(accelerator) => void update({ refineHotkey: accelerator })}
           />
         </Row>
+        <Row title="See changes" hint="Show what the last cleanup, polish, or rewrite changed.">
+          <HotkeyRecorder
+            value={settings.changeOverlayHotkey}
+            onChange={(accelerator) => void update({ changeOverlayHotkey: accelerator })}
+          />
+        </Row>
       </section>
 
       <section className="card">

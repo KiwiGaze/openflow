@@ -29,8 +29,26 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         .map_err(|e| format!("rewrite hotkey “{}”: {e}", settings.refine_hotkey))?;
     let polish = Shortcut::from_str(&settings.polish_hotkey)
         .map_err(|e| format!("polish hotkey “{}”: {e}", settings.polish_hotkey))?;
+    // The see-changes hotkey is optional: an empty string disables it.
+    let changes = if settings.change_overlay_hotkey.trim().is_empty() {
+        None
+    } else {
+        Some(
+            Shortcut::from_str(&settings.change_overlay_hotkey).map_err(|e| {
+                format!(
+                    "see-changes hotkey “{}”: {e}",
+                    settings.change_overlay_hotkey
+                )
+            })?,
+        )
+    };
     if dictation == refine || dictation == polish || refine == polish {
         return Err("the dictation, rewrite, and polish hotkeys must all be different".into());
+    }
+    if let Some(changes) = changes.as_ref() {
+        if changes == &dictation || changes == &refine || changes == &polish {
+            return Err("the see-changes hotkey must differ from the others".into());
+        }
     }
 
     shortcuts
@@ -58,11 +76,28 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         return Err(format!("polish hotkey “{}”: {e}", settings.polish_hotkey));
     }
 
+    // See-changes is a tap: only Pressed matters, and it does no clipboard or
+    // keystroke work, so it can run inline on the hotkey thread.
+    if let Some(changes) = changes {
+        if let Err(e) = shortcuts.on_shortcut(changes, move |app, _shortcut, event| {
+            if event.state() == ShortcutState::Pressed {
+                crate::changes::request_toggle(app);
+            }
+        }) {
+            let _ = shortcuts.unregister_all();
+            return Err(format!(
+                "see-changes hotkey “{}”: {e}",
+                settings.change_overlay_hotkey
+            ));
+        }
+    }
+
     log::info!(
-        "hotkeys registered: dictation={} rewrite={} polish={}",
+        "hotkeys registered: dictation={} rewrite={} polish={} see-changes={}",
         settings.dictation_hotkey,
         settings.refine_hotkey,
-        settings.polish_hotkey
+        settings.polish_hotkey,
+        settings.change_overlay_hotkey
     );
     Ok(())
 }

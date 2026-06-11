@@ -32,6 +32,9 @@ export const ipc = {
   startRefineSelection: (): Promise<void> => invoke(COMMANDS.startRefineSelection),
   startPolishSelection: (): Promise<void> => invoke(COMMANDS.startPolishSelection),
   getLastResult: (): Promise<TranscriptionResult | null> => invoke(COMMANDS.getLastResult),
+  copyText: (text: string): Promise<void> => invoke(COMMANDS.copyText, { text }),
+  setChangesInteractive: (interactive: boolean): Promise<void> =>
+    invoke(COMMANDS.setChangesInteractive, { interactive }),
   testLlm: (profile: LlmProfile): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { profile }),
   listLlmProfiles: (): Promise<LlmProfile[]> => invoke(COMMANDS.listLlmProfiles),
   saveLlmProfile: (profile: LlmProfile): Promise<LlmProfile[]> =>
@@ -69,6 +72,10 @@ export const events = {
     }),
   onResult: (cb: (result: TranscriptionResult) => void): Promise<UnlistenFn> =>
     listen<TranscriptionResult>(EVENTS.result, (e) => {
+      cb(e.payload);
+    }),
+  onChangesToggle: (cb: (result: TranscriptionResult) => void): Promise<UnlistenFn> =>
+    listen<TranscriptionResult>(EVENTS.changesToggle, (e) => {
       cb(e.payload);
     }),
 };

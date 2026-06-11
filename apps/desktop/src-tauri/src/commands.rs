@@ -1,7 +1,7 @@
 //! Tauri IPC commands. Names map 1:1 to `COMMANDS` in `@openflow/core`.
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::{AppError, AppResult};
 use crate::llm::LlmTestResult;
@@ -37,7 +37,8 @@ pub fn save_settings(
 
     let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
         || previous.refine_hotkey != saved.refine_hotkey
-        || previous.polish_hotkey != saved.polish_hotkey;
+        || previous.polish_hotkey != saved.polish_hotkey
+        || previous.change_overlay_hotkey != saved.change_overlay_hotkey;
     if hotkeys_changed {
         if let Err(message) = shortcuts::apply(&app, &saved) {
             // Roll the hotkeys back to the last working set.
@@ -45,6 +46,7 @@ pub fn save_settings(
             reverted.dictation_hotkey = previous.dictation_hotkey.clone();
             reverted.refine_hotkey = previous.refine_hotkey.clone();
             reverted.polish_hotkey = previous.polish_hotkey.clone();
+            reverted.change_overlay_hotkey = previous.change_overlay_hotkey.clone();
             let restored = state.settings.set(reverted)?;
             let _ = shortcuts::apply(&app, &restored);
             let _ = app.emit("settings-changed", &restored);
@@ -153,6 +155,22 @@ pub async fn start_polish_selection(state: State<'_, AppState>) -> AppResult<()>
 #[tauri::command]
 pub fn get_last_result(state: State<'_, AppState>) -> Option<TranscriptionResult> {
     state.pipeline.last_result()
+}
+
+/// Copies text to the clipboard for the changes overlay's Copy button. Routed
+/// through the output worker, which owns the single clipboard handle.
+#[tauri::command]
+pub fn copy_text(state: State<'_, AppState>, text: String) -> AppResult<()> {
+    state.output.copy_text(text)
+}
+
+/// Toggles the changes overlay between click-through (hidden) and interactive
+/// (visible), so the always-present panel never eats clicks while faded out.
+#[tauri::command]
+pub fn set_changes_interactive(app: AppHandle, interactive: bool) {
+    if let Some(window) = app.get_webview_window(crate::changes::CHANGES_LABEL) {
+        let _ = window.set_ignore_cursor_events(!interactive);
+    }
 }
 
 #[tauri::command]
