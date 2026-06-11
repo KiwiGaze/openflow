@@ -8,6 +8,7 @@ import {
 } from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
 import { useLlmProfiles, useModels } from '../hooks.js';
+import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
 
@@ -297,6 +298,30 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
                       </option>
                     ))}
                   </select>
+                </Row>
+                <Row
+                  title="Mode hotkey"
+                  hint="One-shot: dictates in this mode; the active mode is unchanged."
+                >
+                  <div className="stack">
+                    <HotkeyRecorder
+                      value={selected.hotkey ?? ''}
+                      label={selected.name}
+                      onChange={(accelerator) => {
+                        patchMode(selected.id, { hotkey: accelerator });
+                      }}
+                    />
+                    {selected.hotkey && (
+                      <button
+                        className="btn btn-quiet btn-sm"
+                        onClick={() => {
+                          patchMode(selected.id, { hotkey: null });
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                 </Row>
               </>
             )}

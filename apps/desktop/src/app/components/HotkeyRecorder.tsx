@@ -50,20 +50,22 @@ export function HotkeyRecorder({ value, onChange, label }: Props): JSX.Element {
   }, [recording, onChange]);
 
   const name = label ? `${label} shortcut` : 'Shortcut';
+  const formatted = formatAcceleratorMac(value);
+  const display = recording ? 'Press shortcut…' : formatted === '' ? 'Set…' : formatted;
 
   return (
     <div className="hotkey-recorder">
       <button
         type="button"
         className={`hotkey-chip ${recording ? 'hotkey-recording' : ''}`}
-        aria-label={`${name}, currently ${formatAcceleratorMac(value)}. Activate to record a new one.`}
+        aria-label={`${name}, currently ${formatted === '' ? 'unset' : formatted}. Activate to record a new one.`}
         aria-describedby={recording ? helperId : undefined}
         onClick={() => {
           setRecording(true);
           setAnnounce('Recording — press a shortcut, or Esc to cancel.');
         }}
       >
-        {recording ? 'Press shortcut…' : formatAcceleratorMac(value)}
+        {display}
       </button>
       {recording && (
         <span id={helperId} className="hotkey-help">
