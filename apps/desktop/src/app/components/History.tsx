@@ -11,9 +11,15 @@ export function History({ api }: { api: SettingsApi }): JSX.Element {
   const [openId, setOpenId] = useState<string | null>(null);
   const [reprocessMode, setReprocessMode] = useState(settings.activeModeId);
   const [result, setResult] = useState<string | null>(null);
+  const [clearError, setClearError] = useState<string | null>(null);
 
   useEffect(() => {
-    void ipc.getHistory().then(setEntries);
+    void ipc
+      .getHistory()
+      .then(setEntries)
+      .catch((err: unknown) => {
+        console.error('Failed to load history:', err);
+      });
   }, []);
 
   const q = query.trim().toLowerCase();
@@ -22,10 +28,18 @@ export function History({ api }: { api: SettingsApi }): JSX.Element {
     : entries;
 
   const clear = (): void => {
-    void ipc.clearHistory().then(() => {
-      setEntries([]);
-      setOpenId(null);
-    });
+    setClearError(null);
+    void ipc
+      .clearHistory()
+      .then(() => {
+        setEntries([]);
+        setOpenId(null);
+      })
+      .catch((err: unknown) => {
+        // The Rust side only reports success once the file is actually gone, so
+        // a rejection means transcripts may still be on disk — say so.
+        setClearError(`Couldn't clear history — it may still be on disk. ${String(err)}`);
+      });
   };
 
   const reprocess = async (text: string): Promise<void> => {
@@ -65,7 +79,11 @@ export function History({ api }: { api: SettingsApi }): JSX.Element {
                 <span className="row-hint">{new Date(entry.at).toLocaleString()}</span>
                 <button
                   className="btn btn-quiet btn-sm"
-                  onClick={() => void navigator.clipboard.writeText(entry.text)}
+                  onClick={() => {
+                    navigator.clipboard.writeText(entry.text).catch((err: unknown) => {
+                      console.error('Copy failed:', err);
+                    });
+                  }}
                 >
                   Copy
                 </button>
@@ -113,6 +131,7 @@ export function History({ api }: { api: SettingsApi }): JSX.Element {
           Clear history
         </button>
       </div>
+      {clearError && <p className="row-hint row-hint-warn">{clearError}</p>}
     </section>
   );
 }

@@ -148,7 +148,14 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
     setPreviewError(null);
     setPreviewResult(null);
     try {
-      setPreviewResult(await ipc.testMode(selected.prompt, PREVIEW_SAMPLE, selected.transforms));
+      setPreviewResult(
+        await ipc.testMode(
+          selected.prompt,
+          PREVIEW_SAMPLE,
+          selected.transforms,
+          selected.aiProfileId,
+        ),
+      );
     } catch (err) {
       setPreviewError(String(err));
     } finally {

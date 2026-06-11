@@ -385,15 +385,33 @@ impl Pipeline {
                         .find(|r| r.bundle_id == bundle_id)
                         .map(|r| r.mode_id.clone())
                 }
-                None => None,
+                None => {
+                    // Detection failed: clear the stale app so the "add a rule"
+                    // flow can't target whatever was frontmost last time.
+                    *self.last_app.lock().expect("pipeline state poisoned") = None;
+                    None
+                }
             },
             None => None,
         };
 
-        // A cloud engine needs no local model; only gate the on-device default.
-        if !settings.stt_model_id.starts_with("cloud:")
-            && !self.models.is_installed(&settings.stt_model_id)
-        {
+        // Preflight the model this job will actually use: a dictation mode can
+        // override the speech model (07 §3), so checking the global default
+        // would wrongly block a valid per-mode override. A cloud engine needs
+        // no local model.
+        let effective_stt = if job == Job::Dictation {
+            let mode = mode_override
+                .as_ref()
+                .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
+                .unwrap_or_else(|| settings.active_mode());
+            match &mode.stt_model_id {
+                Some(id) if self.stt_model_valid(&settings, id) => id.clone(),
+                _ => settings.stt_model_id.clone(),
+            }
+        } else {
+            settings.stt_model_id.clone()
+        };
+        if !effective_stt.starts_with("cloud:") && !self.models.is_installed(&effective_stt) {
             return Err(AppError::Model(
                 "No speech model yet — open Settings to download one.".into(),
             ));
@@ -892,22 +910,23 @@ impl Pipeline {
                     .append(result.raw, result.text, result.mode_id, result.refined);
             }
         }
-        // The text already pasted; both notices are informational. A flaky-LLM
-        // warning is more useful than a dangling-override notice, so it wins.
-        if let Some(warning) = llm_warning {
-            return Ok(ProcessOutcome::Notice(warning));
-        }
-        if let Some(notice) = notice {
-            return Ok(ProcessOutcome::Notice(notice));
-        }
-        // A clean insert may carry a one-time HUD tip; a clipboard-fallback
-        // Notice does not.
-        Ok(match outcome {
+        // A clipboard fallback (paste failed / no Accessibility) is the
+        // highest-priority message — the user must know to press ⌘V to get
+        // their text. AI/override notes only matter once the text auto-pasted;
+        // between those two a flaky-LLM warning beats a dangling-override note.
+        match outcome {
             ProcessOutcome::Inserted(preview, _) => {
-                ProcessOutcome::Inserted(preview, self.dictation_hud_tip())
+                if let Some(warning) = llm_warning {
+                    Ok(ProcessOutcome::Notice(warning))
+                } else if let Some(notice) = notice {
+                    Ok(ProcessOutcome::Notice(notice))
+                } else {
+                    Ok(ProcessOutcome::Inserted(preview, self.dictation_hud_tip()))
+                }
             }
-            other => other,
-        })
+            // Clipboard-fallback notice from insert(): surface it, never hide it.
+            clipboard_notice => Ok(clipboard_notice),
+        }
     }
 
     async fn finish_refine(

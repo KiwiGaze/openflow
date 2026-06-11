@@ -45,7 +45,11 @@ export function OutputTab({ api }: { api: SettingsApi }): JSX.Element {
             )}
             <button
               className="btn"
-              onClick={() => void navigator.clipboard.writeText(lastResult.text)}
+              onClick={() => {
+                navigator.clipboard.writeText(lastResult.text).catch((err: unknown) => {
+                  console.error('Copy failed:', err);
+                });
+              }}
             >
               Copy
             </button>

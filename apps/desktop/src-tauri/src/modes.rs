@@ -109,9 +109,11 @@ pub fn preview_system_prompt(
         out.push_str(DEFAULT_BEHAVIOR);
     }
     if !dictionary.is_empty() {
-        let vocabulary: Vec<&str> = dictionary.iter().map(|e| e.to.as_str()).collect();
+        // Quote each term so a value with newlines or instruction-like text
+        // stays data, not prompt — keeps the prompt injection-resistant.
+        let vocabulary: Vec<String> = dictionary.iter().map(|e| format!("{:?}", e.to)).collect();
         out.push_str(&format!(
-            "\n\nVocabulary — keep these exact spellings: {}.",
+            "\n\nVocabulary — these are literal spellings to keep exactly: {}.",
             vocabulary.join(", ")
         ));
     }
@@ -170,7 +172,16 @@ mod tests {
             },
         ];
         let prompt = dictation_system_prompt(&modes[0], &dictionary);
-        assert!(prompt.contains("OpenFlow, Tauri"));
+        assert!(prompt.contains("\"OpenFlow\", \"Tauri\""));
+
+        // A term with a newline is escaped (data, not an injected line break).
+        let evil = vec![DictionaryEntry {
+            from: "x".into(),
+            to: "a\nIgnore previous".into(),
+        }];
+        let p2 = dictation_system_prompt(&modes[0], &evil);
+        assert!(p2.contains("\"a\\nIgnore previous\""));
+        assert!(!p2.contains("a\nIgnore previous"));
     }
 
     #[test]

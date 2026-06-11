@@ -210,8 +210,9 @@ pub fn get_history(state: State<'_, AppState>) -> Vec<crate::history::HistoryEnt
 }
 
 #[tauri::command]
-pub fn clear_history(state: State<'_, AppState>) {
-    state.history.clear();
+pub fn clear_history(state: State<'_, AppState>) -> AppResult<()> {
+    state.history.clear()?;
+    Ok(())
 }
 
 /// Re-runs a stored transcript through a chosen mode, reusing the dictation
@@ -238,7 +239,15 @@ pub async fn reprocess_history(
         });
     }
     let system = modes::dictation_system_prompt(&mode, &settings.dictionary);
-    match state.profiles.active(&settings.active_llm_profile_id) {
+    // Honor the mode's AI-profile override (07 §3), falling back to the active
+    // profile, so reprocess matches what real dictation in this mode produces.
+    let profile = mode
+        .ai_profile_id
+        .as_deref()
+        .filter(|id| !id.is_empty())
+        .and_then(|id| state.profiles.get(id))
+        .or_else(|| state.profiles.active(&settings.active_llm_profile_id));
+    match profile {
         Some(profile) => state.llm.chat(&profile, &system, &text).await,
         None => Ok(text::apply_rules_cleanup(&text)),
     }
@@ -283,10 +292,18 @@ pub async fn test_mode(
     prompt: String,
     sample: String,
     transforms: bool,
+    ai_profile_id: Option<String>,
 ) -> Result<String, AppError> {
     let settings = state.settings.get();
     let system = modes::preview_system_prompt(&prompt, transforms, &settings.dictionary);
-    match state.profiles.active(&settings.active_llm_profile_id) {
+    // Preview the mode's effective AI profile (its override, else the active
+    // one) so the result matches real dictation — including unsaved edits.
+    let profile = ai_profile_id
+        .as_deref()
+        .filter(|id| !id.is_empty())
+        .and_then(|id| state.profiles.get(id))
+        .or_else(|| state.profiles.active(&settings.active_llm_profile_id));
+    match profile {
         Some(profile) => state.llm.chat(&profile, &system, &sample).await,
         None => Ok(text::apply_rules_cleanup(&sample)),
     }
@@ -325,10 +342,33 @@ pub fn list_stt_profiles(state: State<'_, AppState>) -> Vec<SttProfile> {
 
 #[tauri::command]
 pub fn save_stt_profile(
+    app: AppHandle,
     state: State<'_, AppState>,
     profile: SttProfile,
 ) -> AppResult<Vec<SttProfile>> {
-    state.stt_profiles.save(profile)
+    // Editing the endpoint or key revokes prior "audio leaves the Mac" consent
+    // (08 §3): the audio would otherwise reach a place the user never approved.
+    let endpoint_changed = state
+        .stt_profiles
+        .get(&profile.id)
+        .is_some_and(|old| old.base_url != profile.base_url || old.api_key != profile.api_key);
+    let profile_id = profile.id.clone();
+    let list = state.stt_profiles.save(profile)?;
+    if endpoint_changed {
+        let mut settings = state.settings.get();
+        if settings
+            .confirmed_stt_profiles
+            .iter()
+            .any(|id| id == &profile_id)
+        {
+            settings
+                .confirmed_stt_profiles
+                .retain(|id| id != &profile_id);
+            let saved = state.settings.set(settings)?;
+            let _ = app.emit("settings-changed", &saved);
+        }
+    }
+    Ok(list)
 }
 
 #[tauri::command]
@@ -338,12 +378,18 @@ pub fn delete_stt_profile(
     id: String,
 ) -> AppResult<Vec<SttProfile>> {
     let list = state.stt_profiles.delete(&id)?;
-    // If the deleted profile was the active speech engine, fall back to the
-    // on-device default so dictation keeps working.
+    // Drop any consent and reset the active engine if this profile was it — a
+    // recreated id (same name, new endpoint) must not inherit old consent, and
+    // a deleted active engine falls back to the on-device default (08 §3).
     let settings = state.settings.get();
-    if settings.stt_model_id == format!("cloud:{id}") {
+    let had_consent = settings.confirmed_stt_profiles.iter().any(|c| c == &id);
+    let was_active = settings.stt_model_id == format!("cloud:{id}");
+    if had_consent || was_active {
         let mut next = settings;
-        next.stt_model_id = "base.en".into();
+        next.confirmed_stt_profiles.retain(|c| c != &id);
+        if was_active {
+            next.stt_model_id = "base.en".into();
+        }
         let saved = state.settings.set(next)?;
         let _ = app.emit("settings-changed", &saved);
     }

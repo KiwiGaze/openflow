@@ -84,11 +84,24 @@ pub async fn transcribe(
         .map_err(|e| AppError::Stt(format!("cloud transcription request failed: {e}")))?;
     let status = resp.status();
     if !status.is_success() {
+        // Never log the raw provider body — on this audio path it can carry
+        // sensitive content. Log the status only; surface a short, truncated
+        // reason to the (local, ephemeral) HUD so the user can act.
         let body = resp.text().await.unwrap_or_default();
-        log::warn!("cloud STT {status}: {body}");
-        return Err(AppError::Stt(format!(
-            "cloud transcription failed ({status})"
-        )));
+        let reason: String = body
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .trim()
+            .chars()
+            .take(120)
+            .collect();
+        log::warn!("cloud STT failed: {status}");
+        return Err(AppError::Stt(if reason.is_empty() {
+            format!("cloud transcription failed ({status})")
+        } else {
+            format!("cloud transcription failed ({status}): {reason}")
+        }));
     }
     let parsed: AudioResponse = resp
         .json()

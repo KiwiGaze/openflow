@@ -44,8 +44,12 @@ export const ipc = {
   setChangesInteractive: (interactive: boolean): Promise<void> =>
     invoke(COMMANDS.setChangesInteractive, { interactive }),
   testLlm: (profile: LlmProfile): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { profile }),
-  testMode: (prompt: string, sample: string, transforms: boolean): Promise<string> =>
-    invoke(COMMANDS.testMode, { prompt, sample, transforms }),
+  testMode: (
+    prompt: string,
+    sample: string,
+    transforms: boolean,
+    aiProfileId: string | null,
+  ): Promise<string> => invoke(COMMANDS.testMode, { prompt, sample, transforms, aiProfileId }),
   listLlmProfiles: (): Promise<LlmProfile[]> => invoke(COMMANDS.listLlmProfiles),
   saveLlmProfile: (profile: LlmProfile): Promise<LlmProfile[]> =>
     invoke(COMMANDS.saveLlmProfile, { profile }),

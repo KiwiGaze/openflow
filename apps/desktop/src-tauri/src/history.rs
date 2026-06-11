@@ -37,7 +37,16 @@ impl HistoryStore {
     pub fn load(dir: &Path) -> Self {
         let path = dir.join("history.json");
         let entries: Vec<HistoryEntry> = match fs::read_to_string(&path) {
-            Ok(raw) => serde_json::from_str(&raw).unwrap_or_default(),
+            Ok(raw) => match serde_json::from_str(&raw) {
+                Ok(entries) => entries,
+                Err(err) => {
+                    // Don't clobber a corrupt-but-present log: the next append()
+                    // would overwrite it. Preserve it so transcripts aren't lost.
+                    log::warn!("history.json unreadable ({err}); preserving as .corrupt");
+                    let _ = fs::rename(&path, path.with_extension("json.corrupt"));
+                    Vec::new()
+                }
+            },
             Err(_) => Vec::new(),
         };
         Self {
@@ -77,11 +86,17 @@ impl HistoryStore {
         }
     }
 
-    /// Clears the log and removes the file, so turning history off and clearing
-    /// leaves nothing on disk.
-    pub fn clear(&self) {
+    /// Clears the log and removes the file. Deletes first and only clears the
+    /// in-memory copy on success: a "cleared" history still sitting on disk is a
+    /// privacy lie, so the failure must surface to the caller.
+    pub fn clear(&self) -> std::io::Result<()> {
+        match fs::remove_file(&self.path) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(err),
+        }
         self.entries.write().expect("history lock poisoned").clear();
-        let _ = fs::remove_file(&self.path);
+        Ok(())
     }
 
     fn persist(&self) -> std::io::Result<()> {

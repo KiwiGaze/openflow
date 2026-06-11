@@ -118,10 +118,24 @@ impl SttProfileManager {
             .map_err(|e| AppError::Settings(e.to_string()))?;
         let path = self.path_for(&profile.id);
         let tmp = path.with_extension("json.tmp");
-        fs::write(&tmp, json)?;
+        {
+            use std::io::Write;
+            let mut opts = fs::OpenOptions::new();
+            opts.write(true).create(true).truncate(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                // The key must never sit on disk umask-wide, even between
+                // create and a later chmod.
+                opts.mode(0o600);
+            }
+            opts.open(&tmp)?.write_all(json.as_bytes())?;
+        }
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
+            // mode() applies only on create; a tmp left by a crash keeps its
+            // old permissions through the truncating open.
             fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600))?;
         }
         fs::rename(&tmp, &path)?;
