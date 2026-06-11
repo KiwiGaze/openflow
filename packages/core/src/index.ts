@@ -6,3 +6,4 @@ export * from './presets.js';
 export * from './templates.js';
 export * from './languages.js';
 export * from './modeio.js';
+export * from './dictionaryio.js';

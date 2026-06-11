@@ -283,6 +283,26 @@ pub fn export_mode(
         .map_err(|e| AppError::Settings(format!("could not open the exported-modes folder: {e}")))
 }
 
+/// Writes the dictionary as CSV to `<app-data>/dictionary.csv` and reveals the
+/// folder — same no-dependency reveal idiom as `export_mode`.
+#[tauri::command]
+pub fn export_dictionary(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    contents: String,
+) -> AppResult<()> {
+    let data_dir = state
+        .profiles
+        .dir()
+        .parent()
+        .ok_or_else(|| AppError::Settings("no data directory".into()))?;
+    std::fs::create_dir_all(data_dir)?;
+    std::fs::write(data_dir.join("dictionary.csv"), contents)?;
+    tauri_plugin_opener::OpenerExt::opener(&app)
+        .open_path(data_dir.display().to_string(), None::<&str>)
+        .map_err(|e| AppError::Settings(format!("could not open the data folder: {e}")))
+}
+
 #[tauri::command]
 pub async fn list_ollama_models(
     state: State<'_, AppState>,

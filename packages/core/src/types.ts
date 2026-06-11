@@ -214,6 +214,7 @@ export const COMMANDS = {
   deleteLlmProfile: 'delete_llm_profile',
   revealLlmProfiles: 'reveal_llm_profiles',
   exportMode: 'export_mode',
+  exportDictionary: 'export_dictionary',
   listOllamaModels: 'list_ollama_models',
   checkPermissions: 'check_permissions',
   requestMicrophonePermission: 'request_microphone_permission',

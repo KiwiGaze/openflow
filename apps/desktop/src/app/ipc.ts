@@ -43,6 +43,8 @@ export const ipc = {
   revealLlmProfiles: (): Promise<void> => invoke(COMMANDS.revealLlmProfiles),
   exportMode: (filename: string, contents: string): Promise<void> =>
     invoke(COMMANDS.exportMode, { filename, contents }),
+  exportDictionary: (contents: string): Promise<void> =>
+    invoke(COMMANDS.exportDictionary, { contents }),
   listOllamaModels: (baseUrl: string): Promise<string[]> =>
     invoke(COMMANDS.listOllamaModels, { baseUrl }),
   checkPermissions: (): Promise<PermissionsState> => invoke(COMMANDS.checkPermissions),
