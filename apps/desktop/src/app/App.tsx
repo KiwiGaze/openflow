@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useModels, useSettings } from './hooks.js';
 import { Onboarding } from './Onboarding.js';
+import { TAB_ICONS } from './components/tabIcons.js';
 import { AboutTab } from './tabs/AboutTab.js';
 import { DictationTab } from './tabs/DictationTab.js';
 import { DictionaryTab } from './tabs/DictionaryTab.js';
@@ -101,7 +102,8 @@ export function App(): JSX.Element {
                 setTab(t.id);
               }}
             >
-              {t.label}
+              {TAB_ICONS[t.id]}
+              <span>{t.label}</span>
             </button>
           ))}
         </div>

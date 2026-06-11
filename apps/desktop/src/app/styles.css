@@ -225,6 +225,9 @@ button:focus-visible {
 }
 
 .sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
   text-align: left;
   border: none;
   background: transparent;
@@ -232,6 +235,12 @@ button:focus-visible {
   border-radius: 6px;
   cursor: pointer;
   color: var(--text);
+}
+
+.sidebar-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .sidebar-item:hover {
