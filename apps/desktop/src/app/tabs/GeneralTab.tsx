@@ -55,6 +55,7 @@ export function GeneralTab({
         >
           <HotkeyRecorder
             value={settings.dictationHotkey}
+            label="Dictation"
             onChange={(accelerator) => void update({ dictationHotkey: accelerator })}
           />
         </Row>
@@ -78,6 +79,7 @@ export function GeneralTab({
         >
           <HotkeyRecorder
             value={settings.polishHotkey}
+            label="Polish selection"
             onChange={(accelerator) => void update({ polishHotkey: accelerator })}
           />
         </Row>
@@ -87,6 +89,7 @@ export function GeneralTab({
         >
           <HotkeyRecorder
             value={settings.refineHotkey}
+            label="Rewrite selection"
             onChange={(accelerator) => void update({ refineHotkey: accelerator })}
           />
         </Row>

@@ -1,28 +1,40 @@
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useId, useState, type JSX } from 'react';
 import { acceleratorFromKeyboardEvent, formatAcceleratorMac } from '@openflow/core';
 
 interface Props {
   value: string;
   onChange: (accelerator: string) => void;
+  /** What this shortcut controls, for the accessible name, e.g. "Dictation". */
+  label?: string;
 }
 
-/** Click, then press the desired combo. Esc cancels. */
-export function HotkeyRecorder({ value, onChange }: Props): JSX.Element {
+/** Click, then press the desired combo. Esc or Tab cancels (no focus trap). */
+export function HotkeyRecorder({ value, onChange, label }: Props): JSX.Element {
   const [recording, setRecording] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [announce, setAnnounce] = useState('');
+  const helperId = useId();
 
   useEffect(() => {
     if (!recording) return;
     const onKeyDown = (ev: KeyboardEvent): void => {
+      // Tab must escape the recorder so keyboard focus is never trapped — let
+      // the browser move focus instead of swallowing the key (UX-03).
+      if (ev.code === 'Tab') {
+        setRecording(false);
+        setAnnounce('Cancelled');
+        return;
+      }
       ev.preventDefault();
       ev.stopPropagation();
       if (ev.code === 'Escape') {
         setRecording(false);
+        setAnnounce('Cancelled');
         return;
       }
       const accelerator = acceleratorFromKeyboardEvent(ev);
       if (accelerator) {
         setRecording(false);
+        setAnnounce(`Recorded ${formatAcceleratorMac(accelerator)}`);
         onChange(accelerator);
       }
     };
@@ -37,17 +49,30 @@ export function HotkeyRecorder({ value, onChange }: Props): JSX.Element {
     };
   }, [recording, onChange]);
 
+  const name = label ? `${label} shortcut` : 'Shortcut';
+
   return (
-    <button
-      ref={buttonRef}
-      type="button"
-      className={`hotkey-chip ${recording ? 'hotkey-recording' : ''}`}
-      onClick={() => {
-        setRecording(true);
-      }}
-      title="Click, then press the new shortcut. Esc to cancel."
-    >
-      {recording ? 'Press shortcut…' : formatAcceleratorMac(value)}
-    </button>
+    <div className="hotkey-recorder">
+      <button
+        type="button"
+        className={`hotkey-chip ${recording ? 'hotkey-recording' : ''}`}
+        aria-label={`${name}, currently ${formatAcceleratorMac(value)}. Activate to record a new one.`}
+        aria-describedby={recording ? helperId : undefined}
+        onClick={() => {
+          setRecording(true);
+          setAnnounce('Recording — press a shortcut, or Esc to cancel.');
+        }}
+      >
+        {recording ? 'Press shortcut…' : formatAcceleratorMac(value)}
+      </button>
+      {recording && (
+        <span id={helperId} className="hotkey-help">
+          Press a shortcut, or Esc to cancel.
+        </span>
+      )}
+      <span className="visually-hidden" aria-live="assertive">
+        {announce}
+      </span>
+    </div>
   );
 }
