@@ -55,22 +55,25 @@ for (const { text } of rustFiles) {
   }
 }
 
-// Literal event names defeat the whole point of the constants; flag the line.
+// Literal event names defeat the whole point of the constants; flag the call.
+// Matched against the whole file, not per line, so rustfmt-wrapped multiline
+// calls like `emit(\n  "event", …)` can't slip past (`\s` spans newlines).
 // Covers both call forms: `app.emit("…")` and `tauri::Emitter::emit(app, "…")`.
 const literalEmitPatterns = [
-  /\.emit\(\s*"/,
-  /\.emit_to\(\s*[^,]+,\s*"/,
-  /Emitter::emit\(\s*[^,]+,\s*"/,
-  /Emitter::emit_to\(\s*[^,]+,\s*[^,]+,\s*"/,
+  /\.emit\(\s*"/g,
+  /\.emit_to\(\s*[^,]+,\s*"/g,
+  /Emitter::emit\(\s*[^,]+,\s*"/g,
+  /Emitter::emit_to\(\s*[^,]+,\s*[^,]+,\s*"/g,
 ];
 for (const { name, text } of rustFiles) {
-  text.split('\n').forEach((line, i) => {
-    if (literalEmitPatterns.some((pattern) => pattern.test(line))) {
+  for (const pattern of literalEmitPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      const line = text.slice(0, match.index).split('\n').length;
       problems.push(
-        `${name}:${i + 1} emits a string-literal event name — use a named *_EVENT constant`,
+        `${name}:${line} emits a string-literal event name — use a named *_EVENT constant`,
       );
     }
-  });
+  }
 }
 
 // --- TypeScript side --------------------------------------------------------
