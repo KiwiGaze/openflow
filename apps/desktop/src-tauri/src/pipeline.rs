@@ -17,7 +17,7 @@ use crate::error::{AppError, AppResult};
 use crate::hud;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
-use crate::modes::{self, LITERAL_MODE_ID};
+use crate::modes::{self, CODE_MODE_ID, LITERAL_MODE_ID};
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
 use crate::settings::{HotkeyBehavior, Settings, SettingsManager, MAX_RECORDING_SECS};
@@ -593,6 +593,9 @@ impl Pipeline {
             }
         } else if mode.id == LITERAL_MODE_ID {
             transcript.clone()
+        } else if mode.id == CODE_MODE_ID {
+            // Deterministic: the whole utterance becomes one identifier.
+            text::apply_code_identifier(&transcript)
         } else {
             text::apply_rules_cleanup(&transcript)
         };

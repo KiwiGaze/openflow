@@ -193,6 +193,99 @@ pub fn apply_snippets(text: &str, snippets: &[Snippet]) -> String {
     replace_phrases(text, &pairs)
 }
 
+/// Casing styles for Code-mode identifier conversion.
+#[derive(Clone, Copy)]
+enum CaseStyle {
+    Camel,
+    Pascal,
+    Snake,
+    ScreamingSnake,
+    Kebab,
+}
+
+/// Code mode: turns a spoken phrase into a single source-code identifier.
+///
+/// The whole utterance becomes one identifier — the utterance boundary is the
+/// delimiter, which sidesteps the "where does the name end" ambiguity that a
+/// mid-sentence command grammar would hit. An optional leading style keyword
+/// overrides the default of camelCase:
+///
+/// - "get user by id"            → `getUserById`
+/// - "snake case user id"        → `user_id`
+/// - "constant max retries"      → `MAX_RETRIES`
+/// - "pascal case user service"  → `UserService`
+/// - "kebab case feature flag"   → `feature-flag`
+pub fn apply_code_identifier(text: &str) -> String {
+    let cleaned = text.trim().trim_end_matches(['.', '!', '?', ',', ';', ':']);
+    let lower = cleaned.to_lowercase();
+    let (style, rest) = parse_case_prefix(&lower);
+    let words: Vec<&str> = rest.split_whitespace().collect();
+    join_identifier(style, &words)
+}
+
+/// Strips a leading style keyword ("snake case", "constant", …) if present,
+/// returning the chosen style and the remaining words. Defaults to camelCase.
+fn parse_case_prefix(lower: &str) -> (CaseStyle, &str) {
+    // Longest phrases first so "screaming snake case" wins over "snake case".
+    const PREFIXES: &[(&str, CaseStyle)] = &[
+        ("screaming snake case", CaseStyle::ScreamingSnake),
+        ("constant case", CaseStyle::ScreamingSnake),
+        ("snake case", CaseStyle::Snake),
+        ("pascal case", CaseStyle::Pascal),
+        ("camel case", CaseStyle::Camel),
+        ("kebab case", CaseStyle::Kebab),
+        ("constant", CaseStyle::ScreamingSnake),
+        ("pascal", CaseStyle::Pascal),
+        ("camel", CaseStyle::Camel),
+        ("kebab", CaseStyle::Kebab),
+    ];
+    for (keyword, style) in PREFIXES {
+        if let Some(rest) = lower.strip_prefix(keyword) {
+            // Require a word boundary so "constants" doesn't match "constant".
+            if rest.is_empty() || rest.starts_with(' ') {
+                return (*style, rest.trim_start());
+            }
+        }
+    }
+    (CaseStyle::Camel, lower)
+}
+
+fn join_identifier(style: CaseStyle, words: &[&str]) -> String {
+    if words.is_empty() {
+        return String::new();
+    }
+    match style {
+        CaseStyle::Snake => words.join("_"),
+        CaseStyle::Kebab => words.join("-"),
+        CaseStyle::ScreamingSnake => words
+            .iter()
+            .map(|w| w.to_uppercase())
+            .collect::<Vec<_>>()
+            .join("_"),
+        CaseStyle::Pascal => words.iter().map(|w| capitalize(w)).collect::<String>(),
+        CaseStyle::Camel => words
+            .iter()
+            .enumerate()
+            .map(|(i, w)| {
+                if i == 0 {
+                    (*w).to_string()
+                } else {
+                    capitalize(w)
+                }
+            })
+            .collect::<String>(),
+    }
+}
+
+/// Uppercases the first character of an already-lowercased word.
+fn capitalize(word: &str) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
+        None => String::new(),
+    }
+}
+
 fn normalize_whitespace(text: &str) -> String {
     let text = MULTI_SPACE.replace_all(text, " ");
     let text = SPACE_BEFORE_PUNCT.replace_all(&text, "$1");
@@ -372,6 +465,44 @@ mod tests {
             apply_snippets("send it to my email", &snippets),
             "send it to my email"
         );
+    }
+
+    #[test]
+    fn code_identifier_defaults_to_camel_case() {
+        assert_eq!(apply_code_identifier("get user by id"), "getUserById");
+        assert_eq!(apply_code_identifier("user service"), "userService");
+        // Trailing punctuation from cleanup is ignored.
+        assert_eq!(apply_code_identifier("Get User By Id."), "getUserById");
+    }
+
+    #[test]
+    fn code_identifier_honors_leading_style_keyword() {
+        assert_eq!(apply_code_identifier("snake case user id"), "user_id");
+        assert_eq!(apply_code_identifier("constant max retries"), "MAX_RETRIES");
+        assert_eq!(
+            apply_code_identifier("pascal case user service"),
+            "UserService"
+        );
+        assert_eq!(
+            apply_code_identifier("kebab case feature flag"),
+            "feature-flag"
+        );
+        assert_eq!(
+            apply_code_identifier("screaming snake case max size"),
+            "MAX_SIZE"
+        );
+    }
+
+    #[test]
+    fn code_identifier_keyword_needs_a_word_boundary() {
+        // "constants" must not be read as the "constant" style keyword.
+        assert_eq!(apply_code_identifier("constants table"), "constantsTable");
+    }
+
+    #[test]
+    fn code_identifier_handles_empty_after_keyword() {
+        assert_eq!(apply_code_identifier("snake case"), "");
+        assert_eq!(apply_code_identifier("   "), "");
     }
 
     #[test]

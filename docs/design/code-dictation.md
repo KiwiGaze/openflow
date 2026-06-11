@@ -1,6 +1,13 @@
 # Dictating code and identifiers
 
-Status: exploration. A brainstorm sketch, not a committed spec.
+Status: **shipped** (a focused first slice). A built-in **Code** mode turns each spoken utterance
+into one source-code identifier. The key design choice that made this clean: the _utterance_ is
+the identifier boundary, which sidesteps the "where does the name end" ambiguity a mid-sentence
+command grammar would hit. The default is camelCase; a leading style keyword overrides it
+("snake case user id" → `user_id`, "constant max size" → `MAX_SIZE`, "pascal case user service"
+→ `UserService`, "kebab case feature flag" → `feature-flag`). The broader Tier-1 symbol grammar
+(spoken "open paren" → `(`, with spacing) and Tier-2 LLM formatting remain follow-ups — the
+symbol-spacing problem deserves its own dedicated pass.
 
 ## Why
 

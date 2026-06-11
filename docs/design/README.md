@@ -34,29 +34,32 @@ Three principles held every idea to account:
 | [Code dictation](code-dictation.md)       | speak identifiers, get `camelCase`/`snake_case`             | `text.rs`, `modes.rs`              | tier 1 none; tier 2 refine | none new                        |
 | [Ambient polish](ambient-polish.md)       | sounds, focus ducking, notifications, presence, UI language | `audio.rs`, `output.rs`, `main.rs` | none                       | settings only                   |
 
-## Recommendation — what to do first
+## Status — what shipped
 
-If we pick up only a few of these, do them in this order. The ranking weighs daily value against
-cost and privacy risk; the cheap, pure-local, zero-policy-change wins come first.
+All six landed on this branch in highest-leverage order, each in its own commit with the full
+CI suite green (lint, format, typecheck, TS tests, `cargo fmt`/`clippy`/`test`). Every "smart"
+surface is computed from local state only; nothing new leaves the machine or is persisted by
+default.
 
-1. **Snippets.** Highest value-per-effort. Pure-local, deterministic, rides the dictionary
-   machinery and the settings blob, no persistence-policy question. People use expansion every
-   day. Ship this first.
-2. **Quick transforms.** Nearly free — it is the existing Polish job parameterised by a saved
-   instruction — and it closes the real gap between "fix grammar" (Polish) and "say it every
-   time" (Rewrite). Bundle the deterministic **register** idea with it to serve offline users.
-3. **Ambient polish (sounds + Dock/presence first).** A bag of afternoons that makes the app feel
-   finished. Do sounds, notifications, and the Dock toggle early; hold ducking until restore-on-
-   all-exits is bulletproof; treat UI localization as its own track.
-4. **Living dictionary (session-only, approach B).** High delight, but the in-RAM candidate
-   model needs care to stay honest. Worth it; not first, because the value depends on getting the
-   privacy framing exactly right.
-5. **Local insights (Tier 1, session-only).** Lovely and on-brand — privacy as the feature — but
-   the least _functional_ of the set. Ship the no-disk version; only add the opt-in `stats.json`
-   for streaks if people actually ask.
-6. **Code dictation.** Real value for a narrower audience, and it leans on per-app activation
-   landing first. Strong follow-on once the casing grammar and the shared internal-caps detector
-   from the living dictionary exist.
+1. **Snippets** ✓ — `trigger → expansion` on the dictation path, after the LLM so expansions
+   stay verbatim; single-pass matcher shared with the dictionary (no cascading). Snippets tab.
+2. **Quick transforms** ✓ — `polish()` generalized into `refine_selection`; named, hotkey-bound
+   instructions on a selection with templates and inline editing. The deterministic **register**
+   idea remains a noted follow-up.
+3. **Local insights** ✓ — session-only, in-memory aggregates (words, pace, dictations, AI share,
+   top modes); no file, no network. Opt-in `stats.json` for cross-session streaks is the
+   follow-up.
+4. **Living dictionary** ✓ — in-RAM internal-caps detector suggests product/proper names;
+   accepting writes a `from == to` vocabulary entry ("kept as-is"). Digit/recurring-correction
+   signals are follow-ups.
+5. **Code dictation** ✓ (first slice) — a built-in **Code** mode turns each utterance into one
+   identifier (camelCase default; leading keyword picks snake/pascal/constant/kebab). The symbol
+   grammar (spoken "open paren") and Tier-2 LLM formatting are deferred — the spacing problem
+   needs its own pass.
+6. **Ambient polish** ◐ (partial) — **Show in Dock** shipped (activation-policy toggle). Sounds,
+   focus ducking, completion notifications, and UI localization are deliberately deferred: each
+   needs new infrastructure (audio playback, the notification plugin, an audio-session API, or an
+   i18n track) that warrants its own focused change.
 
 ## Threads that connect them
 

@@ -91,6 +91,9 @@ Automated tests cover the logic; these flows need a human:
 16. Dictate a sentence naming a product (e.g. "we use TanStack and DeepSeek") → open Dictionary →
     both appear under "Noticed while you spoke"; click one to add it ("kept as-is"), dismiss the
     other → it disappears for the session. Insights → the words/pace/streak update after dictating.
+17. Tray → switch to Code mode → hold `⌥Space`, say "get user by id" → `getUserById` is inserted;
+    say "constant max retries" → `MAX_RETRIES`. Toggle Show in Dock on → a Dock icon appears and
+    survives closing Settings; off → menu-bar only.
 
 ## Repository layout
 
