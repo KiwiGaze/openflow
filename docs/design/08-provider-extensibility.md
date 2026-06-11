@@ -48,7 +48,7 @@ URL cannot lie.
 ### 1.2 The preset registry
 
 Each preset carries `id`, `displayName`, `baseUrl`, the `kind` it maps to (`ollama` for Ollama,
-`openaiCompatible` for everything else), auth style, a default model *suggestion* (prefill only,
+`openaiCompatible` for everything else), auth style, a default model _suggestion_ (prefill only,
 never locked), local/cloud, and a one-line caveat. Model suggestions drift — mark **(verify at
 implementation)**.
 
@@ -203,7 +203,7 @@ endpoints, auth header names, bodies, and AssemblyAI's upload-then-poll dance. S
 unlocks four engines in one implementation; the two bespoke ones are separate, later builds (§7) — do
 the generic one first.
 
-### 2.3 Engine "connections": `SttProfile`, unified with LLM profiles by `kind`
+### 2.3 Engine "connections": `SttProfile`, a sibling of LLM profiles — not a unified `kind`
 
 Cloud STT engines need URL + key config — the same shape `LlmProfile` already stores. The decision:
 
@@ -643,7 +643,7 @@ cloud), which is the right number to design a trait against.
   §8.6 (§4.3), no-marketplace §8.8 (§7).
 - **03 §2/§4** — Models page as home for both cards; tray = quick-switch, config in the window (§3.3, §5).
 - **07 §3** — mode overrides, per-mode `sttModelId`, dangling-reference resolution (§4, §8).
-- **09** — owns the HUD/badge visuals whose *requirements* §3.3 sets.
+- **09** — owns the HUD/badge visuals whose _requirements_ §3.3 sets.
 - **REFINE.md / `profiles.rs`** — the `LlmProfile` pattern reused for `SttProfile`, extended with
   `presetId` (§1, §2.3). **ROADMAP.md** — "alternative STT engines behind the `stt.rs` interface" is
   this seam; whisper-server sidecar is the generic client's local case.
