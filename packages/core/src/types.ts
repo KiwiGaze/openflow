@@ -73,7 +73,13 @@ export interface Mode {
    * transcript only (dictionary still applies).
    */
   usesLlm: boolean;
-  /** System prompt used for LLM refinement. */
+  /**
+   * When true the appended "preserve the language" default is dropped so the
+   * mode may translate/re-cast (still fenced by the invariant safety rules).
+   */
+  transforms: boolean;
+  /** System prompt used for LLM refinement (the user text only; safety rules
+   * are appended at call time). */
   prompt: string;
 }
 

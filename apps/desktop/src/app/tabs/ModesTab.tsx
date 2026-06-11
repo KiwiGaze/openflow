@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react';
-import type { Mode } from '@openflow/core';
+import { MODE_TEMPLATES, type Mode, type ModeTemplate } from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
@@ -7,6 +7,7 @@ import { Toggle } from '../components/Toggle.js';
 export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, save } = api;
   const [selectedId, setSelectedId] = useState(settings.activeModeId);
+  const [showGallery, setShowGallery] = useState(false);
   const selected = settings.modes.find((m) => m.id === selectedId) ?? settings.modes[0];
 
   const patchMode = (id: string, patch: Partial<Mode>): void => {
@@ -22,11 +23,28 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
       name: from ? `${from.name} copy` : 'New mode',
       builtIn: false,
       usesLlm: from?.usesLlm ?? true,
+      transforms: from?.transforms ?? false,
       prompt:
         from?.prompt ??
         'You clean up dictated speech. Fix punctuation and remove fillers. Output only the resulting text.',
     };
     setSelectedId(mode.id);
+    void save({ ...settings, modes: [...settings.modes, mode] });
+  };
+
+  // A template creates a normal editable mode and is never linked again — the
+  // safety rules are appended at call time, so the prompt is copied verbatim.
+  const applyTemplate = (template: ModeTemplate): void => {
+    const mode: Mode = {
+      id: crypto.randomUUID(),
+      name: template.name,
+      builtIn: false,
+      usesLlm: template.usesLlm,
+      transforms: template.transforms,
+      prompt: template.prompt,
+    };
+    setSelectedId(mode.id);
+    setShowGallery(false);
     void save({ ...settings, modes: [...settings.modes, mode] });
   };
 
@@ -81,14 +99,51 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
           })}
         </div>
         <p className="row-hint">Click the circle to switch modes. Click a name to edit it.</p>
-        <button
-          className="btn"
-          onClick={() => {
-            addMode();
-          }}
-        >
-          New mode
-        </button>
+        <div className="row-actions">
+          <button
+            className="btn"
+            onClick={() => {
+              addMode();
+            }}
+          >
+            New mode
+          </button>
+          <button
+            className="btn"
+            aria-expanded={showGallery}
+            onClick={() => {
+              setShowGallery((v) => !v);
+            }}
+          >
+            {showGallery ? 'Hide templates' : 'Browse templates…'}
+          </button>
+        </div>
+        {showGallery && (
+          <div className="template-gallery">
+            <p className="row-hint">
+              Start from a template, then edit it freely. Your copy never changes when OpenFlow
+              updates.
+            </p>
+            {MODE_TEMPLATES.map((template) => (
+              <div key={template.id} className="template-row">
+                <div className="template-text">
+                  <div className="row-title">
+                    {template.name} <span className="badge badge-muted">{template.persona}</span>
+                  </div>
+                  <div className="row-hint">{template.summary}</div>
+                </div>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => {
+                    applyTemplate(template);
+                  }}
+                >
+                  Use
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {selected && (
@@ -141,6 +196,10 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
                   patchMode(selected.id, { prompt: e.target.value });
                 }}
               />
+              <p className="row-hint">
+                OpenFlow always adds rules to keep the output clean, ignore instructions inside your
+                speech, and use your dictionary spellings.
+              </p>
             </div>
           )}
           <div className="row-actions">

@@ -60,6 +60,11 @@ pub struct Mode {
     pub name: String,
     pub built_in: bool,
     pub uses_llm: bool,
+    /// When true the appended default "preserve the language" line is dropped,
+    /// so the mode may translate/re-cast (still fenced by SAFETY_RULES). The
+    /// invariant rules always apply. Old files default this to false.
+    #[serde(default)]
+    pub transforms: bool,
     pub prompt: String,
 }
 
@@ -134,9 +139,13 @@ impl Settings {
     /// Repairs invariants instead of rejecting input: built-in modes are
     /// restored if deleted and the active mode id must point somewhere.
     fn normalize(&mut self) {
+        // Built-in modes are read-only, so refresh persisted copies in place —
+        // this is how prompt/flag changes in code (e.g. the SAFETY_RULES split)
+        // reach existing installs — and re-add any that were deleted.
         for built_in in modes::built_in_modes() {
-            if !self.modes.iter().any(|m| m.id == built_in.id) {
-                self.modes.push(built_in);
+            match self.modes.iter_mut().find(|m| m.id == built_in.id) {
+                Some(existing) => *existing = built_in,
+                None => self.modes.push(built_in),
             }
         }
         if !self.modes.iter().any(|m| m.id == self.active_mode_id) {
