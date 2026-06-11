@@ -151,9 +151,10 @@ two unrelated questions, or you must scroll past one concern to edit another.
   `&Pipeline`). `commands.rs` stays one file on purpose: a single place to
   read the whole IPC surface.
 - A React component splits when a self-contained block has its own state.
-  Known seams, fine to take when touching those files: the mode editor card
-  in `ModesTab.tsx` (~lines 270+) and the LLM profile editor card in
-  `ModelsTab.tsx` (~lines 317+).
+  Both previously documented seams are taken: the mode editor card lives in
+  `components/ModeEditor.tsx` and the LLM profile editor card in
+  `components/LlmProfileEditor.tsx`. Record the next genuine seam here
+  before splitting.
 - Extract a hook when two components need the same stateful logic, or when
   naming one effect makes it understandable. Not before.
 - Never split just to make files smaller — ten 100-line files with shared
