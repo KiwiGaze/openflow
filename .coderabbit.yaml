@@ -1,0 +1,119 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit configuration for OpenFlow.
+# Reference: https://docs.coderabbit.ai/reference/configuration
+# This encodes the review rules in CLAUDE.md and CONTRIBUTING.md so automated
+# review enforces the same things a human maintainer would.
+
+language: en-US
+
+# How CodeRabbit should write its comments (mirrors this repo's house style).
+tone_instructions: >-
+  Write plain English with short sentences so ESL readers can follow, and cite
+  file:line. Favor the smallest change that solves the problem. Do not suggest
+  speculative abstractions, configurability, or future-proofing; do not request
+  defensive code for states the types already rule out; do not propose renames
+  that are cosmetic rather than semantic.
+
+reviews:
+  # chill: surface only higher-impact issues, fewer nitpicks.
+  profile: chill
+  # Gate merges: require review comments to be resolved before merging.
+  request_changes_workflow: true
+  high_level_summary: true
+  sequence_diagrams: true
+  poem: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+
+  # Review everything except generated, vendored, and binary paths.
+  path_filters:
+    - '!**/node_modules/**'
+    - '!**/dist/**'
+    - '!**/target/**'
+    - '!apps/desktop/src-tauri/gen/**'
+    - '!pnpm-lock.yaml'
+    - '!**/Cargo.lock'
+    - '!**/icons/**'
+    - '!**/*.png'
+
+  path_instructions:
+    - path: 'apps/desktop/src-tauri/src/**/*.rs'
+      instructions: >-
+        Rust core that owns everything touching the OS or heavy compute. Enforce:
+        clippy-clean under `-D warnings`; no `unwrap()`/`expect()` outside tests,
+        except `expect()` on a poisoned lock. Failures must become user-readable
+        `AppError`s that surface as HUD notices — never silently drop dictation
+        output (worst case it lands on the clipboard). Comments explain *why*
+        (invariants, OS quirks), not *what*. Preserve the threading model:
+        `cpal::Stream` is `!Send` and lives on the `openflow-audio` thread;
+        `Enigo`/`arboard` live on the `openflow-output` thread (CGEvent
+        affinity); whisper runs in `spawn_blocking` behind a `Mutex`. Do not move
+        these onto async executors. HUD invariant: the HUD window is created once
+        at startup and is never hidden or shown again (Tauri #14102) — content
+        fades on pipeline events; do not "fix" this by hiding/showing the window.
+
+    - path: 'apps/desktop/src-tauri/src/pipeline.rs'
+      instructions: >-
+        Pipeline state machine: idle -> recording -> transcribing -> (refining)
+        -> inserting -> idle, with notice/error auto-clearing after 4s.
+        Cancellation is race-free via a monotonically increasing generation
+        counter: every async stage must re-check the generation before publishing
+        its result, and `cancel()` only bumps the counter. Flag any stage that
+        publishes without re-checking the generation.
+
+    - path: 'apps/desktop/src-tauri/src/{settings,pipeline,models}.rs'
+      instructions: >-
+        These serde structs cross the Tauri IPC boundary (camelCase on the wire).
+        The TypeScript mirror in `packages/core/src/types.ts` is hand-maintained;
+        there is no codegen. Flag any change to an IPC-crossing struct or its
+        field names/casing that does not update `packages/core/src/types.ts` in
+        the same PR.
+
+    - path: 'packages/core/src/types.ts'
+      instructions: >-
+        Hand-mirrored IPC contract for the Rust serde structs (camelCase).
+        Flag drift from the Rust side (`settings.rs`, `pipeline.rs`, `models.rs`)
+        and any added field that has no Rust counterpart.
+
+    - path: 'apps/desktop/src-tauri/src/{llm,text}.rs'
+      instructions: >-
+        Network and LLM path. All cloud calls must be opt-in and BYO-key — no
+        default-on network calls and no telemetry. User transcripts are untrusted
+        data: keep the prompt wrapping injection-resistant and never let
+        transcript content escape the data section of the prompt.
+
+    - path: '**/*.{ts,tsx}'
+      instructions: >-
+        TypeScript is strict: no `any`, and explicit return types on exported
+        functions. The two React webviews are pure UI over Tauri IPC — keep OS
+        access and heavy compute in the Rust core, not in the webview.
+
+    - path: '**/*.{rs,ts,tsx,json}'
+      instructions: >-
+        Privacy is the product. Reject telemetry, default-on network calls, and
+        any persistence of audio or transcripts. The only persisted file is
+        `settings.json` under the app-data directory. Cloud features must be
+        opt-in and BYO-key.
+
+  tools:
+    clippy:
+      enabled: true
+    eslint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    github-checks:
+      enabled: true
