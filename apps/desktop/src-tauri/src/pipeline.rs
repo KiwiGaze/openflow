@@ -119,6 +119,8 @@ pub struct Pipeline {
     last_app: Mutex<Option<(String, String)>>,
     /// At most one HUD educational tip per app session (05 §2.1).
     tip_shown_session: AtomicBool,
+    /// Consecutive empty dictations — drives the one-time accuracy tip (05 §2.3).
+    empty_streak: AtomicU64,
 }
 
 impl Pipeline {
@@ -158,6 +160,7 @@ impl Pipeline {
             last_result: Mutex::new(None),
             last_app: Mutex::new(None),
             tip_shown_session: AtomicBool::new(false),
+            empty_streak: AtomicU64::new(0),
         })
     }
 
@@ -266,6 +269,31 @@ impl Pipeline {
         if let Ok(saved) = self.settings.set(settings) {
             let _ = self.app.emit("settings-changed", &saved);
         }
+    }
+
+    /// The "didn't catch that" notice, upgraded once to suggest a larger model
+    /// after two consecutive empty dictations (tip.accuracy, 05 §2.3). Unlike
+    /// the flash tips this rides a Notice, so it is independent of the
+    /// per-session flash cap; `tips_seen` still bounds it to once ever.
+    fn empty_dictation_notice(&self, streak: u64) -> String {
+        const BASE: &str = "Didn't catch that — try again.";
+        if streak < 2 {
+            return BASE.into();
+        }
+        let mut s = self.settings.get();
+        if !s.tips_enabled
+            || s.tips_seen.iter().any(|t| t == "tip.accuracy")
+            || s.stt_model_id.contains("large")
+            || s.stt_model_id.starts_with("cloud:")
+        {
+            return BASE.into();
+        }
+        s.tips_seen.push("tip.accuracy".into());
+        if let Ok(saved) = self.settings.set(s) {
+            let _ = self.app.emit("settings-changed", &saved);
+        }
+        "Didn't catch that. A larger speech model often helps — switch it in Settings → Models."
+            .into()
     }
 
     // ---- Hotkey entry points -------------------------------------------
@@ -758,9 +786,18 @@ impl Pipeline {
 
         let cleaned = text::clean_transcript(&raw);
         if cleaned.is_empty() {
-            return Ok(ProcessOutcome::Notice(
-                "Didn't catch that — try again.".into(),
-            ));
+            // The accuracy tip is about dictation; an empty Rewrite instruction
+            // is a different situation, so only dictation feeds the streak.
+            let message = if job == Job::Dictation {
+                let streak = self.empty_streak.fetch_add(1, Ordering::SeqCst) + 1;
+                self.empty_dictation_notice(streak)
+            } else {
+                "Didn't catch that — try again.".into()
+            };
+            return Ok(ProcessOutcome::Notice(message));
+        }
+        if job == Job::Dictation {
+            self.empty_streak.store(0, Ordering::SeqCst);
         }
         let with_dictionary = text::apply_dictionary(&cleaned, &settings.dictionary);
 
