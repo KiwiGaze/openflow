@@ -54,8 +54,18 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
 
 fn dispatch(app: &AppHandle, job: Job, state: ShortcutState) {
     let pipeline = app.state::<AppState>().pipeline.clone();
-    match state {
+    // The hotkey handler runs on the main thread. Starting a refine job
+    // blocks on the output worker (selection capture), which round-trips
+    // keystrokes through the main thread — handling it inline would deadlock.
+    //
+    // Pressed/Released are offloaded independently, so the pool could in
+    // principle run Released before its Pressed. Harmless here: a reorder only
+    // changes behavior for holds longer than TAP_THRESHOLD, but the pool is
+    // never saturated (one brief task at a time), so tasks start in order well
+    // within that window — and sub-threshold taps already treat Released as a
+    // no-op.
+    tauri::async_runtime::spawn_blocking(move || match state {
         ShortcutState::Pressed => pipeline.on_hotkey_pressed(job),
         ShortcutState::Released => pipeline.on_hotkey_released(job),
-    }
+    });
 }

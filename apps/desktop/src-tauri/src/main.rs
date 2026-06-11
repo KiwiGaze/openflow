@@ -56,7 +56,7 @@ fn main() {
             let stt = Arc::new(stt::SttEngine::new());
             let llm = Arc::new(llm::LlmClient::new());
             let audio = Arc::new(audio::AudioSystem::spawn());
-            let output = Arc::new(output::OutputSystem::spawn());
+            let output = Arc::new(output::OutputSystem::spawn(handle.clone()));
             let pipeline = pipeline::Pipeline::new(
                 handle.clone(),
                 Arc::clone(&audio),
@@ -125,6 +125,16 @@ fn main() {
             commands::open_microphone_settings,
             commands::get_app_info,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running OpenFlow");
+        .build(tauri::generate_context!())
+        .expect("error while building OpenFlow")
+        .run(|app, event| {
+            // Quit ends in libc exit() (⌘Q via -[NSApplication terminate:],
+            // tray quit via process::exit), which never drops Rust state.
+            // ggml's Metal teardown then aborts on still-resident whisper
+            // buffers, so free the context while drops still run.
+            if let tauri::RunEvent::Exit = event {
+                log::info!("unloading whisper context before exit");
+                app.state::<AppState>().stt.unload();
+            }
+        });
 }

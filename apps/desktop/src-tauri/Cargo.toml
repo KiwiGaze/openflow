@@ -3,7 +3,7 @@ name = "openflow"
 version = "0.1.0"
 description = "Local-first AI voice input for macOS"
 license = "MIT"
-repository = "https://github.com/openflow-app/openflow"
+repository = "https://github.com/KiwiGaze/openflow"
 edition = "2021"
 rust-version = "1.82"
 

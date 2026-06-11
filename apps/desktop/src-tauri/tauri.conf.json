@@ -27,7 +27,7 @@
         "label": "hud",
         "title": "OpenFlow HUD",
         "url": "hud.html",
-        "width": 280,
+        "width": 600,
         "height": 72,
         "visible": false,
         "decorations": false,
