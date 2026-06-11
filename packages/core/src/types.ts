@@ -122,6 +122,14 @@ export interface Settings {
   launchAtLogin: boolean;
   /** Window theme override; `system` defers to macOS. */
   appearance: Appearance;
+  /** Master switch for one-time feature tips. */
+  tipsEnabled: boolean;
+  /** Tip ids already shown; never re-shown. */
+  tipsSeen: string[];
+  /** Successful dictations ever — the only tip counter (never a log). */
+  dictationCount: number;
+  /** ISO date (`YYYY-MM-DD`) of the last tip shown; enforces ≤ 1 tip/day. */
+  lastTipShownAt: string;
   onboardingCompleted: boolean;
 }
 

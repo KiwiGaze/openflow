@@ -651,6 +651,13 @@ impl Pipeline {
             refined,
             started,
         )?;
+        // Count this successful dictation — the only tip-system counter (05); a
+        // count, never a log. Emit so an open settings webview re-evaluates tips.
+        let mut counted = self.settings.get();
+        counted.dictation_count = counted.dictation_count.saturating_add(1);
+        if let Ok(saved) = self.settings.set(counted) {
+            let _ = self.app.emit("settings-changed", &saved);
+        }
         // The text already pasted; both notices are informational. A flaky-LLM
         // warning is more useful than a dangling-override notice, so it wins.
         if let Some(warning) = llm_warning {

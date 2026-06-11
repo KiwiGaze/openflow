@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useModels, useSettings } from './hooks.js';
 import { Onboarding } from './Onboarding.js';
+import { eligibleTip } from './tips.js';
+import { Callout } from './components/Callout.js';
 import { TAB_ICONS } from './components/tabIcons.js';
 import { AboutTab } from './tabs/AboutTab.js';
 import { DictationTab } from './tabs/DictationTab.js';
@@ -76,6 +78,12 @@ export function App(): JSX.Element {
     return <Onboarding api={api} modelsApi={modelsApi} />;
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+  const tip = eligibleTip(tab, api.settings, today);
+  const dismissTip = (id: string): void => {
+    void api.update({ tipsSeen: [...api.settings.tipsSeen, id], lastTipShownAt: today });
+  };
+
   return (
     <div className="shell">
       <nav className="sidebar" aria-label="Settings">
@@ -116,6 +124,23 @@ export function App(): JSX.Element {
               Dismiss
             </button>
           </div>
+        )}
+        {tip && (
+          <Callout
+            variant="info"
+            action={{
+              label: tip.actionLabel,
+              onClick: () => {
+                setTab(tip.actionTab as TabId);
+                dismissTip(tip.id);
+              },
+            }}
+            onDismiss={() => {
+              dismissTip(tip.id);
+            }}
+          >
+            {tip.copy}
+          </Callout>
         )}
         {tab === 'dictation' && <DictationTab api={api} modelsApi={modelsApi} />}
         {tab === 'modes' && <ModesTab api={api} />}

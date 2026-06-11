@@ -33,6 +33,24 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
             Show again
           </button>
         </Row>
+        <Row
+          title="Show tips"
+          hint="One-time hints about features you haven't tried. Never repeats, never interrupts dictation."
+        >
+          <Toggle
+            checked={settings.tipsEnabled}
+            onChange={(checked) => void update({ tipsEnabled: checked })}
+            label="Show tips"
+          />
+        </Row>
+        <div className="row-actions">
+          <button
+            className="btn btn-quiet"
+            onClick={() => void update({ tipsSeen: [], lastTipShownAt: '' })}
+          >
+            Reset tips
+          </button>
+        </div>
       </section>
     </div>
   );

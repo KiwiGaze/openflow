@@ -112,6 +112,15 @@ pub struct Settings {
     pub restore_clipboard: bool,
     pub launch_at_login: bool,
     pub appearance: Appearance,
+    // ---- Tip system (05); all additive, defaulted via the container default ----
+    /// Master switch for one-time feature tips.
+    pub tips_enabled: bool,
+    /// Tip ids already shown; never re-shown.
+    pub tips_seen: Vec<String>,
+    /// Successful dictations ever — the only tip-system counter (never a log).
+    pub dictation_count: u64,
+    /// ISO date (`YYYY-MM-DD`) of the last tip shown; enforces ≤ 1 tip/day.
+    pub last_tip_shown_at: String,
     pub onboarding_completed: bool,
 }
 
@@ -135,6 +144,10 @@ impl Default for Settings {
             restore_clipboard: true,
             launch_at_login: false,
             appearance: Appearance::System,
+            tips_enabled: true,
+            tips_seen: Vec::new(),
+            dictation_count: 0,
+            last_tip_shown_at: String::new(),
             onboarding_completed: false,
         }
     }
@@ -334,6 +347,8 @@ mod tests {
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"insertMethod\":\"paste\""));
         assert!(json.contains("\"appearance\":\"system\""));
+        assert!(json.contains("\"tipsEnabled\":true"));
+        assert!(json.contains("\"dictationCount\":0"));
         // The v1 LLM block is deserialize-only; it must never be written.
         assert!(!json.contains("\"llm\""));
     }
