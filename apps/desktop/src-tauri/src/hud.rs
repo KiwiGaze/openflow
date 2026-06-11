@@ -9,7 +9,7 @@
 //! based on pipeline events, so "showing" the HUD never touches window ordering
 //! or focus.
 
-use tauri::{AppHandle, Manager, PhysicalPosition, WebviewWindow};
+use tauri::{AppHandle, Manager, Monitor, PhysicalPosition, WebviewWindow};
 
 pub const HUD_LABEL: &str = "hud";
 
@@ -40,23 +40,7 @@ pub fn position_on_cursor_monitor(app: &AppHandle) {
 }
 
 fn try_position(app: &AppHandle, hud: &WebviewWindow) -> tauri::Result<()> {
-    let cursor = app.cursor_position().ok();
-    let monitor = match cursor {
-        Some(point) => app
-            .available_monitors()?
-            .into_iter()
-            .find(|m| {
-                let pos = m.position();
-                let size = m.size();
-                point.x >= pos.x as f64
-                    && point.x < (pos.x + size.width as i32) as f64
-                    && point.y >= pos.y as f64
-                    && point.y < (pos.y + size.height as i32) as f64
-            })
-            .or(app.primary_monitor()?),
-        None => app.primary_monitor()?,
-    };
-    let Some(monitor) = monitor else {
+    let Some(monitor) = monitor_under_cursor(app)? else {
         return Ok(());
     };
 
@@ -69,6 +53,27 @@ fn try_position(app: &AppHandle, hud: &WebviewWindow) -> tauri::Result<()> {
     let y = monitor_pos.y + monitor_size.height as i32 - window_size.height as i32 - margin;
     hud.set_position(PhysicalPosition::new(x, y))?;
     Ok(())
+}
+
+/// The monitor holding the cursor — the best proxy for where the user is
+/// working — falling back to the primary monitor. Shared with the changes
+/// overlay so both windows always agree on the target monitor.
+pub fn monitor_under_cursor(app: &AppHandle) -> tauri::Result<Option<Monitor>> {
+    let Ok(point) = app.cursor_position() else {
+        return app.primary_monitor();
+    };
+    Ok(app
+        .available_monitors()?
+        .into_iter()
+        .find(|m| {
+            let pos = m.position();
+            let size = m.size();
+            point.x >= pos.x as f64
+                && point.x < (pos.x + size.width as i32) as f64
+                && point.y >= pos.y as f64
+                && point.y < (pos.y + size.height as i32) as f64
+        })
+        .or(app.primary_monitor()?))
 }
 
 /// Adds `FullScreenAuxiliary` to a collection behavior, leaving the other bits
