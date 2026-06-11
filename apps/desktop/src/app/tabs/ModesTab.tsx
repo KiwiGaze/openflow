@@ -1,13 +1,18 @@
-import { useState, type JSX } from 'react';
+import { useRef, useState, type JSX } from 'react';
 import {
   LANGUAGES,
   languageLabel,
   MODE_TEMPLATES,
   type Mode,
   type ModeTemplate,
+  parseModeImport,
+  serializeMode,
+  slugifyMode,
+  uniqueModeName,
 } from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
 import { useLlmProfiles, useModels } from '../hooks.js';
+import { ipc } from '../ipc.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
@@ -87,6 +92,47 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
     });
   };
 
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+
+  const exportMode = (mode: Mode): void => {
+    const today = new Date().toISOString().slice(0, 10);
+    void ipc.exportMode(slugifyMode(mode.name), serializeMode(mode, today));
+  };
+
+  // Each imported file gets a fresh id and a Finder-style unique name; an
+  // import can never overwrite an existing mode (06 §4).
+  const importFiles = async (files: FileList): Promise<void> => {
+    const created: Mode[] = [];
+    let skipped = 0;
+    for (const file of Array.from(files)) {
+      const result = parseModeImport(await file.text());
+      if (!result.ok) {
+        skipped += 1;
+        continue;
+      }
+      const taken = [...settings.modes, ...created].map((m) => m.name);
+      created.push({
+        ...result.mode,
+        id: crypto.randomUUID(),
+        name: uniqueModeName(result.mode.name, taken),
+      });
+    }
+    if (created.length > 0) {
+      const last = created[created.length - 1];
+      if (last) setSelectedId(last.id);
+      await save({ ...settings, modes: [...settings.modes, ...created] });
+    }
+    const added = created.length;
+    setImportNotice(
+      skipped === 0
+        ? `Added ${added} mode${added === 1 ? '' : 's'}.`
+        : `Added ${added} mode${added === 1 ? '' : 's'}. ${skipped} file${
+            skipped === 1 ? ' was' : 's were'
+          } skipped (not a valid mode).`,
+    );
+  };
+
   return (
     <div className="tab-body">
       <section className="card">
@@ -146,7 +192,23 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
           >
             {showGallery ? 'Hide templates' : 'Browse templates…'}
           </button>
+          <button className="btn btn-quiet" onClick={() => importInputRef.current?.click()}>
+            Import mode…
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json,application/json"
+            multiple
+            hidden
+            onChange={(e) => {
+              const { files } = e.target;
+              e.target.value = '';
+              if (files && files.length > 0) void importFiles(files);
+            }}
+          />
         </div>
+        {importNotice && <p className="row-hint">{importNotice}</p>}
         {showGallery && (
           <div className="template-gallery">
             <p className="row-hint">
@@ -334,6 +396,14 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
               }}
             >
               Duplicate
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                exportMode(selected);
+              }}
+            >
+              Export
             </button>
             {!selected.builtIn && (
               <button

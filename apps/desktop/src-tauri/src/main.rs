@@ -129,6 +129,7 @@ fn main() {
             commands::save_llm_profile,
             commands::delete_llm_profile,
             commands::reveal_llm_profiles,
+            commands::export_mode,
             commands::list_ollama_models,
             commands::check_permissions,
             commands::request_microphone_permission,

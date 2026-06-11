@@ -212,6 +212,7 @@ export const COMMANDS = {
   saveLlmProfile: 'save_llm_profile',
   deleteLlmProfile: 'delete_llm_profile',
   revealLlmProfiles: 'reveal_llm_profiles',
+  exportMode: 'export_mode',
   listOllamaModels: 'list_ollama_models',
   checkPermissions: 'check_permissions',
   requestMicrophonePermission: 'request_microphone_permission',

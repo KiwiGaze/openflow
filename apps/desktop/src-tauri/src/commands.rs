@@ -233,6 +233,37 @@ pub fn reveal_llm_profiles(app: AppHandle, state: State<'_, AppState>) -> AppRes
         .map_err(|e| AppError::Settings(format!("could not open the profiles folder: {e}")))
 }
 
+/// Writes an exported mode JSON to `<app-data>/exported-modes/<filename>.json`
+/// and reveals the folder. A native save panel would need the dialog plugin;
+/// the reveal idiom matches "Show in Finder" for profiles and adds no dependency.
+#[tauri::command]
+pub fn export_mode(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    filename: String,
+    contents: String,
+) -> AppResult<()> {
+    // `filename` is a slug from the frontend; re-check it can't escape the dir.
+    if filename.is_empty()
+        || filename.len() > 80
+        || filename.contains(['/', '\\'])
+        || filename.contains("..")
+    {
+        return Err(AppError::Settings("invalid export filename".into()));
+    }
+    let dir = state
+        .profiles
+        .dir()
+        .parent()
+        .ok_or_else(|| AppError::Settings("no data directory".into()))?
+        .join("exported-modes");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(dir.join(format!("{filename}.json")), contents)?;
+    tauri_plugin_opener::OpenerExt::opener(&app)
+        .open_path(dir.display().to_string(), None::<&str>)
+        .map_err(|e| AppError::Settings(format!("could not open the exported-modes folder: {e}")))
+}
+
 #[tauri::command]
 pub async fn list_ollama_models(
     state: State<'_, AppState>,

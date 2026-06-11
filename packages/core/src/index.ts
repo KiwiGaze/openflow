@@ -5,3 +5,4 @@ export * from './validate.js';
 export * from './presets.js';
 export * from './templates.js';
 export * from './languages.js';
+export * from './modeio.js';
