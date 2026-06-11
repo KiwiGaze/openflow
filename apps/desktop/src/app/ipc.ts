@@ -6,6 +6,7 @@ import {
   COMMANDS,
   EVENTS,
   type AppInfo,
+  type DictionarySuggestion,
   type DownloadProgress,
   type Insights,
   type LlmProfile,
@@ -34,6 +35,10 @@ export const ipc = {
   startPolishSelection: (): Promise<void> => invoke(COMMANDS.startPolishSelection),
   getLastResult: (): Promise<TranscriptionResult | null> => invoke(COMMANDS.getLastResult),
   getInsights: (): Promise<Insights> => invoke(COMMANDS.getInsights),
+  listDictionarySuggestions: (): Promise<DictionarySuggestion[]> =>
+    invoke(COMMANDS.listDictionarySuggestions),
+  dismissDictionarySuggestion: (term: string): Promise<void> =>
+    invoke(COMMANDS.dismissDictionarySuggestion, { term }),
   testLlm: (profile: LlmProfile): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { profile }),
   listLlmProfiles: (): Promise<LlmProfile[]> => invoke(COMMANDS.listLlmProfiles),
   saveLlmProfile: (profile: LlmProfile): Promise<LlmProfile[]> =>

@@ -88,6 +88,9 @@ Automated tests cover the logic; these flows need a human:
 15. Settings → Refine → Transforms: add the "Concise" template, assign a hotkey, select a wordy
     sentence in any app, press it → the selection is rewritten; the HUD reads "Concise…". Assign
     a hotkey already taken by dictation → clear error, the change is rolled back.
+16. Dictate a sentence naming a product (e.g. "we use TanStack and DeepSeek") → open Dictionary →
+    both appear under "Noticed while you spoke"; click one to add it ("kept as-is"), dismiss the
+    other → it disappears for the session. Insights → the words/pace/streak update after dictating.
 
 ## Repository layout
 

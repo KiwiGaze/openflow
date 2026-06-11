@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
+  DictionarySuggestion,
   DownloadProgress,
   Insights,
   LlmProfile,
@@ -164,6 +165,34 @@ export function useInsights(): Insights | null {
   }, []);
 
   return insights;
+}
+
+export interface DictionarySuggestionsApi {
+  suggestions: DictionarySuggestion[];
+  dismiss: (term: string) => void;
+  refresh: () => void;
+}
+
+/** Session dictionary suggestions; refetched after each completed dictation. */
+export function useDictionarySuggestions(): DictionarySuggestionsApi {
+  const [suggestions, setSuggestions] = useState<DictionarySuggestion[]>([]);
+
+  const refresh = useCallback(() => {
+    void ipc.listDictionarySuggestions().then(setSuggestions);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    return subscribe(events.onResult(refresh));
+  }, [refresh]);
+
+  return {
+    suggestions,
+    dismiss: (term) => {
+      void ipc.dismissDictionarySuggestion(term).then(refresh);
+    },
+    refresh,
+  };
 }
 
 /** Polls permissions while mounted — users flip them in System Settings. */

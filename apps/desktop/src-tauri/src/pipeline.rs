@@ -23,6 +23,7 @@ use crate::profiles::{LlmProfile, ProfileManager};
 use crate::settings::{HotkeyBehavior, Settings, SettingsManager, MAX_RECORDING_SECS};
 use crate::stats::{word_count, Insights, Stats};
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
+use crate::suggestions::{DictionarySuggestion, Suggestions};
 use crate::text;
 
 pub const PIPELINE_STATE_EVENT: &str = "pipeline-state";
@@ -103,6 +104,9 @@ pub struct Pipeline {
     /// Session-only usage aggregates for the Insights view (in-RAM, never
     /// persisted or transmitted).
     stats: Stats,
+    /// Session-only candidate-term tally driving dictionary suggestions
+    /// (in-RAM, never persisted or transmitted).
+    suggestions: Suggestions,
 }
 
 impl Pipeline {
@@ -136,12 +140,27 @@ impl Pipeline {
             generation: AtomicU64::new(0),
             last_result: Mutex::new(None),
             stats: Stats::new(),
+            suggestions: Suggestions::new(),
         })
     }
 
     /// Snapshot of this session's usage aggregates for the Insights view.
     pub fn insights(&self) -> Insights {
         self.stats.snapshot()
+    }
+
+    /// Top dictionary suggestions seen this session, excluding known terms.
+    pub fn dictionary_suggestions(
+        &self,
+        dictionary: &[crate::settings::DictionaryEntry],
+        limit: usize,
+    ) -> Vec<DictionarySuggestion> {
+        self.suggestions.top(dictionary, limit)
+    }
+
+    /// Suppresses a suggested term for the rest of the session.
+    pub fn dismiss_suggestion(&self, term: &str) {
+        self.suggestions.dismiss(term);
     }
 
     pub fn state(&self) -> PipelineState {
@@ -541,6 +560,8 @@ impl Pipeline {
         started: Instant,
         record_ms: u64,
     ) -> AppResult<ProcessOutcome> {
+        // Watch for distinctive terms worth suggesting for the dictionary.
+        self.suggestions.observe(&transcript);
         let mode = settings.active_mode();
         // The refine toggle is the master switch; the per-mode flag still
         // decides whether this mode wants AI at all.

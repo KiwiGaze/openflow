@@ -1,6 +1,11 @@
 # A dictionary that learns (with your permission)
 
-Status: exploration. A brainstorm sketch, not a committed spec.
+Status: **shipped** (Approach B — in-RAM, session-only). Began as a brainstorm sketch; this doc
+now records what was built. One refinement emerged while building: a suggested term that whisper
+already spells correctly has no `from → to` correction, so accepting one writes a `from == to`
+**vocabulary entry** (preserve this spelling — it still biases whisper and the LLM), rendered in
+the list as the bare term with a "kept as-is" tag. The detector ships internal-caps only;
+digit-bearing and recurring-correction signals remain follow-ups.
 
 ## Why
 

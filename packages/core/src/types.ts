@@ -70,8 +70,19 @@ export interface Mode {
 export interface DictionaryEntry {
   /** What the transcriber tends to produce, e.g. "open flow". */
   from: string;
-  /** The replacement, e.g. "OpenFlow". */
+  /** The replacement, e.g. "OpenFlow". When equal to `from`, the entry is a
+   * pure vocabulary hint (preserve this spelling) rather than a replacement. */
   to: string;
+}
+
+/**
+ * A term OpenFlow noticed you dictate — a distinctive product/proper name —
+ * offered as a one-click dictionary addition. Computed from in-memory,
+ * session-only counts; never persisted or transmitted.
+ */
+export interface DictionarySuggestion {
+  term: string;
+  count: number;
 }
 
 /**
@@ -230,6 +241,8 @@ export const COMMANDS = {
   startPolishSelection: 'start_polish_selection',
   getLastResult: 'get_last_result',
   getInsights: 'get_insights',
+  listDictionarySuggestions: 'list_dictionary_suggestions',
+  dismissDictionarySuggestion: 'dismiss_dictionary_suggestion',
   testLlm: 'test_llm',
   listLlmProfiles: 'list_llm_profiles',
   saveLlmProfile: 'save_llm_profile',

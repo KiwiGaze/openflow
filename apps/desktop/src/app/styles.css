@@ -446,6 +446,39 @@ button:focus-visible,
   color: var(--text-dim);
 }
 
+.dict-suggestions {
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dict-suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dict-suggestion {
+  display: inline-flex;
+  align-items: center;
+}
+
+.chip-dismiss {
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  margin-left: 2px;
+}
+
+.chip-dismiss:hover {
+  color: var(--text);
+}
+
 .dict-list {
   display: flex;
   flex-direction: column;

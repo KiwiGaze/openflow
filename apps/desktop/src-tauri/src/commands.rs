@@ -173,6 +173,19 @@ pub fn get_insights(state: State<'_, AppState>) -> crate::stats::Insights {
 }
 
 #[tauri::command]
+pub fn list_dictionary_suggestions(
+    state: State<'_, AppState>,
+) -> Vec<crate::suggestions::DictionarySuggestion> {
+    let dictionary = state.settings.get().dictionary;
+    state.pipeline.dictionary_suggestions(&dictionary, 5)
+}
+
+#[tauri::command]
+pub fn dismiss_dictionary_suggestion(state: State<'_, AppState>, term: String) {
+    state.pipeline.dismiss_suggestion(&term);
+}
+
+#[tauri::command]
 pub async fn test_llm(
     state: State<'_, AppState>,
     profile: LlmProfile,

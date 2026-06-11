@@ -18,6 +18,7 @@ mod shortcuts;
 mod state;
 mod stats;
 mod stt;
+mod suggestions;
 mod text;
 mod tray;
 
@@ -126,6 +127,8 @@ fn main() {
             commands::start_polish_selection,
             commands::get_last_result,
             commands::get_insights,
+            commands::list_dictionary_suggestions,
+            commands::dismiss_dictionary_suggestion,
             commands::test_llm,
             commands::list_llm_profiles,
             commands::save_llm_profile,
