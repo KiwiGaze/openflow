@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { todayIso } from '@openflow/core';
 import { useModels, useSettings } from './hooks.js';
 import { Onboarding } from './Onboarding.js';
 import { eligibleTip } from './tips.js';
@@ -82,7 +83,7 @@ export function App(): JSX.Element {
     return <Onboarding api={api} modelsApi={modelsApi} />;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const tip = eligibleTip(tab, api.settings, today);
   const dismissTip = (id: string): void => {
     void api.update({ tipsSeen: [...api.settings.tipsSeen, id], lastTipShownAt: today });
@@ -147,7 +148,7 @@ export function App(): JSX.Element {
           </Callout>
         )}
         {tab === 'dictation' && <DictationTab api={api} modelsApi={modelsApi} />}
-        {tab === 'modes' && <ModesTab api={api} />}
+        {tab === 'modes' && <ModesTab api={api} modelsApi={modelsApi} />}
         {tab === 'models' && <ModelsTab api={api} modelsApi={modelsApi} />}
         {tab === 'output' && <OutputTab api={api} />}
         {tab === 'dictionary' && <DictionaryTab api={api} />}

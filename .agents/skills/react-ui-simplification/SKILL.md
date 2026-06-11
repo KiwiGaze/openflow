@@ -15,9 +15,9 @@ backend values).
 ## Files to inspect first
 
 - `docs/engineering/architecture-boundaries.md` — what React must not own.
-- `docs/engineering/monorepo-conventions.md` §"When to split" — the two
-  sanctioned component-extraction seams (ModesTab editor, ModelsTab profile
-  editor).
+- `docs/engineering/monorepo-conventions.md` §"When to split" — the seam
+  policy. The two previously sanctioned seams are taken: `ModeEditor` and
+  `LlmProfileEditor` in `components/`.
 - `apps/desktop/src/app/hooks.ts` — the established hook patterns
   (optimistic save + rollback, bootstrap-once + subscribe).
 - `apps/desktop/src/app/ipc.ts` — the only place `invoke`/`listen` appear.

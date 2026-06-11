@@ -1,8 +1,9 @@
-import { useMemo, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { formatAcceleratorMac, formatBytes, formatProgress } from '@openflow/core';
 import type { ModelsApi, SettingsApi } from './hooks.js';
 import { usePermissions, usePipeline } from './hooks.js';
 import { ipc } from './ipc.js';
+import { downloadFailed, DOWNLOAD_FAILED_HINT, isDownloading } from './modelStatus.js';
 
 const STEPS = ['Welcome', 'Microphone', 'Accessibility', 'Try it', "You're set"] as const;
 
@@ -25,11 +26,7 @@ export function Onboarding({
   const { state, lastResult } = usePipeline();
   const { models, progress, download } = modelsApi;
 
-  const starterModels = useMemo(
-    () => models.filter((m) => STARTER_MODELS.includes(m.id)),
-    [models],
-  );
-  const activeModel = models.find((m) => m.id === settings.sttModelId);
+  const starterModels = models.filter((m) => STARTER_MODELS.includes(m.id));
   const baseModel = models.find((m) => m.id === DEFAULT_MODEL);
   const hotkey = formatAcceleratorMac(settings.dictationHotkey);
   const rewriteHotkey = formatAcceleratorMac(settings.refineHotkey);
@@ -38,7 +35,7 @@ export function Onboarding({
   const micDenied = permissions?.microphone === 'denied';
   const axGranted = permissions?.accessibility === true;
   const activeProgress = progress[settings.sttModelId];
-  const modelInstalled = activeModel?.installed ?? false;
+  const modelInstalled = models.find((m) => m.id === settings.sttModelId)?.installed ?? false;
   const modelReadyPct = activeProgress
     ? formatProgress(activeProgress.downloadedBytes, activeProgress.totalBytes)
     : '…';
@@ -132,8 +129,8 @@ export function Onboarding({
             <div className="model-list">
               {starterModels.map((model) => {
                 const p = progress[model.id];
-                const downloading = (model.downloading || (p && !p.done)) ?? false;
-                const failed = (p?.done && p.error) ?? false;
+                const downloading = isDownloading(model, p);
+                const failed = downloadFailed(p);
                 return (
                   <label key={model.id} className="model-row">
                     <input
@@ -149,9 +146,7 @@ export function Onboarding({
                           {formatBytes(model.sizeBytes)} — {model.description}
                         </div>
                         {failed && (
-                          <div className="row-hint row-hint-warn">
-                            Download failed — check your connection.
-                          </div>
+                          <div className="row-hint row-hint-warn">{DOWNLOAD_FAILED_HINT}</div>
                         )}
                       </div>
                     </div>
@@ -382,8 +377,8 @@ function DownloadConsent({
 }): JSX.Element {
   const p = progress[DEFAULT_MODEL];
   const installed = baseModel?.installed ?? false;
-  const downloading = (baseModel?.downloading ?? false) || (p !== undefined && !p.done);
-  const failed = (p?.done && p.error) ?? false;
+  const downloading = isDownloading(baseModel, p);
+  const failed = downloadFailed(p);
 
   if (installed) {
     return <span className="badge badge-ok">Base (English) ready ✓</span>;

@@ -53,6 +53,15 @@ export function validateDictionaryEntry(
   return null;
 }
 
+/**
+ * Request-timeout seconds from form input: not a number (or 0) falls back to
+ * the 30 s default, and anything lower than 5 s becomes 5 s. Shared by the
+ * LLM and STT profile editors so the rule cannot drift.
+ */
+export function clampTimeoutSecs(value: string | number): number {
+  return Math.max(5, Number(value) || 30);
+}
+
 /** Max characters for a snippet expansion — long enough for canned replies. */
 export const MAX_SNIPPET_EXPANSION = 4000;
 

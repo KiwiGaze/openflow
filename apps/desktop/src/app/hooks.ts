@@ -8,6 +8,7 @@ import type {
   PermissionsState,
   PipelineState,
   Settings,
+  SttProfile,
   TranscriptionResult,
 } from '@openflow/core';
 import { events, ipc, subscribe } from './ipc.js';
@@ -152,6 +153,31 @@ export function useLlmProfiles(): LlmProfilesApi {
     },
     remove: async (id) => {
       setProfiles(await ipc.deleteLlmProfile(id));
+    },
+  };
+}
+
+export interface SttProfilesApi {
+  profiles: SttProfile[];
+  save: (profile: SttProfile) => Promise<void>;
+  remove: (id: string) => Promise<void>;
+}
+
+/** Lists on mount, so hand-dropped profile files appear on each tab visit. */
+export function useSttProfiles(): SttProfilesApi {
+  const [profiles, setProfiles] = useState<SttProfile[]>([]);
+
+  useEffect(() => {
+    void ipc.listSttProfiles().then(setProfiles);
+  }, []);
+
+  return {
+    profiles,
+    save: async (profile) => {
+      setProfiles(await ipc.saveSttProfile(profile));
+    },
+    remove: async (id) => {
+      setProfiles(await ipc.deleteSttProfile(id));
     },
   };
 }

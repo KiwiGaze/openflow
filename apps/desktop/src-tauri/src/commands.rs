@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::{AppError, AppResult};
 use crate::llm::LlmTestResult;
-use crate::models::ModelInfoDto;
+use crate::models::{ModelInfoDto, DEFAULT_STT_MODEL_ID};
 use crate::permissions::{self, PermissionsState};
 use crate::pipeline::{Job, PipelineState, TranscriptionResult};
 use crate::profiles::LlmProfile;
@@ -284,23 +284,15 @@ pub async fn reprocess_history(
         .cloned()
         .ok_or_else(|| AppError::State("that mode no longer exists".into()))?;
     if !mode.uses_llm {
-        return Ok(if mode.id == modes::LITERAL_MODE_ID {
-            text
-        } else if mode.id == modes::CODE_MODE_ID {
-            text::apply_code_identifier(&text)
-        } else {
-            text::apply_rules_cleanup(&text)
-        });
+        return Ok(modes::no_ai_output(&mode.id, &text));
     }
     let system = modes::dictation_system_prompt(&mode, &settings.dictionary);
     // Honor the mode's AI-profile override (07 §3), falling back to the active
     // profile, so reprocess matches what real dictation in this mode produces.
-    let profile = mode
-        .ai_profile_id
-        .as_deref()
-        .filter(|id| !id.is_empty())
-        .and_then(|id| state.profiles.get(id))
-        .or_else(|| state.profiles.active(&settings.active_llm_profile_id));
+    let profile = state.profiles.resolve(
+        mode.ai_profile_id.as_deref(),
+        &settings.active_llm_profile_id,
+    );
     match profile {
         Some(profile) => state.llm.chat(&profile, &system, &text).await,
         None => Ok(text::apply_rules_cleanup(&text)),
@@ -375,11 +367,9 @@ pub async fn test_mode(
     let system = modes::preview_system_prompt(&prompt, transforms, &settings.dictionary);
     // Preview the mode's effective AI profile (its override, else the active
     // one) so the result matches real dictation — including unsaved edits.
-    let profile = ai_profile_id
-        .as_deref()
-        .filter(|id| !id.is_empty())
-        .and_then(|id| state.profiles.get(id))
-        .or_else(|| state.profiles.active(&settings.active_llm_profile_id));
+    let profile = state
+        .profiles
+        .resolve(ai_profile_id.as_deref(), &settings.active_llm_profile_id);
     match profile {
         Some(profile) => state.llm.chat(&profile, &system, &sample).await,
         None => Ok(text::apply_rules_cleanup(&sample)),
@@ -470,7 +460,7 @@ pub fn delete_stt_profile(
         let mut next = settings;
         next.confirmed_stt_profiles.retain(|c| c != &id);
         if was_active {
-            next.stt_model_id = "base.en".into();
+            next.stt_model_id = DEFAULT_STT_MODEL_ID.into();
         }
         let saved = state.settings.set(next)?;
         let _ = app.emit(SETTINGS_CHANGED_EVENT, &saved);

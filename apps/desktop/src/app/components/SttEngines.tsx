@@ -1,14 +1,16 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import {
   CLOUD_STT_PREFIX,
   DEFAULT_STT_PRESET,
   STT_PRESETS,
   STT_PROFILE_VERSION,
+  clampTimeoutSecs,
   isLocalEndpoint,
   isValidBaseUrl,
   type SttProfile,
 } from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
+import { useSttProfiles } from '../hooks.js';
 import { ipc } from '../ipc.js';
 import { Callout } from './Callout.js';
 import { Row } from './Row.js';
@@ -28,22 +30,14 @@ function hostOf(url: string): string {
  */
 export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, update } = api;
-  const [profiles, setProfiles] = useState<SttProfile[]>([]);
+  const { profiles, save, remove } = useSttProfiles();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [consentFor, setConsentFor] = useState<SttProfile | null>(null);
-
-  useEffect(() => {
-    void ipc.listSttProfiles().then(setProfiles);
-  }, []);
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
   const activeId = settings.sttModelId.startsWith(CLOUD_STT_PREFIX)
     ? settings.sttModelId.slice(CLOUD_STT_PREFIX.length)
     : null;
-
-  const saveProfile = async (profile: SttProfile): Promise<void> => {
-    setProfiles(await ipc.saveSttProfile(profile));
-  };
 
   const addProfile = (): void => {
     const profile: SttProfile = {
@@ -58,11 +52,11 @@ export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
       timeoutSecs: 30,
     };
     setSelectedId(profile.id);
-    void saveProfile(profile);
+    void save(profile);
   };
 
   const deleteProfile = async (id: string): Promise<void> => {
-    setProfiles(await ipc.deleteSttProfile(id));
+    await remove(id);
     if (selectedId === id) setSelectedId(null);
   };
 
@@ -87,7 +81,7 @@ export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
   };
 
   const patch = (next: Partial<SttProfile>): void => {
-    if (selected) void saveProfile({ ...selected, ...next });
+    if (selected) void save({ ...selected, ...next });
   };
 
   const applyPreset = (presetId: string): void => {
@@ -99,7 +93,7 @@ export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
       next.baseUrl = preset.baseUrl;
       next.model = preset.model;
     }
-    void saveProfile(next);
+    void save(next);
   };
 
   return (
@@ -241,7 +235,7 @@ export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
               max={300}
               value={selected.timeoutSecs}
               onChange={(e) => {
-                patch({ timeoutSecs: Math.max(5, Number(e.target.value) || 30) });
+                patch({ timeoutSecs: clampTimeoutSecs(e.target.value) });
               }}
             />
           </Row>
