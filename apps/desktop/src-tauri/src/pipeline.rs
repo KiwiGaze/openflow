@@ -362,6 +362,18 @@ impl Pipeline {
         self.set_state(Status::Idle, None, None);
     }
 
+    /// Surfaces a transient notice in the HUD for callers outside the pipeline
+    /// (e.g. the tray acting on nothing), reusing the existing notice surface
+    /// rather than inventing another. Skipped while a job owns the HUD.
+    pub fn flash_notice(self: &Arc<Self>, message: String) {
+        if matches!(
+            self.state().status,
+            Status::Idle | Status::Notice | Status::Error | Status::Inserted
+        ) {
+            self.set_transient(Status::Notice, message);
+        }
+    }
+
     /// Tap entry point: refine the current selection with the built-in
     /// instruction — no recording, no Session. Runs under the same busy-state
     /// and generation contract as every other job; errors surface as

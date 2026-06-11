@@ -29,9 +29,13 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
 
+  // Only a change that could alter connectivity invalidates a test result;
+  // editing the name or timeout keeps the green check (UX-33).
+  const CONNECTIVITY_KEYS = ['baseUrl', 'apiKey', 'model'] as const;
+
   const patch = (next: Partial<LlmProfile>): void => {
     if (!selected) return;
-    setTestResult(null);
+    if (CONNECTIVITY_KEYS.some((k) => k in next)) setTestResult(null);
     void save({ ...selected, ...next });
   };
 

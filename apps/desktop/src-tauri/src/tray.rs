@@ -92,13 +92,17 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
         "refine-dictation" => toggle_refine_after_dictation(app),
         "copy-last" => {
             let state = app.state::<AppState>();
-            if let Some(result) = state.pipeline.last_result() {
-                if let Err(err) = state
-                    .output
-                    .insert(result.text, InsertMethod::Clipboard, false)
-                {
-                    log::warn!("copy last result failed: {err}");
+            match state.pipeline.last_result() {
+                Some(result) => {
+                    if let Err(err) =
+                        state
+                            .output
+                            .insert(result.text, InsertMethod::Clipboard, false)
+                    {
+                        log::warn!("copy last result failed: {err}");
+                    }
                 }
+                None => state.pipeline.flash_notice("No dictation yet.".into()),
             }
         }
         other => {
