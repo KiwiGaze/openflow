@@ -51,6 +51,16 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
             Reset tips
           </button>
         </div>
+        <Row
+          title="Save history"
+          hint="Keep a local, searchable log of past dictations on this Mac (text only, never audio). Off by default. Clear it anytime under Output."
+        >
+          <Toggle
+            checked={settings.historyEnabled}
+            onChange={(checked) => void update({ historyEnabled: checked })}
+            label="Save history"
+          />
+        </Row>
       </section>
 
       <section className="card">

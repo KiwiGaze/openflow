@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use crate::history::HistoryStore;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
 use crate::output::OutputSystem;
@@ -21,4 +22,5 @@ pub struct AppState {
     pub llm: Arc<LlmClient>,
     pub output: Arc<OutputSystem>,
     pub pipeline: Arc<Pipeline>,
+    pub history: Arc<HistoryStore>,
 }

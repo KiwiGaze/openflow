@@ -744,6 +744,22 @@ button:focus-visible {
   margin: 6px 0;
 }
 
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.history-row {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+
+.history-row:first-child {
+  border-top: none;
+}
+
 .about-list {
   display: grid;
   grid-template-columns: max-content 1fr;

@@ -122,6 +122,8 @@ export interface Settings {
   launchAtLogin: boolean;
   /** Window theme override; `system` defers to macOS. */
   appearance: Appearance;
+  /** Opt-in: keep a local, searchable log of past dictations (default off). */
+  historyEnabled: boolean;
   /** Master switch for one-time feature tips. */
   tipsEnabled: boolean;
   /** Tip ids already shown; never re-shown. */
@@ -163,6 +165,17 @@ export interface TranscriptionResult {
   /** Whether an LLM pass ran (false means rules-based cleanup only). */
   refined: boolean;
   durationMs: number;
+}
+
+/** One entry in the opt-in local dictation history (text only, never audio). */
+export interface HistoryEntry {
+  id: string;
+  raw: string;
+  text: string;
+  modeId: string;
+  refined: boolean;
+  /** Unix epoch milliseconds. */
+  at: number;
 }
 
 export type MicrophonePermission = 'granted' | 'denied' | 'undetermined' | 'unknown';
@@ -207,6 +220,9 @@ export const COMMANDS = {
   startRefineSelection: 'start_refine_selection',
   startPolishSelection: 'start_polish_selection',
   getLastResult: 'get_last_result',
+  getHistory: 'get_history',
+  clearHistory: 'clear_history',
+  reprocessHistory: 'reprocess_history',
   testLlm: 'test_llm',
   testMode: 'test_mode',
   listLlmProfiles: 'list_llm_profiles',

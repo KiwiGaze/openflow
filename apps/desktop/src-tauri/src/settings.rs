@@ -121,6 +121,9 @@ pub struct Settings {
     pub dictation_count: u64,
     /// ISO date (`YYYY-MM-DD`) of the last tip shown; enforces ≤ 1 tip/day.
     pub last_tip_shown_at: String,
+    /// Opt-in (default off): keep a local, searchable log of past dictations.
+    /// Off preserves the no-transcript-persistence privacy default.
+    pub history_enabled: bool,
     pub onboarding_completed: bool,
 }
 
@@ -148,6 +151,7 @@ impl Default for Settings {
             tips_seen: Vec::new(),
             dictation_count: 0,
             last_tip_shown_at: String::new(),
+            history_enabled: false,
             onboarding_completed: false,
         }
     }
@@ -349,6 +353,7 @@ mod tests {
         assert!(json.contains("\"appearance\":\"system\""));
         assert!(json.contains("\"tipsEnabled\":true"));
         assert!(json.contains("\"dictationCount\":0"));
+        assert!(json.contains("\"historyEnabled\":false"));
         // The v1 LLM block is deserialize-only; it must never be written.
         assert!(!json.contains("\"llm\""));
     }

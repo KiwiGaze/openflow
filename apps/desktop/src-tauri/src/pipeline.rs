@@ -14,6 +14,7 @@ use tauri::{AppHandle, Emitter};
 
 use crate::audio::AudioSystem;
 use crate::error::{AppError, AppResult};
+use crate::history::HistoryStore;
 use crate::hud;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
@@ -100,6 +101,7 @@ pub struct Pipeline {
     settings: Arc<SettingsManager>,
     models: Arc<ModelManager>,
     profiles: Arc<ProfileManager>,
+    history: Arc<HistoryStore>,
     state: Mutex<PipelineState>,
     state_seq: AtomicU64,
     session: Mutex<Option<Session>>,
@@ -118,6 +120,7 @@ impl Pipeline {
         settings: Arc<SettingsManager>,
         models: Arc<ModelManager>,
         profiles: Arc<ProfileManager>,
+        history: Arc<HistoryStore>,
     ) -> Arc<Self> {
         Arc::new(Self {
             app,
@@ -128,6 +131,7 @@ impl Pipeline {
             settings,
             models,
             profiles,
+            history,
             state: Mutex::new(PipelineState {
                 status: Status::Idle,
                 job: None,
@@ -657,6 +661,13 @@ impl Pipeline {
         counted.dictation_count = counted.dictation_count.saturating_add(1);
         if let Ok(saved) = self.settings.set(counted) {
             let _ = self.app.emit("settings-changed", &saved);
+        }
+        // Opt-in history: log the text (never audio) when the user turned it on.
+        if settings.history_enabled {
+            if let Some(result) = self.last_result() {
+                self.history
+                    .append(result.raw, result.text, result.mode_id, result.refined);
+            }
         }
         // The text already pasted; both notices are informational. A flaky-LLM
         // warning is more useful than a dangling-override notice, so it wins.

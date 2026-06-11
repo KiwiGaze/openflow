@@ -7,6 +7,7 @@ import {
   EVENTS,
   type AppInfo,
   type DownloadProgress,
+  type HistoryEntry,
   type LlmProfile,
   type LlmTestResult,
   type ModelInfo,
@@ -32,6 +33,10 @@ export const ipc = {
   startRefineSelection: (): Promise<void> => invoke(COMMANDS.startRefineSelection),
   startPolishSelection: (): Promise<void> => invoke(COMMANDS.startPolishSelection),
   getLastResult: (): Promise<TranscriptionResult | null> => invoke(COMMANDS.getLastResult),
+  getHistory: (): Promise<HistoryEntry[]> => invoke(COMMANDS.getHistory),
+  clearHistory: (): Promise<void> => invoke(COMMANDS.clearHistory),
+  reprocessHistory: (text: string, modeId: string): Promise<string> =>
+    invoke(COMMANDS.reprocessHistory, { text, modeId }),
   testLlm: (profile: LlmProfile): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { profile }),
   testMode: (prompt: string, sample: string, transforms: boolean): Promise<string> =>
     invoke(COMMANDS.testMode, { prompt, sample, transforms }),

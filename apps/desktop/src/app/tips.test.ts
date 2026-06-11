@@ -32,6 +32,7 @@ const base: Settings = {
   restoreClipboard: true,
   launchAtLogin: false,
   appearance: 'system',
+  historyEnabled: false,
   tipsEnabled: true,
   tipsSeen: [],
   dictationCount: 0,

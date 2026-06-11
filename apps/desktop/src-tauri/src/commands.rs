@@ -185,6 +185,46 @@ pub fn get_last_result(state: State<'_, AppState>) -> Option<TranscriptionResult
 }
 
 #[tauri::command]
+pub fn get_history(state: State<'_, AppState>) -> Vec<crate::history::HistoryEntry> {
+    state.history.list()
+}
+
+#[tauri::command]
+pub fn clear_history(state: State<'_, AppState>) {
+    state.history.clear();
+}
+
+/// Re-runs a stored transcript through a chosen mode, reusing the dictation
+/// resolution (the mode's prompt + active profile, or rules cleanup with no
+/// profile). Returns the new text for the user to copy — never auto-inserts.
+#[tauri::command]
+pub async fn reprocess_history(
+    state: State<'_, AppState>,
+    text: String,
+    mode_id: String,
+) -> Result<String, AppError> {
+    let settings = state.settings.get();
+    let mode = settings
+        .modes
+        .iter()
+        .find(|m| m.id == mode_id)
+        .cloned()
+        .ok_or_else(|| AppError::State("that mode no longer exists".into()))?;
+    if !mode.uses_llm {
+        return Ok(if mode.id == modes::LITERAL_MODE_ID {
+            text
+        } else {
+            text::apply_rules_cleanup(&text)
+        });
+    }
+    let system = modes::dictation_system_prompt(&mode, &settings.dictionary);
+    match state.profiles.active(&settings.active_llm_profile_id) {
+        Some(profile) => state.llm.chat(&profile, &system, &text).await,
+        None => Ok(text::apply_rules_cleanup(&text)),
+    }
+}
+
+#[tauri::command]
 pub async fn test_llm(
     state: State<'_, AppState>,
     profile: LlmProfile,

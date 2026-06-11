@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 import { type InsertMethod } from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
 import { usePipeline } from '../hooks.js';
+import { History } from '../components/History.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
 
@@ -53,6 +54,8 @@ export function OutputTab({ api }: { api: SettingsApi }): JSX.Element {
           <p className="row-hint">Your last dictation will appear here.</p>
         )}
       </section>
+
+      {settings.historyEnabled && <History api={api} />}
     </div>
   );
 }

@@ -4,6 +4,7 @@
 mod audio;
 mod commands;
 mod error;
+mod history;
 mod hud;
 mod llm;
 mod models;
@@ -58,6 +59,7 @@ fn main() {
             // dangling active-profile pointer.
             profiles::reconcile(&settings, &profiles);
             let models = Arc::new(models::ModelManager::new(data_dir.join("models")));
+            let history = Arc::new(history::HistoryStore::load(&data_dir));
             let stt = Arc::new(stt::SttEngine::new());
             let llm = Arc::new(llm::LlmClient::new());
             let audio = Arc::new(audio::AudioSystem::spawn());
@@ -71,6 +73,7 @@ fn main() {
                 Arc::clone(&settings),
                 Arc::clone(&models),
                 Arc::clone(&profiles),
+                Arc::clone(&history),
             );
 
             app.manage(AppState {
@@ -81,6 +84,7 @@ fn main() {
                 llm,
                 output,
                 pipeline,
+                history,
             });
 
             hud::init(&handle)?;
@@ -124,6 +128,9 @@ fn main() {
             commands::start_refine_selection,
             commands::start_polish_selection,
             commands::get_last_result,
+            commands::get_history,
+            commands::clear_history,
+            commands::reprocess_history,
             commands::test_llm,
             commands::test_mode,
             commands::list_llm_profiles,
