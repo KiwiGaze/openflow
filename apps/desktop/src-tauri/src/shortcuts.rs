@@ -8,7 +8,7 @@
 use std::str::FromStr;
 
 use tauri::{AppHandle, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::pipeline::Job;
 use crate::settings::Settings;
@@ -65,6 +65,31 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         settings.polish_hotkey
     );
     Ok(())
+}
+
+/// Esc cancels an in-progress recording — a "never mind" for a mistaken
+/// activation (UX-12). It is bound only while recording (registered on start,
+/// dropped on finish/cancel) so Esc stays free for every other app the rest of
+/// the time. Carbon registration must happen on the main thread, so this
+/// marshals there regardless of the caller's thread; both register and
+/// unregister are idempotent (unbinding a free key is a no-op we log at debug).
+pub fn set_cancel_key(app: &AppHandle, active: bool) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let shortcuts = handle.global_shortcut();
+        let esc = Shortcut::new(None, Code::Escape);
+        if active {
+            if let Err(err) = shortcuts.on_shortcut(esc, |app, _shortcut, event| {
+                if event.state() == ShortcutState::Pressed {
+                    app.state::<AppState>().pipeline.clone().cancel();
+                }
+            }) {
+                log::warn!("could not bind Esc-to-cancel: {err}");
+            }
+        } else if let Err(err) = shortcuts.unregister(esc) {
+            log::debug!("Esc-to-cancel already unbound: {err}");
+        }
+    });
 }
 
 fn dispatch(app: &AppHandle, job: Job, state: ShortcutState) {

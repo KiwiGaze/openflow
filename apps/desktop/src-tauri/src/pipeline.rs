@@ -21,6 +21,7 @@ use crate::modes::{self, LITERAL_MODE_ID};
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
 use crate::settings::{HotkeyBehavior, Settings, SettingsManager, MAX_RECORDING_SECS};
+use crate::shortcuts;
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
 use crate::text;
 
@@ -289,6 +290,8 @@ impl Pipeline {
             selection,
         });
         self.set_state(Status::Recording, Some(job), None);
+        // Bind Esc so a recording started by mistake has a "never mind".
+        shortcuts::set_cancel_key(&self.app, true);
         hud::position_on_cursor_monitor(&self.app);
 
         // Level meter for the HUD while recording.
@@ -325,6 +328,8 @@ impl Pipeline {
         let Some(session) = self.session.lock().expect("pipeline state poisoned").take() else {
             return;
         };
+        // Recording is over; Esc-to-cancel is scoped to recording only.
+        shortcuts::set_cancel_key(&self.app, false);
         self.set_state(Status::Transcribing, Some(session.job), None);
 
         let pipeline = Arc::clone(self);
@@ -353,6 +358,7 @@ impl Pipeline {
         self.generation.fetch_add(1, Ordering::SeqCst);
         *self.session.lock().expect("pipeline state poisoned") = None;
         self.audio.cancel();
+        shortcuts::set_cancel_key(&self.app, false);
         self.set_state(Status::Idle, None, None);
     }
 

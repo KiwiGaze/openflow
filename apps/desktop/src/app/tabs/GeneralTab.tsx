@@ -88,6 +88,7 @@ export function GeneralTab({
             onChange={(accelerator) => void update({ refineHotkey: accelerator })}
           />
         </Row>
+        <p className="row-hint">Press Esc while recording to cancel.</p>
       </section>
 
       <section className="card">
