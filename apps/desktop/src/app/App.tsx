@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useModels, useSettings } from './hooks.js';
 import { Onboarding } from './Onboarding.js';
 import { AboutTab } from './tabs/AboutTab.js';
@@ -28,6 +29,22 @@ export function App(): JSX.Element {
   useEffect(() => {
     document.documentElement.dataset.theme = api?.settings.appearance ?? 'system';
   }, [api?.settings.appearance]);
+
+  // Cmd+W closes the settings window (UX-14). close() routes through the Rust
+  // CloseRequested handler, which hides it and drops back to Accessory — the
+  // same path as the red traffic-light, so the app stays in the menu bar.
+  useEffect(() => {
+    const onKeyDown = (e: globalThis.KeyboardEvent): void => {
+      if (e.metaKey && e.key.toLowerCase() === 'w') {
+        e.preventDefault();
+        void getCurrentWindow().close();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
 
   // Arrow/Home/End move selection within the tablist and follow focus (the
   // ARIA tabs pattern with roving tabindex).
