@@ -1,33 +1,17 @@
 import { useEffect, useState, type JSX } from 'react';
-import { isLocalEndpoint, isValidBaseUrl, type SttProfile } from '@openflow/core';
+import {
+  CLOUD_STT_PREFIX,
+  DEFAULT_STT_PRESET,
+  STT_PRESETS,
+  STT_PROFILE_VERSION,
+  isLocalEndpoint,
+  isValidBaseUrl,
+  type SttProfile,
+} from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
 import { ipc } from '../ipc.js';
 import { Callout } from './Callout.js';
 import { Row } from './Row.js';
-
-interface SttPreset {
-  id: string;
-  label: string;
-  baseUrl: string;
-  model: string;
-}
-
-const STT_PRESETS: SttPreset[] = [
-  {
-    id: 'groqStt',
-    label: 'Groq',
-    baseUrl: 'https://api.groq.com/openai/v1',
-    model: 'whisper-large-v3',
-  },
-  { id: 'openaiStt', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'whisper-1' },
-  {
-    id: 'whisperServer',
-    label: 'Local whisper-server',
-    baseUrl: 'http://localhost:8080/v1',
-    model: 'whisper-1',
-  },
-  { id: 'custom', label: 'Custom (OpenAI-audio)', baseUrl: '', model: '' },
-];
 
 function hostOf(url: string): string {
   try {
@@ -53,8 +37,8 @@ export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
   }, []);
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
-  const activeId = settings.sttModelId.startsWith('cloud:')
-    ? settings.sttModelId.slice('cloud:'.length)
+  const activeId = settings.sttModelId.startsWith(CLOUD_STT_PREFIX)
+    ? settings.sttModelId.slice(CLOUD_STT_PREFIX.length)
     : null;
 
   const saveProfile = async (profile: SttProfile): Promise<void> => {
@@ -63,14 +47,14 @@ export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
 
   const addProfile = (): void => {
     const profile: SttProfile = {
-      version: 1,
+      version: STT_PROFILE_VERSION,
       id: crypto.randomUUID(),
       name: 'New engine',
       engine: 'openaiAudio',
-      presetId: 'groqStt',
-      baseUrl: 'https://api.groq.com/openai/v1',
+      presetId: DEFAULT_STT_PRESET.id,
+      baseUrl: DEFAULT_STT_PRESET.baseUrl,
       apiKey: '',
-      model: 'whisper-large-v3',
+      model: DEFAULT_STT_PRESET.model,
       timeoutSecs: 30,
     };
     setSelectedId(profile.id);
@@ -91,12 +75,12 @@ export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
       setConsentFor(profile);
       return;
     }
-    void update({ sttModelId: `cloud:${profile.id}` });
+    void update({ sttModelId: `${CLOUD_STT_PREFIX}${profile.id}` });
   };
 
   const confirmConsent = (profile: SttProfile): void => {
     void update({
-      sttModelId: `cloud:${profile.id}`,
+      sttModelId: `${CLOUD_STT_PREFIX}${profile.id}`,
       confirmedSttProfiles: [...settings.confirmedSttProfiles, profile.id],
     });
     setConsentFor(null);

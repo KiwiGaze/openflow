@@ -22,9 +22,11 @@ IPC. There is no other process — whisper.cpp is linked in.
                          │                     ▼                          │
                          │ output.rs (worker thread: arboard + enigo ⌘V)  │
                          │                                                │
-                         │ settings.rs · profiles.rs · models.rs          │
-                         │ permissions.rs · tray.rs · hud.rs              │
-                         │ commands.rs (IPC surface)                      │
+                         │ settings.rs · profiles.rs · stt_profiles.rs    │
+                         │ models.rs · history.rs · permissions.rs        │
+                         │ tray.rs · hud.rs · changes.rs · apps.rs        │
+                         │ stats.rs · suggestions.rs · modes.rs · state.rs│
+                         │ commands.rs (IPC surface) · error.rs           │
                          └───────△─────────────────────────△──────────────┘
                                  │ events (pipeline-state,  │ invoke (get/save settings,
                                  │ audio-level, downloads)  │ models, permissions, …)
@@ -77,7 +79,8 @@ openflow/
 The IPC contract (command names, event names, camelCase serde shapes) is defined once in Rust
 and mirrored by hand in `@openflow/core` (`types.ts`). The mirror is small and changes rarely;
 codegen (specta/tauri-specta) was considered and skipped for the MVP — one more build step for
-~150 lines of types. Revisit if the surface grows.
+~150 lines of types. Revisit if the surface grows. `pnpm check:ipc` guards the name-level half
+of the mirror; the rules live in `docs/engineering/ipc-contract-conventions.md`.
 
 ## 3. Threading model
 
@@ -110,9 +113,13 @@ it, and an empty id means "No AI". v1 installs carried the LLM config inline in 
 one-time, self-erasing migration (`profiles::reconcile`) moves it into a profile file at
 startup.
 
-Nothing else is persisted: no audio, no transcripts, no history (the last result is in-memory
-only). Session usage aggregates for the Insights view (`stats.rs`) are likewise in-memory only —
-counts and sums, never content — and reset on quit. That is a privacy feature, not an omission.
+Cloud STT profiles follow the same file-backed pattern under `<app-data>/stt-profiles/`
+(`stt_profiles.rs`). Beyond that: audio is **never** persisted; transcripts persist only when
+the user opts into history (`historyEnabled`, default off — `history.rs`, text only, capped,
+clearable); the last result is otherwise in-memory. Session usage aggregates for the Insights
+view (`stats.rs`) and dictionary-suggestion tallies (`suggestions.rs`) are in-memory only —
+counts and sums, never content — and reset on quit. That is a privacy feature, not an omission;
+`pnpm check:privacy` trips on the cheap-to-catch violations.
 
 ## 5. Key decisions and tradeoffs
 
@@ -208,12 +215,13 @@ running?"). Dictation output is never silently dropped — worst case it lands o
 
 ## 8. Testing strategy
 
-- **Rust unit tests (35):** text cleanup/dictionary edge cases, resampler DSP properties
+- **Rust unit tests:** text cleanup/dictionary edge cases, resampler DSP properties
   (length, tone preservation, anti-aliasing), settings persistence/migration/corruption,
-  model registry URLs, LLM request/response shapes and URL building, prompt construction.
+  profile stores (escape-proof ids, corrupt-file handling), model registry URLs, LLM
+  request/response shapes and URL building, prompt construction.
 - **Ignored integration test:** real whisper inference, opt-in via `OPENFLOW_TEST_MODEL=<path>
 cargo test -- --ignored` (CI cannot download 148 MB models per run).
-- **TS unit tests (23):** accelerator parsing/formatting/capture, validation, formatting, HUD
-  state mapping.
+- **TS unit tests:** accelerator parsing/formatting/capture, validation, formatting,
+  mode/dictionary import-export, diff, presets, tips, HUD state mapping.
 - **Not covered (manual):** the GUI itself, TCC permission flows, actual paste into third-party
   apps — exercised via the onboarding "Try it" step; checklist in DEVELOPMENT.md.

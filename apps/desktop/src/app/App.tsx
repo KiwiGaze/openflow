@@ -27,7 +27,7 @@ const TABS = [
   { id: 'about', label: 'About' },
 ] as const;
 
-type TabId = (typeof TABS)[number]['id'];
+export type TabId = (typeof TABS)[number]['id'];
 
 export function App(): JSX.Element {
   const api = useSettings();
@@ -135,7 +135,7 @@ export function App(): JSX.Element {
             action={{
               label: tip.actionLabel,
               onClick: () => {
-                setTab(tip.actionTab as TabId);
+                setTab(tip.actionTab);
                 dismissTip(tip.id);
               },
             }}

@@ -84,7 +84,7 @@ Prerequisites: Xcode Command Line Tools, Rust (stable), Node 22+, pnpm 10+, CMak
 - **Switch modes** from the menu-bar icon (Standard / Email / Notes / Literal / custom).
 - **Hands-free:** tap the hotkey instead of holding; tap again to stop.
 - **Recover a result:** menu bar → _Copy Last Result_.
-- **AI profiles:** Settings → Refine. Each profile is a connection (provider, endpoint, model)
+- **AI profiles:** Settings → Models. Each profile is a connection (provider, endpoint, model)
   stored as a file under the app's `profiles/` folder; exactly one is active for refinement.
   With Ollama, `ollama pull qwen2.5:3b` is a fast, high-quality default for cleanup.
 - Dictation works without any AI profile; _polish_ and _rewrite selection_ require one.
@@ -94,9 +94,7 @@ Prerequisites: Xcode Command Line Tools, Rust (stable), Node 22+, pnpm 10+, CMak
 ```sh
 pnpm install
 pnpm dev            # tauri dev: Vite + Rust with hot reload
-pnpm -r test        # TS tests        (packages/core, apps/desktop)
-cargo test          # Rust tests      (run in apps/desktop/src-tauri)
-pnpm lint && pnpm typecheck && pnpm format:check
+pnpm check:all      # every check CI runs: TS + Rust + IPC-contract + privacy gates
 ```
 
 The monorepo: `packages/core` (shared TS contract + utils), `apps/desktop` (React UI +

@@ -15,6 +15,11 @@ use crate::modes;
 pub const SETTINGS_VERSION: u32 = 3;
 pub const MAX_RECORDING_SECS: u64 = 300;
 
+/// Emitted (with the full `Settings` payload) after every backend-initiated
+/// settings change so open webviews stay in sync. Mirrored as
+/// `EVENTS.settingsChanged` in `@openflow/core`.
+pub const SETTINGS_CHANGED_EVENT: &str = "settings-changed";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum HotkeyBehavior {

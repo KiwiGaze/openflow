@@ -4,8 +4,9 @@ use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager};
 
-use crate::settings::InsertMethod;
+use crate::settings::{InsertMethod, SETTINGS_CHANGED_EVENT};
 use crate::state::AppState;
+use crate::stt_profiles::CLOUD_STT_PREFIX;
 
 pub const TRAY_ID: &str = "openflow-tray";
 
@@ -58,7 +59,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     }
     // Always-visible speech locality (08 §3.3): on-device by default, or the
     // active cloud engine with a warning glyph. Disabled — a status, not a control.
-    let speech_label = match settings.stt_model_id.strip_prefix("cloud:") {
+    let speech_label = match settings.stt_model_id.strip_prefix(CLOUD_STT_PREFIX) {
         Some(pid) => {
             let name = state
                 .stt_profiles
@@ -147,7 +148,7 @@ fn toggle_refine_after_dictation(app: &AppHandle) {
     settings.refine_after_dictation = !settings.refine_after_dictation;
     match state.settings.set(settings) {
         Ok(saved) => {
-            let _ = tauri::Emitter::emit(app, "settings-changed", &saved);
+            let _ = tauri::Emitter::emit(app, SETTINGS_CHANGED_EVENT, &saved);
             if let Err(err) = rebuild_menu(app) {
                 log::warn!("tray rebuild failed: {err}");
             }
@@ -162,7 +163,7 @@ fn set_active_mode(app: &AppHandle, mode_id: &str) {
     settings.active_mode_id = mode_id.to_string();
     match state.settings.set(settings) {
         Ok(saved) => {
-            let _ = tauri::Emitter::emit(app, "settings-changed", &saved);
+            let _ = tauri::Emitter::emit(app, SETTINGS_CHANGED_EVENT, &saved);
             if let Err(err) = rebuild_menu(app) {
                 log::warn!("tray rebuild failed: {err}");
             }

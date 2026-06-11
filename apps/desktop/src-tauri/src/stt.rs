@@ -83,7 +83,9 @@ impl SttEngine {
                 context,
             });
         }
-        let loaded = guard.as_ref().expect("model just loaded");
+        let loaded = guard
+            .as_ref()
+            .ok_or_else(|| AppError::Stt("whisper context missing after load".into()))?;
 
         let mut state = loaded
             .context

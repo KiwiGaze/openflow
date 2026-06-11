@@ -23,6 +23,10 @@ ggml-*.bin
 !.vscode/extensions.json
 !.vscode/settings.json
 
+# Git worktrees (local checkouts of other branches)
+.worktrees/
+.claude/worktrees/
+
 # Env / local
 *.local
 .env

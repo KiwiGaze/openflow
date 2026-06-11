@@ -93,7 +93,7 @@ export function parseModeImport(text: string): ModeImportResult {
   if (typeof schema !== 'string' || !schema.startsWith(SCHEMA_PREFIX)) {
     return { ok: false, error: "This file isn't a valid mode." };
   }
-  if (schema.slice(SCHEMA_PREFIX.length) !== '1') {
+  if (schema.slice(SCHEMA_PREFIX.length) !== MODE_SCHEMA.slice(SCHEMA_PREFIX.length)) {
     return { ok: false, error: 'This mode was made with a newer version of OpenFlow.' };
   }
   const raw = envelope.mode;
@@ -106,8 +106,11 @@ export function parseModeImport(text: string): ModeImportResult {
   if (name === '' || prompt.trim() === '') {
     return { ok: false, error: "This file isn't a valid mode." };
   }
+  // `auto` (auto-detect) is a valid stored language alongside ISO 639-1 codes.
   const language =
-    typeof mode.language === 'string' && /^[a-z]{2}$/.test(mode.language) ? mode.language : null;
+    typeof mode.language === 'string' && /^([a-z]{2}|auto)$/.test(mode.language)
+      ? mode.language
+      : null;
   return {
     ok: true,
     mode: {

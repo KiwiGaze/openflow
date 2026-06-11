@@ -40,6 +40,9 @@ export type Appearance = 'system' | 'light' | 'dark';
 
 export type LlmProviderKind = 'ollama' | 'openaiCompatible';
 
+/** Schema version written to new LLM profile files. Mirrors `PROFILE_VERSION` in `profiles.rs`. */
+export const LLM_PROFILE_VERSION = 1;
+
 /**
  * One refinement connection, stored as `<app-data>/profiles/<id>.json`.
  * "No AI" is the absence of an active profile, not a provider kind.
@@ -67,6 +70,16 @@ export interface LlmProfile {
 
 /** Which STT client transcribes. Only `openaiAudio` ships now (08 §2). */
 export type SttEngineKind = 'openaiAudio';
+
+/** Schema version written to new STT profile files. Mirrors `STT_PROFILE_VERSION` in `stt_profiles.rs`. */
+export const STT_PROFILE_VERSION = 1;
+
+/**
+ * `Settings.sttModelId` prefix marking a cloud engine: `cloud:<profile-id>`.
+ * Anything else is an on-device whisper model id. Mirrors `CLOUD_STT_PREFIX`
+ * in `stt_profiles.rs` — update both together.
+ */
+export const CLOUD_STT_PREFIX = 'cloud:';
 
 /**
  * One cloud/remote STT connection, stored as `<app-data>/stt-profiles/<id>.json`.

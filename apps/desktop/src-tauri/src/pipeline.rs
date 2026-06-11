@@ -23,11 +23,13 @@ use crate::models::ModelManager;
 use crate::modes::{self, CODE_MODE_ID, LITERAL_MODE_ID};
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
-use crate::settings::{HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS};
+use crate::settings::{
+    HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS, SETTINGS_CHANGED_EVENT,
+};
 use crate::shortcuts;
 use crate::stats::{word_count, Insights, Stats};
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
-use crate::stt_profiles::SttProfileManager;
+use crate::stt_profiles::{SttProfileManager, CLOUD_STT_PREFIX};
 use crate::suggestions::{DictionarySuggestion, Suggestions};
 use crate::text;
 
@@ -305,7 +307,7 @@ impl Pipeline {
         self.tip_shown_session.store(true, Ordering::SeqCst);
         settings.tips_seen.push(id.to_string());
         if let Ok(saved) = self.settings.set(settings) {
-            let _ = self.app.emit("settings-changed", &saved);
+            let _ = self.app.emit(SETTINGS_CHANGED_EVENT, &saved);
         }
     }
 
@@ -322,13 +324,13 @@ impl Pipeline {
         if !s.tips_enabled
             || s.tips_seen.iter().any(|t| t == "tip.accuracy")
             || s.stt_model_id.contains("large")
-            || s.stt_model_id.starts_with("cloud:")
+            || s.stt_model_id.starts_with(CLOUD_STT_PREFIX)
         {
             return BASE.into();
         }
         s.tips_seen.push("tip.accuracy".into());
         if let Ok(saved) = self.settings.set(s) {
-            let _ = self.app.emit("settings-changed", &saved);
+            let _ = self.app.emit(SETTINGS_CHANGED_EVENT, &saved);
         }
         "Didn't catch that. A larger speech model often helps — switch it in Settings → Models."
             .into()
@@ -443,7 +445,8 @@ impl Pipeline {
         } else {
             settings.stt_model_id.clone()
         };
-        if !effective_stt.starts_with("cloud:") && !self.models.is_installed(&effective_stt) {
+        if !effective_stt.starts_with(CLOUD_STT_PREFIX) && !self.models.is_installed(&effective_stt)
+        {
             return Err(AppError::Model(
                 "No speech model yet — open Settings to download one.".into(),
             ));
@@ -763,7 +766,7 @@ impl Pipeline {
     /// the profile present AND its consent confirmed (08 §3); a bare id needs the
     /// whisper model installed.
     fn stt_model_valid(&self, settings: &Settings, id: &str) -> bool {
-        match id.strip_prefix("cloud:") {
+        match id.strip_prefix(CLOUD_STT_PREFIX) {
             Some(pid) => {
                 self.stt_profiles.get(pid).is_some()
                     && settings.confirmed_stt_profiles.iter().any(|c| c == pid)
@@ -775,7 +778,7 @@ impl Pipeline {
     /// An installed local whisper model to fall back to (08 §4.3) — the global
     /// if it is local and installed, else any installed model.
     fn installed_local_model(&self, settings: &Settings) -> Option<String> {
-        if !settings.stt_model_id.starts_with("cloud:")
+        if !settings.stt_model_id.starts_with(CLOUD_STT_PREFIX)
             && self.models.is_installed(&settings.stt_model_id)
         {
             return Some(settings.stt_model_id.clone());
@@ -853,7 +856,7 @@ impl Pipeline {
         let record_ms = recorded.duration.as_millis() as u64;
         let samples = recorded.samples;
 
-        let raw = match model_id.strip_prefix("cloud:") {
+        let raw = match model_id.strip_prefix(CLOUD_STT_PREFIX) {
             // Cloud STT uploads audio off the Mac. Gate: the profile must exist
             // AND its consent be confirmed, or nothing is uploaded (08 §3).
             Some(pid) => {
@@ -988,6 +991,9 @@ impl Pipeline {
         let final_text = text::apply_snippets(&final_text, &settings.snippets);
 
         let words = word_count(&final_text);
+        // Clone only when the opt-in history will consume it below — `insert`
+        // takes the text by move.
+        let history_text = settings.history_enabled.then(|| final_text.clone());
         let outcome = self.insert(
             settings,
             &transcript,
@@ -1006,14 +1012,14 @@ impl Pipeline {
         let mut counted = self.settings.get();
         counted.dictation_count = counted.dictation_count.saturating_add(1);
         if let Ok(saved) = self.settings.set(counted) {
-            let _ = self.app.emit("settings-changed", &saved);
+            let _ = self.app.emit(SETTINGS_CHANGED_EVENT, &saved);
         }
-        // Opt-in history: log the text (never audio) when the user turned it on.
-        if settings.history_enabled {
-            if let Some(result) = self.last_result() {
-                self.history
-                    .append(result.raw, result.text, result.mode_id, result.refined);
-            }
+        // Opt-in history: log the text (never audio) when the user turned it
+        // on. Uses the in-scope values rather than re-reading `last_result` —
+        // `insert` stores the same text verbatim, so these are identical.
+        if let Some(text) = history_text {
+            self.history
+                .append(transcript.clone(), text, mode.id.clone(), refined);
         }
         // A clipboard fallback (paste failed / no Accessibility) is the
         // highest-priority message — the user must know to press ⌘V to get

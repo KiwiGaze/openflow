@@ -9,9 +9,9 @@ use crate::models::ModelInfoDto;
 use crate::permissions::{self, PermissionsState};
 use crate::pipeline::{Job, PipelineState, TranscriptionResult};
 use crate::profiles::LlmProfile;
-use crate::settings::Settings;
+use crate::settings::{Settings, SETTINGS_CHANGED_EVENT};
 use crate::state::AppState;
-use crate::stt_profiles::SttProfile;
+use crate::stt_profiles::{SttProfile, CLOUD_STT_PREFIX};
 use crate::{modes, shortcuts, text, tray};
 
 #[derive(Serialize)]
@@ -22,11 +22,14 @@ pub struct AppInfo {
     pub config_path: String,
 }
 
+/// Returns the current settings snapshot.
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Settings {
     state.settings.get()
 }
 
+/// Persists settings; hotkey changes re-register as one atomic unit and every
+/// hotkey rolls back to the last working set when registration fails.
 #[tauri::command]
 pub fn save_settings(
     app: AppHandle,
@@ -91,7 +94,7 @@ pub fn save_settings(
             reverted.transforms = previous.transforms.clone();
             let restored = state.settings.set(reverted)?;
             let _ = shortcuts::apply(&app, &restored);
-            let _ = app.emit("settings-changed", &restored);
+            let _ = app.emit(SETTINGS_CHANGED_EVENT, &restored);
             return Err(AppError::Settings(message));
         }
     }
@@ -107,11 +110,12 @@ pub fn save_settings(
     if let Err(err) = tray::rebuild_menu(&app) {
         log::warn!("tray rebuild failed: {err}");
     }
-    let _ = app.emit("settings-changed", &saved);
+    let _ = app.emit(SETTINGS_CHANGED_EVENT, &saved);
     Ok(saved)
 }
 
 /// Regular keeps a Dock icon; Accessory is menu-bar-only. No-op off macOS.
+/// Not an IPC command — called from `main.rs` and `save_settings`.
 pub fn apply_dock_policy(app: &AppHandle, show_in_dock: bool) {
     #[cfg(target_os = "macos")]
     {
@@ -139,11 +143,14 @@ fn sync_autostart(app: &AppHandle, enabled: bool) {
     }
 }
 
+/// Returns the whisper model registry with installed/downloading status.
 #[tauri::command]
 pub fn list_models(state: State<'_, AppState>) -> Vec<ModelInfoDto> {
     state.models.list()
 }
 
+/// Starts a background model download; progress (and any failure) streams to
+/// the webview via `model-download` events.
 #[tauri::command]
 pub fn download_model(
     app: AppHandle,
@@ -159,11 +166,13 @@ pub fn download_model(
     Ok(())
 }
 
+/// Cancels an in-flight download; no-op when none is running for this id.
 #[tauri::command]
 pub fn cancel_model_download(state: State<'_, AppState>, model_id: String) {
     state.models.cancel(&model_id);
 }
 
+/// Deletes the model file and unloads it from memory if it was loaded.
 #[tauri::command]
 pub fn delete_model(state: State<'_, AppState>, model_id: String) -> AppResult<()> {
     state.models.delete(&model_id)?;
@@ -171,26 +180,32 @@ pub fn delete_model(state: State<'_, AppState>, model_id: String) -> AppResult<(
     Ok(())
 }
 
+/// Returns the current pipeline state — the HUD's initial sync before events.
 #[tauri::command]
 pub fn get_pipeline_state(state: State<'_, AppState>) -> PipelineState {
     state.pipeline.state()
 }
 
+/// Starts recording a dictation in the active mode.
 #[tauri::command]
 pub fn start_dictation(state: State<'_, AppState>) -> AppResult<()> {
     state.pipeline.start(Job::Dictation, None)
 }
 
+/// Stops recording and processes the take: transcribe → clean/refine → insert.
+/// Contrast with [`cancel_dictation`], which discards it.
 #[tauri::command]
 pub fn stop_dictation(state: State<'_, AppState>) {
     state.pipeline.finish();
 }
 
+/// Discards the in-flight recording or processing; nothing is inserted.
 #[tauri::command]
 pub fn cancel_dictation(state: State<'_, AppState>) {
     state.pipeline.cancel();
 }
 
+/// Captures the current selection and starts a voice-rewrite recording.
 #[tauri::command]
 pub async fn start_refine_selection(state: State<'_, AppState>) -> AppResult<()> {
     // Sync commands run on the main thread, but starting a refine job blocks
@@ -202,6 +217,8 @@ pub async fn start_refine_selection(state: State<'_, AppState>) -> AppResult<()>
         .map_err(|e| AppError::State(format!("refine task failed: {e}")))?
 }
 
+/// Rewrites the current selection with the built-in fix-grammar instruction —
+/// no recording involved.
 #[tauri::command]
 pub async fn start_polish_selection(state: State<'_, AppState>) -> AppResult<()> {
     // Same offload as start_refine_selection: polish blocks on selection
@@ -213,6 +230,8 @@ pub async fn start_polish_selection(state: State<'_, AppState>) -> AppResult<()>
         .map_err(|e| AppError::State(format!("polish task failed: {e}")))
 }
 
+/// Returns the most recent result — backs tray “Copy Last Result” and the
+/// changes overlay.
 #[tauri::command]
 pub fn get_last_result(state: State<'_, AppState>) -> Option<TranscriptionResult> {
     state.pipeline.last_result()
@@ -235,11 +254,13 @@ pub fn get_last_dictation_app(state: State<'_, AppState>) -> Option<FrontmostApp
         .map(|(bundle_id, name)| FrontmostApp { bundle_id, name })
 }
 
+/// Returns the opt-in local dictation history (text only — never audio).
 #[tauri::command]
 pub fn get_history(state: State<'_, AppState>) -> Vec<crate::history::HistoryEntry> {
     state.history.list()
 }
 
+/// Deletes every persisted history entry.
 #[tauri::command]
 pub fn clear_history(state: State<'_, AppState>) -> AppResult<()> {
     state.history.clear()?;
@@ -302,11 +323,13 @@ pub fn set_changes_interactive(app: AppHandle, interactive: bool) {
     }
 }
 
+/// Returns session-only usage aggregates (in-memory, reset on quit).
 #[tauri::command]
 pub fn get_insights(state: State<'_, AppState>) -> crate::stats::Insights {
     state.pipeline.insights()
 }
 
+/// Returns session-only candidate terms for the dictionary, most-seen first.
 #[tauri::command]
 pub fn list_dictionary_suggestions(
     state: State<'_, AppState>,
@@ -315,11 +338,13 @@ pub fn list_dictionary_suggestions(
     state.pipeline.dictionary_suggestions(&dictionary, 5)
 }
 
+/// Hides a suggested term for the rest of the session.
 #[tauri::command]
 pub fn dismiss_dictionary_suggestion(state: State<'_, AppState>, term: String) {
     state.pipeline.dismiss_suggestion(&term);
 }
 
+/// Round-trips a tiny prompt through the profile to verify the connection.
 #[tauri::command]
 pub async fn test_llm(
     state: State<'_, AppState>,
@@ -328,6 +353,7 @@ pub async fn test_llm(
     Ok(state.llm.test(&profile).await)
 }
 
+/// Returns all saved LLM profiles (one JSON file each).
 #[tauri::command]
 pub fn list_llm_profiles(state: State<'_, AppState>) -> Vec<LlmProfile> {
     state.profiles.list()
@@ -360,6 +386,7 @@ pub async fn test_mode(
     }
 }
 
+/// Upserts a profile file (0600 — it can hold an API key); returns the fresh list.
 #[tauri::command]
 pub fn save_llm_profile(
     state: State<'_, AppState>,
@@ -368,6 +395,7 @@ pub fn save_llm_profile(
     state.profiles.save(profile)
 }
 
+/// Deletes the profile; refinement turns off if this was the active one.
 #[tauri::command]
 pub fn delete_llm_profile(
     app: AppHandle,
@@ -381,11 +409,12 @@ pub fn delete_llm_profile(
         let mut next = settings;
         next.active_llm_profile_id.clear();
         let saved = state.settings.set(next)?;
-        let _ = app.emit("settings-changed", &saved);
+        let _ = app.emit(SETTINGS_CHANGED_EVENT, &saved);
     }
     Ok(list)
 }
 
+/// Returns all saved cloud STT profiles.
 #[tauri::command]
 pub fn list_stt_profiles(state: State<'_, AppState>) -> Vec<SttProfile> {
     state.stt_profiles.list()
@@ -416,12 +445,14 @@ pub fn save_stt_profile(
                 .confirmed_stt_profiles
                 .retain(|id| id != &profile_id);
             let saved = state.settings.set(settings)?;
-            let _ = app.emit("settings-changed", &saved);
+            let _ = app.emit(SETTINGS_CHANGED_EVENT, &saved);
         }
     }
     Ok(list)
 }
 
+/// Deletes the profile; its consent is revoked and an active engine falls
+/// back to on-device whisper.
 #[tauri::command]
 pub fn delete_stt_profile(
     app: AppHandle,
@@ -434,7 +465,7 @@ pub fn delete_stt_profile(
     // a deleted active engine falls back to the on-device default (08 §3).
     let settings = state.settings.get();
     let had_consent = settings.confirmed_stt_profiles.iter().any(|c| c == &id);
-    let was_active = settings.stt_model_id == format!("cloud:{id}");
+    let was_active = settings.stt_model_id == format!("{CLOUD_STT_PREFIX}{id}");
     if had_consent || was_active {
         let mut next = settings;
         next.confirmed_stt_profiles.retain(|c| c != &id);
@@ -442,11 +473,12 @@ pub fn delete_stt_profile(
             next.stt_model_id = "base.en".into();
         }
         let saved = state.settings.set(next)?;
-        let _ = app.emit("settings-changed", &saved);
+        let _ = app.emit(SETTINGS_CHANGED_EVENT, &saved);
     }
     Ok(list)
 }
 
+/// Opens the STT profiles folder in Finder (created on demand).
 #[tauri::command]
 pub fn reveal_stt_profiles(app: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
     let dir = state.stt_profiles.dir();
@@ -456,6 +488,7 @@ pub fn reveal_stt_profiles(app: AppHandle, state: State<'_, AppState>) -> AppRes
         .map_err(|e| AppError::Settings(format!("could not open the STT profiles folder: {e}")))
 }
 
+/// Opens the LLM profiles folder in Finder (created on demand).
 #[tauri::command]
 pub fn reveal_llm_profiles(app: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
     let dir = state.profiles.dir();
@@ -517,6 +550,8 @@ pub fn export_dictionary(
         .map_err(|e| AppError::Settings(format!("could not open the data folder: {e}")))
 }
 
+/// Lists installed model names from an Ollama server — the one Ollama-native
+/// call (everything else goes through the OpenAI-compatible client).
 #[tauri::command]
 pub async fn list_ollama_models(
     state: State<'_, AppState>,
@@ -525,11 +560,14 @@ pub async fn list_ollama_models(
     state.llm.list_ollama_models(&base_url).await
 }
 
+/// Returns microphone and Accessibility permission state.
 #[tauri::command]
 pub fn check_permissions() -> PermissionsState {
     permissions::check()
 }
 
+/// Shows the system microphone consent prompt; the grant lands asynchronously
+/// (the UI polls `check_permissions`).
 #[tauri::command]
 pub fn request_microphone_permission() {
     permissions::request_microphone();
@@ -542,6 +580,7 @@ pub fn prompt_accessibility_permission() -> bool {
     permissions::accessibility_trusted(true)
 }
 
+/// Opens System Settings at Privacy & Security → Accessibility.
 #[tauri::command]
 pub fn open_accessibility_settings(app: AppHandle) {
     if let Err(err) = tauri_plugin_opener::OpenerExt::opener(&app)
@@ -551,6 +590,7 @@ pub fn open_accessibility_settings(app: AppHandle) {
     }
 }
 
+/// Opens System Settings at Privacy & Security → Microphone.
 #[tauri::command]
 pub fn open_microphone_settings(app: AppHandle) {
     if let Err(err) = tauri_plugin_opener::OpenerExt::opener(&app)
@@ -560,6 +600,7 @@ pub fn open_microphone_settings(app: AppHandle) {
     }
 }
 
+/// Returns the app version and data paths shown in the About tab.
 #[tauri::command]
 pub fn get_app_info(app: AppHandle, state: State<'_, AppState>) -> AppInfo {
     AppInfo {
