@@ -29,6 +29,14 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
 
+  // Test results and Ollama listings belong to one profile; drop them on switch.
+  const selectProfile = (id: string | null): void => {
+    setSelectedId(id);
+    setTestResult(null);
+    setOllamaModels(null);
+    setListError(null);
+  };
+
   const patch = (next: Partial<LlmProfile>): void => {
     if (!selected) return;
     setTestResult(null);
@@ -54,7 +62,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
       model: 'qwen2.5:3b',
       timeoutSecs: 30,
     };
-    setSelectedId(profile.id);
+    selectProfile(profile.id);
     void save(profile).then(() => {
       // The first profile is what the user came for: select it for refinement.
       if (settings.activeLlmProfileId === '') void update({ activeLlmProfileId: profile.id });
@@ -62,7 +70,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
   };
 
   const deleteProfile = (id: string): void => {
-    if (selectedId === id) setSelectedId(null);
+    if (selectedId === id) selectProfile(null);
     // Deleting the active profile clears the selection backend-side.
     void remove(id);
   };
@@ -133,8 +141,18 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
             <div
               key={profile.id}
               className={`mode-row ${selectedId === profile.id ? 'mode-selected' : ''}`}
+              role="button"
+              tabIndex={0}
               onClick={() => {
-                setSelectedId(profile.id);
+                selectProfile(profile.id);
+              }}
+              onKeyDown={(e) => {
+                // Keys on the nested radio bubble up here; leave those alone.
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  selectProfile(profile.id);
+                }
               }}
             >
               <label
