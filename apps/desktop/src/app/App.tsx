@@ -3,16 +3,20 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useModels, useSettings } from './hooks.js';
 import { Onboarding } from './Onboarding.js';
 import { AboutTab } from './tabs/AboutTab.js';
+import { DictationTab } from './tabs/DictationTab.js';
 import { DictionaryTab } from './tabs/DictionaryTab.js';
 import { GeneralTab } from './tabs/GeneralTab.js';
+import { ModelsTab } from './tabs/ModelsTab.js';
 import { ModesTab } from './tabs/ModesTab.js';
-import { RefineTab } from './tabs/RefineTab.js';
+import { OutputTab } from './tabs/OutputTab.js';
 
 const TABS = [
-  { id: 'general', label: 'General' },
+  { id: 'dictation', label: 'Dictation' },
   { id: 'modes', label: 'Modes' },
+  { id: 'models', label: 'Models' },
+  { id: 'output', label: 'Output' },
   { id: 'dictionary', label: 'Dictionary' },
-  { id: 'refine', label: 'Refine' },
+  { id: 'general', label: 'General' },
   { id: 'about', label: 'About' },
 ] as const;
 
@@ -21,7 +25,7 @@ type TabId = (typeof TABS)[number]['id'];
 export function App(): JSX.Element {
   const api = useSettings();
   const modelsApi = useModels();
-  const [tab, setTab] = useState<TabId>('general');
+  const [tab, setTab] = useState<TabId>('dictation');
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   // Apply the theme override before content paints; `system` defers to the
@@ -111,10 +115,12 @@ export function App(): JSX.Element {
             </button>
           </div>
         )}
-        {tab === 'general' && <GeneralTab api={api} modelsApi={modelsApi} />}
+        {tab === 'dictation' && <DictationTab api={api} modelsApi={modelsApi} />}
         {tab === 'modes' && <ModesTab api={api} />}
+        {tab === 'models' && <ModelsTab api={api} modelsApi={modelsApi} />}
+        {tab === 'output' && <OutputTab api={api} />}
         {tab === 'dictionary' && <DictionaryTab api={api} />}
-        {tab === 'refine' && <RefineTab api={api} />}
+        {tab === 'general' && <GeneralTab api={api} />}
         {tab === 'about' && <AboutTab />}
       </main>
     </div>
