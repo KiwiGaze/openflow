@@ -617,6 +617,27 @@ button:focus-visible {
   background: var(--chip);
 }
 
+/* The mode name is the edit trigger — a text button, not a chunky control. */
+.mode-edit {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  padding: 0;
+}
+
+.mode-edit:hover {
+  text-decoration: underline;
+}
+
+.badge-active {
+  color: var(--ok);
+  font-size: var(--text-hint);
+}
+
 .prompt-edit {
   margin-top: 10px;
 }

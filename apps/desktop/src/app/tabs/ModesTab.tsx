@@ -48,33 +48,39 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
           Output styles — how your dictation is written. Modes that use AI fall back to rules-based
           cleanup when no AI profile is active.
         </p>
-        <div className="mode-list">
-          {settings.modes.map((mode) => (
-            <div
-              key={mode.id}
-              className={`mode-row ${selectedId === mode.id ? 'mode-selected' : ''}`}
-              onClick={() => {
-                setSelectedId(mode.id);
-              }}
-            >
-              <label
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
+        <div className="mode-list" role="radiogroup" aria-label="Active writing mode">
+          {settings.modes.map((mode) => {
+            const active = settings.activeModeId === mode.id;
+            return (
+              <div
+                key={mode.id}
+                className={`mode-row ${selectedId === mode.id ? 'mode-selected' : ''}`}
               >
                 <input
                   type="radio"
                   name="active-mode"
-                  checked={settings.activeModeId === mode.id}
+                  aria-label={`Use ${mode.name}`}
+                  checked={active}
                   onChange={() => void save({ ...settings, activeModeId: mode.id })}
                 />
-              </label>
-              <span className="row-title">{mode.name}</span>
-              {mode.usesLlm && <span className="badge">AI</span>}
-              {mode.builtIn && <span className="badge badge-muted">built-in</span>}
-            </div>
-          ))}
+                <button
+                  type="button"
+                  className="mode-edit"
+                  aria-label={`Edit ${mode.name}`}
+                  onClick={() => {
+                    setSelectedId(mode.id);
+                  }}
+                >
+                  {mode.name}
+                </button>
+                {active && <span className="badge badge-active">Active</span>}
+                {mode.usesLlm && <span className="badge">AI</span>}
+                {mode.builtIn && <span className="badge badge-muted">built-in</span>}
+              </div>
+            );
+          })}
         </div>
+        <p className="row-hint">Click the circle to switch modes. Click a name to edit it.</p>
         <button
           className="btn"
           onClick={() => {
