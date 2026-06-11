@@ -7,7 +7,7 @@ import {
   EVENTS,
   type AppInfo,
   type DownloadProgress,
-  type LlmConfig,
+  type LlmProfile,
   type LlmTestResult,
   type ModelInfo,
   type PermissionsState,
@@ -30,8 +30,15 @@ export const ipc = {
   stopDictation: (): Promise<void> => invoke(COMMANDS.stopDictation),
   cancelDictation: (): Promise<void> => invoke(COMMANDS.cancelDictation),
   startRefineSelection: (): Promise<void> => invoke(COMMANDS.startRefineSelection),
+  startPolishSelection: (): Promise<void> => invoke(COMMANDS.startPolishSelection),
   getLastResult: (): Promise<TranscriptionResult | null> => invoke(COMMANDS.getLastResult),
-  testLlm: (config: LlmConfig): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { config }),
+  testLlm: (profile: LlmProfile): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { profile }),
+  listLlmProfiles: (): Promise<LlmProfile[]> => invoke(COMMANDS.listLlmProfiles),
+  saveLlmProfile: (profile: LlmProfile): Promise<LlmProfile[]> =>
+    invoke(COMMANDS.saveLlmProfile, { profile }),
+  deleteLlmProfile: (id: string): Promise<LlmProfile[]> =>
+    invoke(COMMANDS.deleteLlmProfile, { id }),
+  revealLlmProfiles: (): Promise<void> => invoke(COMMANDS.revealLlmProfiles),
   listOllamaModels: (baseUrl: string): Promise<string[]> =>
     invoke(COMMANDS.listOllamaModels, { baseUrl }),
   checkPermissions: (): Promise<PermissionsState> => invoke(COMMANDS.checkPermissions),

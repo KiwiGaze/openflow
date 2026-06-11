@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
   DownloadProgress,
+  LlmProfile,
   ModelInfo,
   PermissionsState,
   PipelineState,
@@ -119,6 +120,31 @@ export function useModels(): ModelsApi {
     remove: async (modelId) => {
       await ipc.deleteModel(modelId);
       refresh();
+    },
+  };
+}
+
+export interface LlmProfilesApi {
+  profiles: LlmProfile[];
+  save: (profile: LlmProfile) => Promise<void>;
+  remove: (id: string) => Promise<void>;
+}
+
+/** Lists on mount, so hand-dropped profile files appear on each tab visit. */
+export function useLlmProfiles(): LlmProfilesApi {
+  const [profiles, setProfiles] = useState<LlmProfile[]>([]);
+
+  useEffect(() => {
+    void ipc.listLlmProfiles().then(setProfiles);
+  }, []);
+
+  return {
+    profiles,
+    save: async (profile) => {
+      setProfiles(await ipc.saveLlmProfile(profile));
+    },
+    remove: async (id) => {
+      setProfiles(await ipc.deleteLlmProfile(id));
     },
   };
 }

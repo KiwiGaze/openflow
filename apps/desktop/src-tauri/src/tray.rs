@@ -49,6 +49,15 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         menu.append(&item)?;
     }
     menu.append(&PredefinedMenuItem::separator(app)?)?;
+    menu.append(&CheckMenuItem::with_id(
+        app,
+        "refine-dictation",
+        "Refine Dictation with AI",
+        true,
+        settings.refine_after_dictation,
+        None::<&str>,
+    )?)?;
+    menu.append(&PredefinedMenuItem::separator(app)?)?;
     menu.append(&MenuItem::with_id(
         app,
         "copy-last",
@@ -80,6 +89,7 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     match id {
         "quit" => app.exit(0),
         "settings" => show_settings_window(app),
+        "refine-dictation" => toggle_refine_after_dictation(app),
         "copy-last" => {
             let state = app.state::<AppState>();
             if let Some(result) = state.pipeline.last_result() {
@@ -96,6 +106,21 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                 set_active_mode(app, mode_id);
             }
         }
+    }
+}
+
+fn toggle_refine_after_dictation(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut settings = state.settings.get();
+    settings.refine_after_dictation = !settings.refine_after_dictation;
+    match state.settings.set(settings) {
+        Ok(saved) => {
+            let _ = tauri::Emitter::emit(app, "settings-changed", &saved);
+            if let Err(err) = rebuild_menu(app) {
+                log::warn!("tray rebuild failed: {err}");
+            }
+        }
+        Err(err) => log::warn!("could not toggle dictation refinement: {err}"),
     }
 }
 

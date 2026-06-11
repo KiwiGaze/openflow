@@ -8,6 +8,7 @@ use crate::llm::LlmTestResult;
 use crate::models::ModelInfoDto;
 use crate::permissions::{self, PermissionsState};
 use crate::pipeline::{Job, PipelineState, TranscriptionResult};
+use crate::profiles::LlmProfile;
 use crate::settings::Settings;
 use crate::state::AppState;
 use crate::{shortcuts, tray};
@@ -35,13 +36,15 @@ pub fn save_settings(
     let saved = state.settings.set(settings)?;
 
     let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
-        || previous.refine_hotkey != saved.refine_hotkey;
+        || previous.refine_hotkey != saved.refine_hotkey
+        || previous.polish_hotkey != saved.polish_hotkey;
     if hotkeys_changed {
         if let Err(message) = shortcuts::apply(&app, &saved) {
-            // Roll the hotkeys back to the last working pair.
+            // Roll the hotkeys back to the last working set.
             let mut reverted = saved.clone();
             reverted.dictation_hotkey = previous.dictation_hotkey.clone();
             reverted.refine_hotkey = previous.refine_hotkey.clone();
+            reverted.polish_hotkey = previous.polish_hotkey.clone();
             let restored = state.settings.set(reverted)?;
             let _ = shortcuts::apply(&app, &restored);
             let _ = app.emit("settings-changed", &restored);
@@ -137,6 +140,17 @@ pub async fn start_refine_selection(state: State<'_, AppState>) -> AppResult<()>
 }
 
 #[tauri::command]
+pub async fn start_polish_selection(state: State<'_, AppState>) -> AppResult<()> {
+    // Same offload as start_refine_selection: polish blocks on selection
+    // capture, which round-trips keystrokes through the main thread.
+    // Errors surface as transient HUD states inside polish().
+    let pipeline = state.pipeline.clone();
+    tauri::async_runtime::spawn_blocking(move || pipeline.polish())
+        .await
+        .map_err(|e| AppError::State(format!("polish task failed: {e}")))
+}
+
+#[tauri::command]
 pub fn get_last_result(state: State<'_, AppState>) -> Option<TranscriptionResult> {
     state.pipeline.last_result()
 }
@@ -144,9 +158,50 @@ pub fn get_last_result(state: State<'_, AppState>) -> Option<TranscriptionResult
 #[tauri::command]
 pub async fn test_llm(
     state: State<'_, AppState>,
-    config: crate::settings::LlmConfig,
+    profile: LlmProfile,
 ) -> Result<LlmTestResult, AppError> {
-    Ok(state.llm.test(&config).await)
+    Ok(state.llm.test(&profile).await)
+}
+
+#[tauri::command]
+pub fn list_llm_profiles(state: State<'_, AppState>) -> Vec<LlmProfile> {
+    state.profiles.list()
+}
+
+#[tauri::command]
+pub fn save_llm_profile(
+    state: State<'_, AppState>,
+    profile: LlmProfile,
+) -> AppResult<Vec<LlmProfile>> {
+    state.profiles.save(profile)
+}
+
+#[tauri::command]
+pub fn delete_llm_profile(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<Vec<LlmProfile>> {
+    let list = state.profiles.delete(&id)?;
+    // Deleting the active profile turns refinement off.
+    let settings = state.settings.get();
+    if settings.active_llm_profile_id == id {
+        let mut next = settings;
+        next.active_llm_profile_id.clear();
+        let saved = state.settings.set(next)?;
+        let _ = app.emit("settings-changed", &saved);
+    }
+    Ok(list)
+}
+
+#[tauri::command]
+pub fn reveal_llm_profiles(app: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    let dir = state.profiles.dir();
+    // Make sure there is something to show on a fresh install.
+    std::fs::create_dir_all(dir)?;
+    tauri_plugin_opener::OpenerExt::opener(&app)
+        .open_path(dir.display().to_string(), None::<&str>)
+        .map_err(|e| AppError::Settings(format!("could not open the profiles folder: {e}")))
 }
 
 #[tauri::command]

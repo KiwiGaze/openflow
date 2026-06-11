@@ -24,9 +24,19 @@ use crate::settings::InsertMethod;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InsertOutcome {
     Pasted,
-    /// Text was left on the clipboard (chosen method, or paste unavailable
-    /// because Accessibility permission is missing).
-    CopiedToClipboard,
+    /// Text was left on the clipboard; the reason decides what to tell the user.
+    CopiedToClipboard(CopyReason),
+}
+
+/// Why the text ended up on the clipboard instead of being pasted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CopyReason {
+    /// The user chose the clipboard-only insert method.
+    ChosenMethod,
+    /// Pasting needs the Accessibility permission and it is missing.
+    NoAccessibility,
+    /// The ⌘V keystroke failed after the clipboard was already written.
+    PasteFailed,
 }
 
 /// Marker used to detect "nothing was selected" when capturing a selection.
@@ -168,7 +178,12 @@ impl Worker {
             self.clipboard()?
                 .set_text(text)
                 .map_err(|e| AppError::Output(format!("could not write clipboard: {e}")))?;
-            return Ok(InsertOutcome::CopiedToClipboard);
+            let reason = if paste_requested {
+                CopyReason::NoAccessibility
+            } else {
+                CopyReason::ChosenMethod
+            };
+            return Ok(InsertOutcome::CopiedToClipboard(reason));
         }
 
         let saved = self.clipboard()?.get_text().ok();
@@ -176,7 +191,12 @@ impl Worker {
             .set_text(text)
             .map_err(|e| AppError::Output(format!("could not write clipboard: {e}")))?;
         std::thread::sleep(CLIPBOARD_SETTLE);
-        self.send_shortcut('v')?;
+        if let Err(err) = self.send_shortcut('v') {
+            // The result is already on the clipboard — degrade instead of
+            // erroring, and skip the restore that would wipe it.
+            log::warn!("paste keystroke failed; leaving the result on the clipboard: {err}");
+            return Ok(InsertOutcome::CopiedToClipboard(CopyReason::PasteFailed));
+        }
         std::thread::sleep(KEYSTROKE_SETTLE);
 
         if restore_clipboard {

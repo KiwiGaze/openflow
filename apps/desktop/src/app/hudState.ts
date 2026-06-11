@@ -8,6 +8,8 @@ export function hudLabel(state: PipelineState): string {
     case 'transcribing':
       return 'Transcribing…';
     case 'refining':
+      if (state.job === 'refineSelection') return 'Rewriting…';
+      if (state.job === 'polishSelection') return 'Polishing selection…';
       return 'Polishing…';
     case 'inserting':
       return 'Inserting…';

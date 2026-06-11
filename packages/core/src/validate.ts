@@ -15,6 +15,17 @@ export function isValidBaseUrl(url: string): boolean {
   }
 }
 
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]', '0.0.0.0']);
+
+/** True when the endpoint host is loopback — refined text stays on-device. */
+export function isLocalEndpoint(url: string): boolean {
+  try {
+    return LOCAL_HOSTS.has(new URL(normalizeBaseUrl(url)).hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** Returns an error message, or null when the entry is valid. */
 export function validateDictionaryEntry(
   entry: DictionaryEntry,
