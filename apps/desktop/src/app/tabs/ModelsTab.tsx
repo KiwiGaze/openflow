@@ -16,6 +16,7 @@ import {
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { useLlmProfiles } from '../hooks.js';
 import { ipc } from '../ipc.js';
+import { downloadFailed, DOWNLOAD_FAILED_HINT, isDownloading } from '../modelStatus.js';
 import { Callout } from '../components/Callout.js';
 import { Row } from '../components/Row.js';
 import { SttEngines } from '../components/SttEngines.js';
@@ -155,8 +156,8 @@ export function ModelsTab({
         <div className="model-list">
           {models.map((model) => {
             const p = progress[model.id];
-            const downloading = (model.downloading || (p && !p.done)) ?? false;
-            const failed = (p?.done && p.error) ?? false;
+            const downloading = isDownloading(model, p);
+            const failed = downloadFailed(p);
             const active = settings.sttModelId === model.id;
             return (
               <div key={model.id} className={`model-row ${active ? 'model-active' : ''}`}>
@@ -176,11 +177,7 @@ export function ModelsTab({
                     <div className="row-hint">
                       {formatBytes(model.sizeBytes)} — {model.description}
                     </div>
-                    {failed && (
-                      <div className="row-hint row-hint-warn">
-                        Download failed — check your connection.
-                      </div>
-                    )}
+                    {failed && <div className="row-hint row-hint-warn">{DOWNLOAD_FAILED_HINT}</div>}
                   </div>
                 </label>
                 <div className="model-actions">

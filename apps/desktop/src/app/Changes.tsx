@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState, type JSX } from 'react';
+import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { countChanges, diffWords, type InsertMethod } from '@openflow/core';
 import { events, ipc, subscribe } from './ipc.js';
 import { initialChangesState, nextChangesState } from './changesState.js';
@@ -47,10 +47,16 @@ export function Changes(): JSX.Element | null {
   }, [state.visible]);
 
   const { result, visible } = state;
-  if (!result) return null;
+  // The word diff allocates an O(n·m) table; pipeline events re-render the
+  // open overlay, so compute it only when the result actually changes.
+  const diff = useMemo(() => {
+    if (!result) return null;
+    const runs = diffWords(result.original, result.text);
+    return { runs, changes: countChanges(runs) };
+  }, [result]);
+  if (!result || !diff) return null;
 
-  const runs = diffWords(result.original, result.text);
-  const changes = countChanges(runs);
+  const { runs, changes } = diff;
 
   return (
     <div
