@@ -148,7 +148,7 @@ export function App(): JSX.Element {
           </Callout>
         )}
         {tab === 'dictation' && <DictationTab api={api} modelsApi={modelsApi} />}
-        {tab === 'modes' && <ModesTab api={api} />}
+        {tab === 'modes' && <ModesTab api={api} modelsApi={modelsApi} />}
         {tab === 'models' && <ModelsTab api={api} modelsApi={modelsApi} />}
         {tab === 'output' && <OutputTab api={api} />}
         {tab === 'dictionary' && <DictionaryTab api={api} />}
