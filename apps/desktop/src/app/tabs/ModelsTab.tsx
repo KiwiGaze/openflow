@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import {
   formatBytes,
   formatProgress,
@@ -117,6 +117,38 @@ export function ModelsTab({
 
   const urlInvalid = selected !== null && !isValidBaseUrl(selected.baseUrl);
 
+  // One probe of the default Ollama endpoint on mount — a quick-add nudge, not
+  // a storm. Removes the last manual step from the biggest single upgrade.
+  const [ollamaDetected, setOllamaDetected] = useState<string[] | null>(null);
+  useEffect(() => {
+    void ipc.listOllamaModels('http://localhost:11434').then(
+      (found) => {
+        setOllamaDetected(found);
+      },
+      () => {
+        setOllamaDetected(null);
+      },
+    );
+  }, []);
+
+  const addOllamaProfile = (): void => {
+    const profile: LlmProfile = {
+      version: 1,
+      id: crypto.randomUUID(),
+      name: 'Ollama (local)',
+      provider: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      apiKey: '',
+      model: ollamaDetected?.[0] ?? 'qwen2.5:3b',
+      timeoutSecs: 30,
+      presetId: 'ollama',
+    };
+    setSelectedId(profile.id);
+    void save(profile).then(() => {
+      if (settings.activeLlmProfileId === '') void update({ activeLlmProfileId: profile.id });
+    });
+  };
+
   return (
     <div className="tab-body">
       <section className="card">
@@ -203,6 +235,13 @@ export function ModelsTab({
             Dictation uses fast rules-based cleanup. Add a profile to enable AI polish and the
             selection shortcuts — nothing leaves your Mac unless you pick a cloud endpoint.
           </p>
+        )}
+        {profiles.length === 0 && ollamaDetected && ollamaDetected.length > 0 && (
+          <Callout variant="info" action={{ label: 'Add Ollama', onClick: addOllamaProfile }}>
+            Ollama is running locally with {ollamaDetected.length} model
+            {ollamaDetected.length === 1 ? '' : 's'}. Add it for on-device AI polish — nothing
+            leaves your Mac.
+          </Callout>
         )}
         <div className="mode-list">
           <div className="mode-row">
