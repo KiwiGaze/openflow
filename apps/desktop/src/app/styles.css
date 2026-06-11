@@ -581,6 +581,45 @@ button:focus-visible,
   flex-wrap: wrap;
 }
 
+/* ---- Insights ---- */
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.insight-stat {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+}
+
+.insight-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.insight-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.insights-modes {
+  margin-top: 14px;
+}
+
+.insights-mode-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
 /* ---- Misc ---- */
 
 .result-text {

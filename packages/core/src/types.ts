@@ -166,6 +166,27 @@ export interface TranscriptionResult {
   durationMs: number;
 }
 
+export interface ModeCount {
+  modeId: string;
+  count: number;
+}
+
+/**
+ * Session-only usage aggregates for the Insights view. Counts and sums only —
+ * never transcripts or audio — held in memory and reset on quit. Mirrors the
+ * Rust `Insights` in `stats.rs`.
+ */
+export interface Insights {
+  totalWords: number;
+  dictations: number;
+  /** Average speaking pace this session; 0 until some speech is recorded. */
+  wordsPerMinute: number;
+  /** Percent of dictations that went through the LLM (vs rules cleanup). */
+  refinedPercent: number;
+  /** Most-used modes, highest first (up to 3). */
+  topModes: ModeCount[];
+}
+
 export type MicrophonePermission = 'granted' | 'denied' | 'undetermined' | 'unknown';
 
 export interface PermissionsState {
@@ -208,6 +229,7 @@ export const COMMANDS = {
   startRefineSelection: 'start_refine_selection',
   startPolishSelection: 'start_polish_selection',
   getLastResult: 'get_last_result',
+  getInsights: 'get_insights',
   testLlm: 'test_llm',
   listLlmProfiles: 'list_llm_profiles',
   saveLlmProfile: 'save_llm_profile',

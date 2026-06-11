@@ -21,6 +21,7 @@ use crate::modes::{self, LITERAL_MODE_ID};
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
 use crate::settings::{HotkeyBehavior, Settings, SettingsManager, MAX_RECORDING_SECS};
+use crate::stats::{word_count, Insights, Stats};
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
 use crate::text;
 
@@ -99,6 +100,9 @@ pub struct Pipeline {
     session: Mutex<Option<Session>>,
     generation: AtomicU64,
     last_result: Mutex<Option<TranscriptionResult>>,
+    /// Session-only usage aggregates for the Insights view (in-RAM, never
+    /// persisted or transmitted).
+    stats: Stats,
 }
 
 impl Pipeline {
@@ -131,7 +135,13 @@ impl Pipeline {
             session: Mutex::new(None),
             generation: AtomicU64::new(0),
             last_result: Mutex::new(None),
+            stats: Stats::new(),
         })
+    }
+
+    /// Snapshot of this session's usage aggregates for the Insights view.
+    pub fn insights(&self) -> Insights {
+        self.stats.snapshot()
     }
 
     pub fn state(&self) -> PipelineState {
@@ -481,6 +491,8 @@ impl Pipeline {
             recorded.duration.as_secs_f32(),
             recorded.samples.len()
         );
+        // Speech duration drives the Insights pace (words ÷ minutes spoken).
+        let record_ms = recorded.duration.as_millis() as u64;
         let samples = recorded.samples;
         let raw = tauri::async_runtime::spawn_blocking(move || {
             stt.transcribe(
@@ -502,7 +514,7 @@ impl Pipeline {
 
         match job {
             Job::Dictation => {
-                self.finish_dictation(&settings, with_dictionary, started)
+                self.finish_dictation(&settings, with_dictionary, started, record_ms)
                     .await
             }
             Job::RefineSelection => {
@@ -527,6 +539,7 @@ impl Pipeline {
         settings: &Settings,
         transcript: String,
         started: Instant,
+        record_ms: u64,
     ) -> AppResult<ProcessOutcome> {
         let mode = settings.active_mode();
         // The refine toggle is the master switch; the per-mode flag still
@@ -568,6 +581,7 @@ impl Pipeline {
         // jobs (rewrite/polish) edit existing text and deliberately skip this.
         let final_text = text::apply_snippets(&final_text, &settings.snippets);
 
+        let words = word_count(&final_text);
         let outcome = self.insert(
             settings,
             &transcript,
@@ -576,6 +590,10 @@ impl Pipeline {
             refined,
             started,
         )?;
+        // Record the session aggregate only once the text actually reached the
+        // user (insert returns Ok even on the clipboard fallback).
+        self.stats
+            .record_dictation(words, record_ms, &mode.id, refined);
         if let Some(warning) = llm_warning {
             return Ok(ProcessOutcome::Notice(warning));
         }

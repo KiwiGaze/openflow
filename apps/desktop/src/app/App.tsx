@@ -4,6 +4,7 @@ import { Onboarding } from './Onboarding.js';
 import { AboutTab } from './tabs/AboutTab.js';
 import { DictionaryTab } from './tabs/DictionaryTab.js';
 import { GeneralTab } from './tabs/GeneralTab.js';
+import { InsightsTab } from './tabs/InsightsTab.js';
 import { ModesTab } from './tabs/ModesTab.js';
 import { RefineTab } from './tabs/RefineTab.js';
 import { SnippetsTab } from './tabs/SnippetsTab.js';
@@ -14,6 +15,7 @@ const TABS = [
   { id: 'dictionary', label: 'Dictionary' },
   { id: 'snippets', label: 'Snippets' },
   { id: 'refine', label: 'Refine' },
+  { id: 'insights', label: 'Insights' },
   { id: 'about', label: 'About' },
 ] as const;
 
@@ -62,6 +64,7 @@ export function App(): JSX.Element {
         {tab === 'dictionary' && <DictionaryTab api={api} />}
         {tab === 'snippets' && <SnippetsTab api={api} />}
         {tab === 'refine' && <RefineTab api={api} />}
+        {tab === 'insights' && <InsightsTab api={api} />}
         {tab === 'about' && <AboutTab />}
       </main>
     </div>

@@ -111,7 +111,8 @@ one-time, self-erasing migration (`profiles::reconcile`) moves it into a profile
 startup.
 
 Nothing else is persisted: no audio, no transcripts, no history (the last result is in-memory
-only). That is a privacy feature, not an omission.
+only). Session usage aggregates for the Insights view (`stats.rs`) are likewise in-memory only —
+counts and sums, never content — and reset on quit. That is a privacy feature, not an omission.
 
 ## 5. Key decisions and tradeoffs
 

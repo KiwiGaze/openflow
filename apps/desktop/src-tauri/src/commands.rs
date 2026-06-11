@@ -168,6 +168,11 @@ pub fn get_last_result(state: State<'_, AppState>) -> Option<TranscriptionResult
 }
 
 #[tauri::command]
+pub fn get_insights(state: State<'_, AppState>) -> crate::stats::Insights {
+    state.pipeline.insights()
+}
+
+#[tauri::command]
 pub async fn test_llm(
     state: State<'_, AppState>,
     profile: LlmProfile,

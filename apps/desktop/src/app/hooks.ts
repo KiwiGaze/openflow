@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
   DownloadProgress,
+  Insights,
   LlmProfile,
   ModelInfo,
   PermissionsState,
@@ -147,6 +148,22 @@ export function useLlmProfiles(): LlmProfilesApi {
       setProfiles(await ipc.deleteLlmProfile(id));
     },
   };
+}
+
+/** Session usage aggregates; refetched after each completed dictation. */
+export function useInsights(): Insights | null {
+  const [insights, setInsights] = useState<Insights | null>(null);
+
+  useEffect(() => {
+    void ipc.getInsights().then(setInsights);
+    return subscribe(
+      events.onResult(() => {
+        void ipc.getInsights().then(setInsights);
+      }),
+    );
+  }, []);
+
+  return insights;
 }
 
 /** Polls permissions while mounted — users flip them in System Settings. */

@@ -1,6 +1,8 @@
 # Insights without surveillance
 
-Status: exploration. A brainstorm sketch, not a committed spec.
+Status: **Tier 1 shipped** (session-only, in-memory). Began as a brainstorm sketch; the
+no-disk version is built. Tier 2 (opt-in `stats.json` for cross-session streaks) remains a
+deliberate follow-up.
 
 ## Why
 
