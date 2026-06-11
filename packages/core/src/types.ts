@@ -56,6 +56,11 @@ export interface LlmProfile {
   /** Model name, e.g. `llama3.2:3b` or `gpt-4o-mini`. */
   model: string;
   timeoutSecs: number;
+  /**
+   * Which `LLM_PRESETS` entry the editor shows — display only. Never changes
+   * request behavior (that is `provider` + `baseUrl`); empty for legacy/custom.
+   */
+  presetId: string;
 }
 
 export interface Mode {

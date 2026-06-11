@@ -40,6 +40,10 @@ pub struct LlmProfile {
     pub api_key: String,
     pub model: String,
     pub timeout_secs: u64,
+    /// Which `LLM_PRESETS` entry the editor shows — display only. It never
+    /// changes request behavior (that is `provider` + `base_url`); two profiles
+    /// at the same URL behave identically regardless of `preset_id`.
+    pub preset_id: String,
 }
 
 impl Default for LlmProfile {
@@ -53,6 +57,7 @@ impl Default for LlmProfile {
             api_key: String::new(),
             model: String::new(),
             timeout_secs: 30,
+            preset_id: String::new(),
         }
     }
 }
@@ -233,6 +238,8 @@ pub fn reconcile(settings: &SettingsManager, profiles: &ProfileManager) {
                 } else {
                     legacy.timeout_secs
                 },
+                // Empty: the editor infers the preset from the wire kind.
+                preset_id: String::new(),
             };
             match profiles.save(profile) {
                 Ok(_) => next.active_llm_profile_id = MIGRATED_PROFILE_ID.into(),

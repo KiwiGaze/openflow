@@ -2,21 +2,17 @@ import { useState, type JSX } from 'react';
 import {
   isLocalEndpoint,
   isValidBaseUrl,
-  normalizeBaseUrl,
+  LLM_PRESETS,
   type LlmProfile,
-  type LlmProviderKind,
   type LlmTestResult,
+  normalizeBaseUrl,
+  presetForProfile,
 } from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
 import { useLlmProfiles } from '../hooks.js';
 import { ipc } from '../ipc.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
-
-const PROVIDER_DEFAULTS: Record<LlmProviderKind, Partial<LlmProfile>> = {
-  ollama: { baseUrl: 'http://localhost:11434', model: 'qwen2.5:3b', apiKey: '' },
-  openaiCompatible: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
-};
 
 export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, update } = api;
@@ -28,6 +24,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
   const [listError, setListError] = useState<string | null>(null);
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
+  const currentPreset = selected ? presetForProfile(selected.presetId, selected.provider) : null;
 
   // Only a change that could alter connectivity invalidates a test result;
   // editing the name or timeout keeps the green check (UX-33).
@@ -39,12 +36,22 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
     void save({ ...selected, ...next });
   };
 
-  const switchProvider = (provider: LlmProviderKind): void => {
+  // A preset prefills the connection fields but never locks them; `custom`
+  // keeps whatever is there so a curated URL survives the switch.
+  const applyPreset = (presetId: string): void => {
     if (!selected) return;
+    const preset = LLM_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
     setTestResult(null);
     setOllamaModels(null);
     setListError(null);
-    void save({ ...selected, provider, ...PROVIDER_DEFAULTS[provider] });
+    const next: LlmProfile = { ...selected, presetId, provider: preset.kind };
+    if (preset.id !== 'custom') {
+      next.baseUrl = preset.baseUrl;
+      next.model = preset.modelSuggestion;
+    }
+    if (!preset.needsKey) next.apiKey = '';
+    void save(next);
   };
 
   const addProfile = (): void => {
@@ -57,6 +64,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
       apiKey: '',
       model: 'qwen2.5:3b',
       timeoutSecs: 30,
+      presetId: 'ollama',
     };
     setSelectedId(profile.id);
     void save(profile).then(() => {
@@ -181,15 +189,18 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
               }}
             />
           </Row>
-          <Row title="Provider">
+          <Row title="Provider" hint={currentPreset?.caveat ?? ''}>
             <select
-              value={selected.provider}
+              value={currentPreset?.id ?? 'custom'}
               onChange={(e) => {
-                switchProvider(e.target.value as LlmProviderKind);
+                applyPreset(e.target.value);
               }}
             >
-              <option value="ollama">Ollama (local)</option>
-              <option value="openaiCompatible">OpenAI-compatible API (your key)</option>
+              {LLM_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.displayName}
+                </option>
+              ))}
             </select>
           </Row>
           <Row
@@ -209,7 +220,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
               }}
             />
           </Row>
-          {selected.provider === 'openaiCompatible' && (
+          {currentPreset?.needsKey && (
             <Row
               title="API key"
               hint="Stored in the profile file. Sent only to the base URL above."
@@ -229,6 +240,7 @@ export function RefineTab({ api }: { api: SettingsApi }): JSX.Element {
               <input
                 type="text"
                 value={selected.model}
+                placeholder={currentPreset?.modelSuggestion ?? ''}
                 onChange={(e) => {
                   patch({ model: e.target.value });
                 }}
