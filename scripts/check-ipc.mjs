@@ -24,9 +24,23 @@ const typesPath = join(repoRoot, 'packages/core/src/types.ts');
 
 const problems = [];
 
-const rustFiles = readdirSync(rustSrcDir)
-  .filter((name) => name.endsWith('.rs'))
-  .map((name) => ({ name, text: readFileSync(join(rustSrcDir, name), 'utf8') }));
+// Walked recursively so commands, event constants, and emit sites are found
+// even in nested modules (e.g. a future `pipeline/cloud.rs`) — a flat listing
+// would silently under-check. `name` is the src/-relative path.
+function rustSourceFiles(dir) {
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...rustSourceFiles(path));
+    else if (entry.name.endsWith('.rs')) files.push(path);
+  }
+  return files;
+}
+
+const rustFiles = rustSourceFiles(rustSrcDir).map((path) => ({
+  name: path.slice(rustSrcDir.length + 1),
+  text: readFileSync(path, 'utf8'),
+}));
 
 // --- Rust side -------------------------------------------------------------
 

@@ -24,19 +24,33 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const problems = [];
 
+function walkFiles(dir, extension) {
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...walkFiles(path, extension));
+    else if (extension.test(entry.name)) files.push(path);
+  }
+  return files;
+}
+
 // --- 1. HTTP crates stay in the audited network modules ---------------------
 
 const NETWORK_MODULES = new Set(['llm.rs', 'models.rs', 'cloud_stt.rs']);
 const HTTP_CRATE_PATTERN = /\b(reqwest|ureq|hyper|isahc|curl)::/;
 
 const rustSrcDir = join(repoRoot, 'apps/desktop/src-tauri/src');
-for (const name of readdirSync(rustSrcDir).filter((n) => n.endsWith('.rs'))) {
-  if (NETWORK_MODULES.has(name)) continue;
-  const text = readFileSync(join(rustSrcDir, name), 'utf8');
+// Walked recursively so a nested module (e.g. a future `pipeline/cloud.rs`)
+// can't escape the scan; the allowlist matches src/-relative paths, so a
+// nested file can't borrow an audited module's name either.
+for (const path of walkFiles(rustSrcDir, /\.rs$/)) {
+  const relative = path.slice(rustSrcDir.length + 1);
+  if (NETWORK_MODULES.has(relative)) continue;
+  const text = readFileSync(path, 'utf8');
   text.split('\n').forEach((line, i) => {
     if (HTTP_CRATE_PATTERN.test(line)) {
       problems.push(
-        `${name}:${i + 1} uses an HTTP client outside the audited network modules ` +
+        `${relative}:${i + 1} uses an HTTP client outside the audited network modules ` +
           `(${[...NETWORK_MODULES].join(', ')})`,
       );
     }
@@ -47,18 +61,8 @@ for (const name of readdirSync(rustSrcDir).filter((n) => n.endsWith('.rs'))) {
 
 const WEBVIEW_NETWORK_PATTERN = /\b(fetch\(|XMLHttpRequest|sendBeacon|new WebSocket)/;
 
-function walkTsFiles(dir) {
-  const files = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...walkTsFiles(path));
-    else if (/\.(ts|tsx)$/.test(entry.name)) files.push(path);
-  }
-  return files;
-}
-
 for (const dir of ['apps/desktop/src', 'packages/core/src']) {
-  for (const path of walkTsFiles(join(repoRoot, dir))) {
+  for (const path of walkFiles(join(repoRoot, dir), /\.(ts|tsx)$/)) {
     const text = readFileSync(path, 'utf8');
     text.split('\n').forEach((line, i) => {
       if (WEBVIEW_NETWORK_PATTERN.test(line)) {
