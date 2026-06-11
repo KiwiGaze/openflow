@@ -30,3 +30,8 @@ export function formatProgress(downloaded: number, total: number): string {
   const pct = Math.min(100, (downloaded / total) * 100);
   return `${pct.toFixed(0)}%`;
 }
+
+/** Today as a `YYYY-MM-DD` string (UTC calendar date) — tip caps, export stamps. */
+export function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}

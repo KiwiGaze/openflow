@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clampTimeoutSecs,
   isLocalEndpoint,
   isValidBaseUrl,
   normalizeBaseUrl,
   validateDictionaryEntry,
   validateSnippet,
 } from './validate.js';
+
+describe('clampTimeoutSecs', () => {
+  it('floors at 5 and falls back to 30 for non-numbers', () => {
+    expect(clampTimeoutSecs('60')).toBe(60);
+    expect(clampTimeoutSecs('3')).toBe(5);
+    expect(clampTimeoutSecs('')).toBe(30);
+    expect(clampTimeoutSecs('abc')).toBe(30);
+  });
+});
 
 describe('normalizeBaseUrl', () => {
   it('trims whitespace and trailing slashes', () => {

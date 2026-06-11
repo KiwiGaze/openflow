@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, formatDurationMs, formatProgress } from './format.js';
+import { formatBytes, formatDurationMs, formatProgress, todayIso } from './format.js';
 
 describe('formatBytes', () => {
   it('formats common sizes', () => {
@@ -29,5 +29,11 @@ describe('formatProgress', () => {
     expect(formatProgress(50, 200)).toBe('25%');
     expect(formatProgress(250, 200)).toBe('100%');
     expect(formatProgress(10, 0)).toBe('—');
+  });
+});
+
+describe('todayIso', () => {
+  it('returns a YYYY-MM-DD date', () => {
+    expect(todayIso()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

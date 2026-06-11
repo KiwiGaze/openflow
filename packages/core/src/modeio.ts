@@ -93,7 +93,7 @@ export function parseModeImport(text: string): ModeImportResult {
   if (typeof schema !== 'string' || !schema.startsWith(SCHEMA_PREFIX)) {
     return { ok: false, error: "This file isn't a valid mode." };
   }
-  if (schema.slice(SCHEMA_PREFIX.length) !== MODE_SCHEMA.slice(SCHEMA_PREFIX.length)) {
+  if (schema !== MODE_SCHEMA) {
     return { ok: false, error: 'This mode was made with a newer version of OpenFlow.' };
   }
   const raw = envelope.mode;

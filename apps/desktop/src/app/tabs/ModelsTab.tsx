@@ -1,5 +1,6 @@
 import { useEffect, useState, type JSX } from 'react';
 import {
+  clampTimeoutSecs,
   formatBytes,
   formatProgress,
   isLocalEndpoint,
@@ -420,7 +421,7 @@ export function ModelsTab({
               max={300}
               value={selected.timeoutSecs}
               onChange={(e) => {
-                patch({ timeoutSecs: Math.max(5, Number(e.target.value) || 30) });
+                patch({ timeoutSecs: clampTimeoutSecs(e.target.value) });
               }}
             />
           </Row>

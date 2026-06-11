@@ -8,6 +8,7 @@ import {
   parseModeImport,
   serializeMode,
   slugifyMode,
+  todayIso,
   uniqueModeName,
 } from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
@@ -101,8 +102,7 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
   const [importNotice, setImportNotice] = useState<string | null>(null);
 
   const exportMode = (mode: Mode): void => {
-    const today = new Date().toISOString().slice(0, 10);
-    void ipc.exportMode(slugifyMode(mode.name), serializeMode(mode, today));
+    void ipc.exportMode(slugifyMode(mode.name), serializeMode(mode, todayIso()));
   };
 
   // Each imported file gets a fresh id and a Finder-style unique name; an

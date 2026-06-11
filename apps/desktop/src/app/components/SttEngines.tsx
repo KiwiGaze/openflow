@@ -4,6 +4,7 @@ import {
   DEFAULT_STT_PRESET,
   STT_PRESETS,
   STT_PROFILE_VERSION,
+  clampTimeoutSecs,
   isLocalEndpoint,
   isValidBaseUrl,
   type SttProfile,
@@ -241,7 +242,7 @@ export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
               max={300}
               value={selected.timeoutSecs}
               onChange={(e) => {
-                patch({ timeoutSecs: Math.max(5, Number(e.target.value) || 30) });
+                patch({ timeoutSecs: clampTimeoutSecs(e.target.value) });
               }}
             />
           </Row>
