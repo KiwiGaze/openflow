@@ -90,29 +90,19 @@ impl OutputSystem {
         method: InsertMethod,
         restore_clipboard: bool,
     ) -> AppResult<InsertOutcome> {
-        let (respond, wait) = mpsc::sync_channel(1);
-        self.tx
-            .send(OutputCmd::Insert {
-                text,
-                method,
-                restore_clipboard,
-                respond,
-            })
-            .map_err(|_| AppError::Output("output thread is gone".into()))?;
-        wait.recv()
-            .map_err(|_| AppError::Output("output thread did not respond".into()))?
+        self.request(|respond| OutputCmd::Insert {
+            text,
+            method,
+            restore_clipboard,
+            respond,
+        })
     }
 
     /// Writes text to the clipboard via the worker that owns the clipboard
     /// handle. Does not paste — used by the changes overlay's Copy button.
     /// Blocks until the worker replies.
     pub fn copy_text(&self, text: String) -> AppResult<()> {
-        let (respond, wait) = mpsc::sync_channel(1);
-        self.tx
-            .send(OutputCmd::CopyText { text, respond })
-            .map_err(|_| AppError::Output("output thread is gone".into()))?;
-        wait.recv()
-            .map_err(|_| AppError::Output("output thread did not respond".into()))?
+        self.request(|respond| OutputCmd::CopyText { text, respond })
     }
 
     /// Returns the currently selected text in the frontmost app, or `None`
@@ -120,9 +110,18 @@ impl OutputSystem {
     /// same main-thread rule as [`OutputSystem::insert`] applies: calling this
     /// on the main thread deadlocks.
     pub fn capture_selection(&self) -> AppResult<Option<String>> {
+        self.request(|respond| OutputCmd::CaptureSelection { respond })
+    }
+
+    /// Sends the command built by `command` (handing it the reply channel)
+    /// and blocks until the worker replies.
+    fn request<T>(
+        &self,
+        command: impl FnOnce(SyncSender<AppResult<T>>) -> OutputCmd,
+    ) -> AppResult<T> {
         let (respond, wait) = mpsc::sync_channel(1);
         self.tx
-            .send(OutputCmd::CaptureSelection { respond })
+            .send(command(respond))
             .map_err(|_| AppError::Output("output thread is gone".into()))?;
         wait.recv()
             .map_err(|_| AppError::Output("output thread did not respond".into()))?
