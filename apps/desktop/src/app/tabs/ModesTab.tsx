@@ -24,6 +24,11 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
       builtIn: false,
       usesLlm: from?.usesLlm ?? true,
       transforms: from?.transforms ?? false,
+      aiProfileId: from?.aiProfileId ?? null,
+      sttModelId: from?.sttModelId ?? null,
+      language: from?.language ?? null,
+      // A copy never inherits the hotkey — two modes can't share one.
+      hotkey: null,
       prompt:
         from?.prompt ??
         'You clean up dictated speech. Fix punctuation and remove fillers. Output only the resulting text.',
@@ -41,6 +46,10 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
       builtIn: false,
       usesLlm: template.usesLlm,
       transforms: template.transforms,
+      aiProfileId: null,
+      sttModelId: null,
+      language: null,
+      hotkey: null,
       prompt: template.prompt,
     };
     setSelectedId(mode.id);

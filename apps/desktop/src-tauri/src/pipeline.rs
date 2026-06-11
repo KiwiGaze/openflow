@@ -20,7 +20,7 @@ use crate::models::ModelManager;
 use crate::modes::{self, LITERAL_MODE_ID};
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
-use crate::settings::{HotkeyBehavior, Settings, SettingsManager, MAX_RECORDING_SECS};
+use crate::settings::{HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS};
 use crate::shortcuts;
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
 use crate::text;
@@ -289,7 +289,14 @@ impl Pipeline {
             started: Instant::now(),
             selection,
         });
-        self.set_state(Status::Recording, Some(job), None);
+        // Name the mode in the listening label so the user sees which mode will
+        // write before speaking (07 §5). Rewrite is an action, not a mode.
+        let recording_label = if job == Job::Dictation {
+            Some(truncate_mode_name(&settings.active_mode().name))
+        } else {
+            None
+        };
+        self.set_state(Status::Recording, Some(job), recording_label);
         // Bind Esc so a recording started by mistake has a "never mind".
         shortcuts::set_cancel_key(&self.app, true);
         hud::position_on_cursor_monitor(&self.app);
@@ -444,10 +451,74 @@ impl Pipeline {
 
     // ---- Processing -----------------------------------------------------
 
+    /// Resolves a dictation mode's overrides once, at job start (07 §3). Each
+    /// field falls back `mode override (set AND valid) → global → default`; a
+    /// dangling override never fails the job — it falls through and the first
+    /// dangling field (AI profile → STT → language) yields one informational
+    /// notice that names the mode.
+    fn resolve_dictation(&self, settings: &Settings, mode: &Mode) -> ResolvedDictation {
+        let mut notice: Option<String> = None;
+        let name = truncate_mode_name(&mode.name);
+
+        // AI profile is only resolved when the mode wants AI and the master
+        // switch is on, so a no-AI mode never notices a dangling profile.
+        let profile = if mode.uses_llm && settings.refine_after_dictation {
+            match &mode.ai_profile_id {
+                Some(id) => self.profiles.get(id).or_else(|| {
+                    notice.get_or_insert(format!(
+                        "{name}: its AI profile is missing — used your active profile instead."
+                    ));
+                    self.profiles.active(&settings.active_llm_profile_id)
+                }),
+                None => self.profiles.active(&settings.active_llm_profile_id),
+            }
+        } else {
+            None
+        };
+
+        let stt_model_id = match &mode.stt_model_id {
+            Some(id) if self.models.is_installed(id) => id.clone(),
+            Some(_) => {
+                notice.get_or_insert(format!(
+                    "{name}: its speech model isn’t available — used your default model instead."
+                ));
+                settings.stt_model_id.clone()
+            }
+            None => settings.stt_model_id.clone(),
+        };
+
+        let language = match &mode.language {
+            Some(lang) if is_known_language(lang) => lang.clone(),
+            Some(_) => {
+                notice.get_or_insert(format!(
+                    "{name}: its language setting was invalid — used your default."
+                ));
+                settings.language.clone()
+            }
+            None => settings.language.clone(),
+        };
+
+        ResolvedDictation {
+            mode: mode.clone(),
+            stt_model_id,
+            language,
+            profile,
+            notice,
+        }
+    }
+
     async fn process(self: &Arc<Self>, session: Session) -> AppResult<ProcessOutcome> {
         let settings = self.settings.get();
         let job = session.job;
         let started = session.started;
+
+        // Resolve mode overrides once, up front (dictation only). Rewrite uses
+        // the global speech model + language to hear the spoken instruction.
+        let resolved = if job == Job::Dictation {
+            Some(self.resolve_dictation(&settings, &settings.active_mode()))
+        } else {
+            None
+        };
 
         // Stop capture and get 16 kHz samples (resampled on the audio thread).
         let audio = Arc::clone(&self.audio);
@@ -457,9 +528,15 @@ impl Pipeline {
 
         // Transcribe on a blocking thread; whisper inference is CPU/GPU heavy.
         let stt = Arc::clone(&self.stt);
-        let model_id = settings.stt_model_id.clone();
+        let model_id = match &resolved {
+            Some(r) => r.stt_model_id.clone(),
+            None => settings.stt_model_id.clone(),
+        };
         let model_path = self.models.path_for(&model_id)?;
-        let language = settings.language.clone();
+        let language = match &resolved {
+            Some(r) => r.language.clone(),
+            None => settings.language.clone(),
+        };
         let prompt = initial_prompt_from_dictionary(&settings.dictionary);
         log::info!(
             "recorded {:.1}s of audio ({} samples at 16 kHz)",
@@ -489,7 +566,8 @@ impl Pipeline {
 
         match job {
             Job::Dictation => {
-                self.finish_dictation(&settings, with_dictionary, started)
+                let resolved = resolved.expect("dictation always resolves a mode");
+                self.finish_dictation(&settings, resolved, with_dictionary, started)
                     .await
             }
             Job::RefineSelection => {
@@ -512,17 +590,16 @@ impl Pipeline {
     async fn finish_dictation(
         self: &Arc<Self>,
         settings: &Settings,
+        resolved: ResolvedDictation,
         transcript: String,
         started: Instant,
     ) -> AppResult<ProcessOutcome> {
-        let mode = settings.active_mode();
-        // The refine toggle is the master switch; the per-mode flag still
-        // decides whether this mode wants AI at all.
-        let profile = if mode.uses_llm && settings.refine_after_dictation {
-            self.profiles.active(&settings.active_llm_profile_id)
-        } else {
-            None
-        };
+        let ResolvedDictation {
+            mode,
+            profile,
+            notice,
+            ..
+        } = resolved;
 
         let mut refined = false;
         let mut llm_warning: Option<String> = None;
@@ -557,8 +634,13 @@ impl Pipeline {
             refined,
             started,
         )?;
+        // The text already pasted; both notices are informational. A flaky-LLM
+        // warning is more useful than a dangling-override notice, so it wins.
         if let Some(warning) = llm_warning {
             return Ok(ProcessOutcome::Notice(warning));
+        }
+        if let Some(notice) = notice {
+            return Ok(ProcessOutcome::Notice(notice));
         }
         Ok(outcome)
     }
@@ -647,8 +729,58 @@ impl Pipeline {
     }
 }
 
+/// A dictation mode's overrides resolved against the globals (07 §3).
+struct ResolvedDictation {
+    mode: Mode,
+    stt_model_id: String,
+    language: String,
+    profile: Option<LlmProfile>,
+    /// First dangling-override notice, if any; informational, never fatal.
+    notice: Option<String>,
+}
+
+/// Mode names render up to 16 chars in the HUD and dangling notices (07 §5);
+/// the pill must not resize.
+fn truncate_mode_name(name: &str) -> String {
+    const MAX: usize = 16;
+    if name.chars().count() > MAX {
+        let head: String = name.chars().take(MAX - 1).collect();
+        format!("{head}…")
+    } else {
+        name.to_string()
+    }
+}
+
+/// A mode language override is valid if it is `auto` or a 2-letter code; a
+/// hand-edited garbage value falls back to the global language (07 §3).
+fn is_known_language(lang: &str) -> bool {
+    lang == "auto" || (lang.len() == 2 && lang.chars().all(|c| c.is_ascii_lowercase()))
+}
+
 enum ProcessOutcome {
     /// Inserted cleanly; carries the text for the success flash.
     Inserted(String),
     Notice(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_known_language, truncate_mode_name};
+
+    #[test]
+    fn truncates_long_mode_names_to_16_chars() {
+        assert_eq!(truncate_mode_name("Notes"), "Notes");
+        let long = truncate_mode_name("Quarterly Board Update");
+        assert_eq!(long.chars().count(), 16);
+        assert!(long.ends_with('…'));
+    }
+
+    #[test]
+    fn language_override_validity() {
+        assert!(is_known_language("auto"));
+        assert!(is_known_language("de"));
+        assert!(!is_known_language("English"));
+        assert!(!is_known_language("EN"));
+        assert!(!is_known_language(""));
+    }
 }

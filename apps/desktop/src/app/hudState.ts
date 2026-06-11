@@ -12,7 +12,9 @@ function ellipsize(text: string, max = MAX_PREVIEW): string {
 export function hudLabel(state: PipelineState): string {
   switch (state.status) {
     case 'recording':
-      return state.job === 'refineSelection' ? 'Listening for instruction…' : 'Listening…';
+      if (state.job === 'refineSelection') return 'Listening for instruction…';
+      // Dictation names the active mode (07 §5); Rewrite is an action, not a mode.
+      return state.message ? `Listening — ${state.message}` : 'Listening…';
     case 'transcribing':
       return 'Transcribing…';
     case 'refining':

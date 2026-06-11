@@ -7,6 +7,9 @@ describe('hudLabel', () => {
     expect(hudLabel({ status: 'recording', job: 'refineSelection', message: null })).toBe(
       'Listening for instruction…',
     );
+    expect(hudLabel({ status: 'recording', job: 'dictation', message: 'Notes' })).toBe(
+      'Listening — Notes',
+    );
     expect(hudLabel({ status: 'transcribing', job: 'dictation', message: null })).toBe(
       'Transcribing…',
     );

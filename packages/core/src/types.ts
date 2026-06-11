@@ -81,6 +81,15 @@ export interface Mode {
   /** System prompt used for LLM refinement (the user text only; safety rules
    * are appended at call time). */
   prompt: string;
+  // ---- Mode v2 overrides (07); null = inherit the global setting ----
+  /** AI profile id, or null to use the active profile. */
+  aiProfileId: string | null;
+  /** Whisper model id, or null to use the global speech model. */
+  sttModelId: string | null;
+  /** ISO 639-1 code or `auto`, or null to use the global language. */
+  language: string | null;
+  /** Accelerator string (e.g. `Alt+Ctrl+N`), or null for no mode hotkey. */
+  hotkey: string | null;
 }
 
 export interface DictionaryEntry {

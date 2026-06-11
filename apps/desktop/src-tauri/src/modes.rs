@@ -30,6 +30,10 @@ pub fn built_in_modes() -> Vec<Mode> {
             built_in: true,
             uses_llm: true,
             transforms: false,
+            ai_profile_id: None,
+            stt_model_id: None,
+            language: None,
+            hotkey: None,
             prompt: "You clean up dictated speech into natural written text. \
 Remove filler words and false starts, apply the speaker's self-corrections \
 (\"Tuesday, no wait, Wednesday\" becomes \"Wednesday\"), and fix punctuation, \
@@ -43,6 +47,10 @@ otherwise."
             built_in: true,
             uses_llm: true,
             transforms: false,
+            ai_profile_id: None,
+            stt_model_id: None,
+            language: None,
+            hotkey: None,
             prompt: "You turn dictated speech into clear, polite, well-structured \
 email prose. Use short paragraphs and greetings/sign-offs only when the \
 speaker dictated them. Remove fillers and tighten phrasing without changing \
@@ -55,6 +63,10 @@ intent."
             built_in: true,
             uses_llm: true,
             transforms: false,
+            ai_profile_id: None,
+            stt_model_id: None,
+            language: None,
+            hotkey: None,
             prompt: "You turn dictated speech into concise notes. Prefer short \
 bullet points (one per idea, prefixed with \"- \"). Keep all concrete \
 details: names, dates, numbers, decisions, action items."
@@ -66,6 +78,10 @@ details: names, dates, numbers, decisions, action items."
             built_in: true,
             uses_llm: false,
             transforms: false,
+            ai_profile_id: None,
+            stt_model_id: None,
+            language: None,
+            hotkey: None,
             prompt: String::new(),
         },
     ]

@@ -66,6 +66,19 @@ pub struct Mode {
     #[serde(default)]
     pub transforms: bool,
     pub prompt: String,
+    // ---- Mode v2 overrides (07); null = inherit the global setting ----
+    /// AI profile id, or null to use the globally active profile.
+    #[serde(default)]
+    pub ai_profile_id: Option<String>,
+    /// Whisper model id, or null to use the global speech model.
+    #[serde(default)]
+    pub stt_model_id: Option<String>,
+    /// ISO 639-1 code or `auto`, or null to use the global spoken language.
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Per-mode one-shot hotkey accelerator, or null for none.
+    #[serde(default)]
+    pub hotkey: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -150,6 +163,13 @@ impl Settings {
         }
         if !self.modes.iter().any(|m| m.id == self.active_mode_id) {
             self.active_mode_id = modes::STANDARD_MODE_ID.into();
+        }
+        // An empty-string mode hotkey normalizes to None so "" never reaches
+        // the registrar (built-ins carry no overrides — refreshed above).
+        for mode in &mut self.modes {
+            if mode.hotkey.as_deref() == Some("") {
+                mode.hotkey = None;
+            }
         }
         self.dictionary
             .retain(|e| !e.from.trim().is_empty() && !e.to.trim().is_empty());
