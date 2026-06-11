@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 use crate::modes;
 
-pub const SETTINGS_VERSION: u32 = 2;
+pub const SETTINGS_VERSION: u32 = 3;
 pub const MAX_RECORDING_SECS: u64 = 300;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +60,21 @@ pub struct DictionaryEntry {
     pub to: String,
 }
 
+/// A spoken shorthand that expands into a longer block on insert. Unlike a
+/// dictionary entry (which fixes a misheard word) a snippet is intentional
+/// abbreviation: short trigger → long, possibly multi-line, verbatim text.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Snippet {
+    /// The spoken phrase that triggers expansion, e.g. "my email".
+    pub trigger: String,
+    /// Text inserted in place of the trigger; may span multiple lines.
+    pub expansion: String,
+    /// When true, expand only if the trigger is the whole dictation — for
+    /// triggers that also occur in ordinary prose ("my email").
+    pub whole_utterance: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -75,6 +90,7 @@ pub struct Settings {
     pub active_mode_id: String,
     pub modes: Vec<Mode>,
     pub dictionary: Vec<DictionaryEntry>,
+    pub snippets: Vec<Snippet>,
     pub stt_model_id: String,
     pub language: String,
     /// v1 migration only — see `profiles::reconcile`.
@@ -99,6 +115,7 @@ impl Default for Settings {
             active_mode_id: modes::STANDARD_MODE_ID.into(),
             modes: modes::built_in_modes(),
             dictionary: Vec::new(),
+            snippets: Vec::new(),
             stt_model_id: "base.en".into(),
             language: "auto".into(),
             llm: None,
@@ -132,6 +149,8 @@ impl Settings {
         }
         self.dictionary
             .retain(|e| !e.from.trim().is_empty() && !e.to.trim().is_empty());
+        self.snippets
+            .retain(|s| !s.trigger.trim().is_empty() && !s.expansion.is_empty());
         self.version = SETTINGS_VERSION;
     }
 }
@@ -292,8 +311,40 @@ mod tests {
         assert!(json.contains("\"refineAfterDictation\":true"));
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"insertMethod\":\"paste\""));
+        assert!(json.contains("\"snippets\":[]"));
         // The v1 LLM block is deserialize-only; it must never be written.
         assert!(!json.contains("\"llm\""));
+    }
+
+    #[test]
+    fn normalize_drops_blank_snippets_and_keeps_valid_ones() {
+        let dir = temp_dir("snippets");
+        let manager = SettingsManager::load(&dir);
+        let mut s = manager.get();
+        s.snippets = vec![
+            Snippet {
+                trigger: "my email".into(),
+                expansion: "me@example.com".into(),
+                whole_utterance: true,
+            },
+            Snippet {
+                trigger: "  ".into(),
+                expansion: "dropped — blank trigger".into(),
+                whole_utterance: false,
+            },
+            Snippet {
+                trigger: "empty".into(),
+                expansion: String::new(),
+                whole_utterance: false,
+            },
+        ];
+        let fixed = manager.set(s).unwrap();
+        assert_eq!(fixed.snippets.len(), 1);
+        assert_eq!(fixed.snippets[0].trigger, "my email");
+
+        let reloaded = SettingsManager::load(&dir).get();
+        assert_eq!(reloaded.snippets.len(), 1);
+        assert!(reloaded.snippets[0].whole_utterance);
     }
 
     #[test]

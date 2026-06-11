@@ -82,6 +82,9 @@ Automated tests cover the logic; these flows need a human:
     next polish uses the newly selected profile; _Show in Finder_ opens `<app-data>/profiles/`.
 13. Put another app (Safari, an editor) in macOS full-screen, then hold `⌥Space` → the HUD pill
     shows over the full-screen app and the text still pastes into that app.
+14. Settings → Snippets: add `my email → me@example.com` (inline) → dictate "send it to my email"
+    → the address is inserted in place. Add a "spoken alone" snippet and confirm it expands only
+    when said by itself, not mid-sentence.
 
 ## Repository layout
 

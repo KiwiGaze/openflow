@@ -74,6 +74,23 @@ export interface DictionaryEntry {
   to: string;
 }
 
+/**
+ * A spoken shorthand that expands into a longer block on insert. Unlike a
+ * dictionary entry (which fixes a misheard word), a snippet is intentional
+ * abbreviation: short trigger → long, possibly multi-line, verbatim text.
+ */
+export interface Snippet {
+  /** The spoken phrase that triggers expansion, e.g. "my email". */
+  trigger: string;
+  /** Text inserted in place of the trigger; may span multiple lines. */
+  expansion: string;
+  /**
+   * When true, expand only if the trigger is the whole dictation — for
+   * triggers that also occur in ordinary prose ("my email").
+   */
+  wholeUtterance: boolean;
+}
+
 export interface Settings {
   /** Schema version for forward migrations. */
   version: number;
@@ -88,6 +105,8 @@ export interface Settings {
   activeModeId: string;
   modes: Mode[];
   dictionary: DictionaryEntry[];
+  /** Spoken shorthands expanded into longer blocks on insert (dictation only). */
+  snippets: Snippet[];
   /** Whisper model id from the model registry, e.g. `base.en`. */
   sttModelId: string;
   /** ISO 639-1 code or `auto`. */

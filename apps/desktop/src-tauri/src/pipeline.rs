@@ -506,6 +506,11 @@ impl Pipeline {
             text::apply_rules_cleanup(&transcript)
         };
 
+        // Snippets expand on the final text only: dictation-only, verbatim,
+        // and after any LLM pass so the expansion is never reworded. Selection
+        // jobs (rewrite/polish) edit existing text and deliberately skip this.
+        let final_text = text::apply_snippets(&final_text, &settings.snippets);
+
         let outcome = self.insert(
             settings,
             &transcript,
