@@ -56,11 +56,22 @@ pub fn save_settings(
             .filter_map(|m| m.hotkey.as_deref().map(|h| (m.id.clone(), h.to_string())))
             .collect()
     };
+    // Transforms carry hotkeys too, but the handler resolves the instruction by
+    // id at trigger time — so only a changed id↔hotkey binding needs a
+    // re-register, not an instruction or name edit (which save on every
+    // keystroke).
+    let bindings = |s: &Settings| -> Vec<(String, String)> {
+        s.transforms
+            .iter()
+            .map(|t| (t.id.clone(), t.hotkey.clone()))
+            .collect()
+    };
     let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
         || previous.refine_hotkey != saved.refine_hotkey
         || previous.polish_hotkey != saved.polish_hotkey
         || previous.change_overlay_hotkey != saved.change_overlay_hotkey
-        || mode_hotkeys(&previous) != mode_hotkeys(&saved);
+        || mode_hotkeys(&previous) != mode_hotkeys(&saved)
+        || bindings(&previous) != bindings(&saved);
     if hotkeys_changed {
         if let Err(message) = shortcuts::apply(&app, &saved) {
             // Roll every hotkey — the three globals AND each mode hotkey — back
@@ -77,6 +88,7 @@ pub fn save_settings(
                     .find(|m| m.id == mode.id)
                     .and_then(|m| m.hotkey.clone());
             }
+            reverted.transforms = previous.transforms.clone();
             let restored = state.settings.set(reverted)?;
             let _ = shortcuts::apply(&app, &restored);
             let _ = app.emit("settings-changed", &restored);
@@ -88,11 +100,30 @@ pub fn save_settings(
         sync_autostart(&app, saved.launch_at_login);
     }
 
+    if previous.show_in_dock != saved.show_in_dock {
+        apply_dock_policy(&app, saved.show_in_dock);
+    }
+
     if let Err(err) = tray::rebuild_menu(&app) {
         log::warn!("tray rebuild failed: {err}");
     }
     let _ = app.emit("settings-changed", &saved);
     Ok(saved)
+}
+
+/// Regular keeps a Dock icon; Accessory is menu-bar-only. No-op off macOS.
+pub fn apply_dock_policy(app: &AppHandle, show_in_dock: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        let policy = if show_in_dock {
+            tauri::ActivationPolicy::Regular
+        } else {
+            tauri::ActivationPolicy::Accessory
+        };
+        let _ = app.set_activation_policy(policy);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, show_in_dock);
 }
 
 fn sync_autostart(app: &AppHandle, enabled: bool) {
@@ -234,6 +265,8 @@ pub async fn reprocess_history(
     if !mode.uses_llm {
         return Ok(if mode.id == modes::LITERAL_MODE_ID {
             text
+        } else if mode.id == modes::CODE_MODE_ID {
+            text::apply_code_identifier(&text)
         } else {
             text::apply_rules_cleanup(&text)
         });
@@ -267,6 +300,24 @@ pub fn set_changes_interactive(app: AppHandle, interactive: bool) {
     if let Some(window) = app.get_webview_window(crate::changes::CHANGES_LABEL) {
         let _ = window.set_ignore_cursor_events(!interactive);
     }
+}
+
+#[tauri::command]
+pub fn get_insights(state: State<'_, AppState>) -> crate::stats::Insights {
+    state.pipeline.insights()
+}
+
+#[tauri::command]
+pub fn list_dictionary_suggestions(
+    state: State<'_, AppState>,
+) -> Vec<crate::suggestions::DictionarySuggestion> {
+    let dictionary = state.settings.get().dictionary;
+    state.pipeline.dictionary_suggestions(&dictionary, 5)
+}
+
+#[tauri::command]
+pub fn dismiss_dictionary_suggestion(state: State<'_, AppState>, term: String) {
+    state.pipeline.dismiss_suggestion(&term);
 }
 
 #[tauri::command]

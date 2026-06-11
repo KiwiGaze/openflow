@@ -20,13 +20,15 @@ use crate::history::HistoryStore;
 use crate::hud;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
-use crate::modes::{self, LITERAL_MODE_ID};
+use crate::modes::{self, CODE_MODE_ID, LITERAL_MODE_ID};
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
 use crate::settings::{HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS};
 use crate::shortcuts;
+use crate::stats::{word_count, Insights, Stats};
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
 use crate::stt_profiles::SttProfileManager;
+use crate::suggestions::{DictionarySuggestion, Suggestions};
 use crate::text;
 
 pub const PIPELINE_STATE_EVENT: &str = "pipeline-state";
@@ -64,6 +66,9 @@ pub enum Job {
     RefineSelection,
     /// Refine the selection with the built-in instruction — no recording.
     PolishSelection,
+    /// Apply a user-defined transform's instruction to the selection — no
+    /// recording. Which transform is resolved at dispatch time by id.
+    Transform,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -125,6 +130,12 @@ pub struct Pipeline {
     tip_shown_session: AtomicBool,
     /// Consecutive empty dictations — drives the one-time accuracy tip (05 §2.3).
     empty_streak: AtomicU64,
+    /// Session-only usage aggregates for the Insights view (in-RAM, never
+    /// persisted or transmitted).
+    stats: Stats,
+    /// Session-only candidate-term tally driving dictionary suggestions
+    /// (in-RAM, never persisted or transmitted).
+    suggestions: Suggestions,
 }
 
 impl Pipeline {
@@ -165,6 +176,8 @@ impl Pipeline {
             last_app: Mutex::new(None),
             tip_shown_session: AtomicBool::new(false),
             empty_streak: AtomicU64::new(0),
+            stats: Stats::new(),
+            suggestions: Suggestions::new(),
         })
     }
 
@@ -173,6 +186,25 @@ impl Pipeline {
             .lock()
             .expect("pipeline state poisoned")
             .clone()
+    }
+
+    /// Snapshot of this session's usage aggregates for the Insights view.
+    pub fn insights(&self) -> Insights {
+        self.stats.snapshot()
+    }
+
+    /// Top dictionary suggestions seen this session, excluding known terms.
+    pub fn dictionary_suggestions(
+        &self,
+        dictionary: &[crate::settings::DictionaryEntry],
+        limit: usize,
+    ) -> Vec<DictionarySuggestion> {
+        self.suggestions.top(dictionary, limit)
+    }
+
+    /// Suppresses a suggested term for the rest of the session.
+    pub fn dismiss_suggestion(&self, term: &str) {
+        self.suggestions.dismiss(term);
     }
 
     pub fn state(&self) -> PipelineState {
@@ -336,8 +368,8 @@ impl Pipeline {
             Job::Dictation => self.settings.get().dictation_hotkey_behavior,
             // Refinement is always push-to-talk style.
             Job::RefineSelection => HotkeyBehavior::Hold,
-            // Polish is a tap; there is no recording to stop.
-            Job::PolishSelection => return,
+            // Polish and transforms are taps; there is no recording to stop.
+            Job::PolishSelection | Job::Transform => return,
         };
         if behavior == HotkeyBehavior::Toggle {
             return;
@@ -547,12 +579,47 @@ impl Pipeline {
         }
     }
 
-    /// Tap entry point: refine the current selection with the built-in
-    /// instruction — no recording, no Session. Runs under the same busy-state
-    /// and generation contract as every other job; errors surface as
-    /// transient HUD states. Blocks on selection capture, so callers must
-    /// stay off the main thread (capture round-trips keystrokes through it).
+    /// Tap entry point: polish the current selection with the built-in
+    /// fix-grammar instruction — no recording, no Session.
     pub fn polish(self: &Arc<Self>) {
+        self.refine_selection(Job::PolishSelection, String::new(), "polish", None);
+    }
+
+    /// Tap entry point: apply a user-defined transform to the selection. The
+    /// transform is resolved by id at dispatch time so edits take effect
+    /// without re-binding the hotkey; a transform deleted between keypress and
+    /// dispatch is a silent no-op (its hotkey is already being unregistered).
+    pub fn run_transform(self: &Arc<Self>, transform_id: &str) {
+        let Some(transform) = self
+            .settings
+            .get()
+            .transforms
+            .into_iter()
+            .find(|t| t.id == transform_id)
+        else {
+            return;
+        };
+        self.refine_selection(
+            Job::Transform,
+            transform.instruction,
+            "transform",
+            Some(transform.name),
+        );
+    }
+
+    /// Shared body for the no-recording selection jobs (Polish, Transform):
+    /// resolve the active profile, capture the selection, then refine it with
+    /// `instruction` and insert. Runs under the same busy-state and generation
+    /// contract as every other job; errors surface as transient HUD states.
+    /// Blocks on selection capture, so callers must stay off the main thread
+    /// (capture round-trips keystrokes through it).
+    fn refine_selection(
+        self: &Arc<Self>,
+        job: Job,
+        instruction: String,
+        mode_id: &'static str,
+        hud_label: Option<String>,
+    ) {
         if !matches!(
             self.state().status,
             Status::Idle | Status::Error | Status::Notice
@@ -561,23 +628,35 @@ impl Pipeline {
         }
         let settings = self.settings.get();
         let Some(profile) = self.profiles.active(&settings.active_llm_profile_id) else {
+            let what = if job == Job::PolishSelection {
+                "Polishing"
+            } else {
+                "This transform"
+            };
             self.set_transient(
                 Status::Error,
-                "Polishing needs an AI profile — add one in Settings.".into(),
+                format!("{what} needs an AI profile — add one in Settings."),
             );
             return;
         };
 
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
-        self.set_state(Status::Refining, Some(Job::PolishSelection), None);
+        // The transform name rides in the message so the HUD can read
+        // "Concise…" instead of a generic label.
+        self.set_state(Status::Refining, Some(job), hud_label);
         hud::position_on_cursor_monitor(&self.app);
 
         let selection = match self.output.capture_selection() {
             Ok(Some(text)) => text,
             Ok(None) => {
+                let key = if job == Job::PolishSelection {
+                    "the polish hotkey"
+                } else {
+                    "the transform's hotkey"
+                };
                 self.set_transient(
                     Status::Error,
-                    "Select some text first, then press the polish hotkey.".into(),
+                    format!("Select some text first, then press {key}."),
                 );
                 return;
             }
@@ -595,7 +674,14 @@ impl Pipeline {
         let pipeline = Arc::clone(self);
         tauri::async_runtime::spawn(async move {
             let result = pipeline
-                .finish_polish(&settings, &profile, selection, started)
+                .finish_selection_refine(
+                    &settings,
+                    &profile,
+                    selection,
+                    &instruction,
+                    mode_id,
+                    started,
+                )
                 .await;
             if pipeline.generation.load(Ordering::SeqCst) != generation {
                 return; // cancelled mid-flight; a newer job owns the UI now
@@ -763,6 +849,8 @@ impl Pipeline {
             recorded.duration.as_secs_f32(),
             recorded.samples.len()
         );
+        // Speech duration drives the Insights pace (words ÷ minutes spoken).
+        let record_ms = recorded.duration.as_millis() as u64;
         let samples = recorded.samples;
 
         let raw = match model_id.strip_prefix("cloud:") {
@@ -828,7 +916,7 @@ impl Pipeline {
         match job {
             Job::Dictation => {
                 let resolved = resolved.expect("dictation always resolves a mode");
-                self.finish_dictation(&settings, resolved, with_dictionary, started)
+                self.finish_dictation(&settings, resolved, with_dictionary, started, record_ms)
                     .await
             }
             Job::RefineSelection => {
@@ -840,10 +928,10 @@ impl Pipeline {
                 )
                 .await
             }
-            // Sessions are only created for recording jobs; polish runs
-            // through `polish()` without one.
-            Job::PolishSelection => Err(AppError::State(
-                "polish does not use a recording session".into(),
+            // Sessions are only created for recording jobs; polish and
+            // transforms run through `refine_selection()` without one.
+            Job::PolishSelection | Job::Transform => Err(AppError::State(
+                "selection refinement does not use a recording session".into(),
             )),
         }
     }
@@ -854,7 +942,11 @@ impl Pipeline {
         resolved: ResolvedDictation,
         transcript: String,
         started: Instant,
+        record_ms: u64,
     ) -> AppResult<ProcessOutcome> {
+        // Watch for distinctive terms worth suggesting for the dictionary.
+        self.suggestions.observe(&transcript);
+        // Mode, profile, and language were resolved once at job start (07 §3).
         let ResolvedDictation {
             mode,
             profile,
@@ -883,10 +975,19 @@ impl Pipeline {
             }
         } else if mode.id == LITERAL_MODE_ID {
             transcript.clone()
+        } else if mode.id == CODE_MODE_ID {
+            // Deterministic: the whole utterance becomes one identifier.
+            text::apply_code_identifier(&transcript)
         } else {
             text::apply_rules_cleanup(&transcript)
         };
 
+        // Snippets expand on the final text only: dictation-only, verbatim,
+        // and after any LLM pass so the expansion is never reworded. Selection
+        // jobs (rewrite/polish) edit existing text and deliberately skip this.
+        let final_text = text::apply_snippets(&final_text, &settings.snippets);
+
+        let words = word_count(&final_text);
         let outcome = self.insert(
             settings,
             &transcript,
@@ -896,6 +997,10 @@ impl Pipeline {
             refined,
             started,
         )?;
+        // Record the session aggregate only once the text actually reached the
+        // user (insert returns Ok even on the clipboard fallback).
+        self.stats
+            .record_dictation(words, record_ms, &mode.id, refined);
         // Count this successful dictation — the only tip-system counter (05); a
         // count, never a log. Emit so an open settings webview re-evaluates tips.
         let mut counted = self.settings.get();
@@ -966,21 +1071,25 @@ impl Pipeline {
         })
     }
 
-    async fn finish_polish(
+    async fn finish_selection_refine(
         self: &Arc<Self>,
         settings: &Settings,
         profile: &LlmProfile,
         selection: String,
+        instruction: &str,
+        mode_id: &str,
         started: Instant,
     ) -> AppResult<ProcessOutcome> {
         let system = modes::selection_system_prompt();
-        // An empty instruction selects the built-in fix-grammar default.
-        let user = modes::selection_user_prompt(&selection, "");
+        // An empty instruction selects the built-in fix-grammar default
+        // (Polish); a transform passes its own instruction.
+        let user = modes::selection_user_prompt(&selection, instruction);
         // Like rewrite: no fallback — wrong text over the user's selection is
         // worse than nothing.
-        let polished = self.llm.chat(profile, &system, &user).await?;
+        let result = self.llm.chat(profile, &system, &user).await?;
+        // `original` is the text the diff is measured against — the selection.
         self.insert(
-            settings, &selection, &selection, polished, "polish", true, started,
+            settings, &selection, &selection, result, mode_id, true, started,
         )
     }
 

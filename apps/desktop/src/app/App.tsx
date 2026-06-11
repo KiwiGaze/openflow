@@ -9,9 +9,11 @@ import { AboutTab } from './tabs/AboutTab.js';
 import { DictationTab } from './tabs/DictationTab.js';
 import { DictionaryTab } from './tabs/DictionaryTab.js';
 import { GeneralTab } from './tabs/GeneralTab.js';
+import { InsightsTab } from './tabs/InsightsTab.js';
 import { ModelsTab } from './tabs/ModelsTab.js';
 import { ModesTab } from './tabs/ModesTab.js';
 import { OutputTab } from './tabs/OutputTab.js';
+import { SnippetsTab } from './tabs/SnippetsTab.js';
 
 const TABS = [
   { id: 'dictation', label: 'Dictation' },
@@ -19,6 +21,8 @@ const TABS = [
   { id: 'models', label: 'Models' },
   { id: 'output', label: 'Output' },
   { id: 'dictionary', label: 'Dictionary' },
+  { id: 'snippets', label: 'Snippets' },
+  { id: 'insights', label: 'Insights' },
   { id: 'general', label: 'General' },
   { id: 'about', label: 'About' },
 ] as const;
@@ -147,6 +151,8 @@ export function App(): JSX.Element {
         {tab === 'models' && <ModelsTab api={api} modelsApi={modelsApi} />}
         {tab === 'output' && <OutputTab api={api} />}
         {tab === 'dictionary' && <DictionaryTab api={api} />}
+        {tab === 'snippets' && <SnippetsTab api={api} />}
+        {tab === 'insights' && <InsightsTab api={api} />}
         {tab === 'general' && <GeneralTab api={api} />}
         {tab === 'about' && <AboutTab />}
       </main>

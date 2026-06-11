@@ -1,10 +1,12 @@
 import { useRef, useState, type JSX } from 'react';
 import { dictionaryToCsv, parseDictionaryCsv, validateDictionaryEntry } from '@openflow/core';
+import { useDictionarySuggestions } from '../hooks.js';
 import type { SettingsApi } from '../hooks.js';
 import { ipc } from '../ipc.js';
 
 export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, save } = api;
+  const { suggestions, dismiss, refresh } = useDictionarySuggestions();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,25 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
     });
   };
 
+  // A suggested term is a vocabulary hint: keep this spelling (from === to, so
+  // validateDictionaryEntry — which rejects no-op replacements — does not apply
+  // here). Suggestions already exclude dictionary terms, but the list can lag a
+  // manual add, so guard against creating a duplicate entry.
+  const accept = (term: string): void => {
+    const trimmed = term.trim();
+    const exists = settings.dictionary.some(
+      (e) => e.from.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (exists) {
+      refresh();
+      return;
+    }
+    void save({
+      ...settings,
+      dictionary: [...settings.dictionary, { from: trimmed, to: trimmed }],
+    }).then(refresh);
+  };
+
   return (
     <div className="tab-body">
       <section className="card">
@@ -58,6 +79,42 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
           Fix words the transcriber keeps getting wrong — names, products, jargon. Replacements
           match whole words, ignore case, and are also fed to the speech model as vocabulary hints.
         </p>
+
+        {suggestions.length > 0 && (
+          <div className="dict-suggestions">
+            <div className="row-hint">
+              Noticed while you spoke — add the ones you want kept spelled this way (this session
+              only; nothing was saved).
+            </div>
+            <div className="dict-suggestion-chips">
+              {suggestions.map((s) => (
+                <span key={s.term} className="dict-suggestion">
+                  <button
+                    type="button"
+                    className="chip"
+                    title={`Seen ${String(s.count)}× — add to dictionary`}
+                    onClick={() => {
+                      accept(s.term);
+                    }}
+                  >
+                    + {s.term}
+                  </button>
+                  <button
+                    type="button"
+                    className="chip-dismiss"
+                    aria-label={`Dismiss ${s.term}`}
+                    onClick={() => {
+                      dismiss(s.term);
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <form
           className="dict-form"
           onSubmit={(e) => {
@@ -97,9 +154,18 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
           <div className="dict-list">
             {settings.dictionary.map((entry, index) => (
               <div key={`${entry.from}-${index}`} className="dict-row">
-                <span className="dict-from">{entry.from}</span>
-                <span className="dict-arrow">→</span>
-                <span className="dict-to">{entry.to}</span>
+                {entry.from === entry.to ? (
+                  <>
+                    <span className="dict-to">{entry.to}</span>
+                    <span className="badge badge-muted">kept as-is</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="dict-from">{entry.from}</span>
+                    <span className="dict-arrow">→</span>
+                    <span className="dict-to">{entry.to}</span>
+                  </>
+                )}
                 <button
                   className="btn btn-quiet"
                   onClick={() => {

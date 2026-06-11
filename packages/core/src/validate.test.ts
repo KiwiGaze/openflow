@@ -4,6 +4,7 @@ import {
   isValidBaseUrl,
   normalizeBaseUrl,
   validateDictionaryEntry,
+  validateSnippet,
 } from './validate.js';
 
 describe('normalizeBaseUrl', () => {
@@ -53,5 +54,42 @@ describe('validateDictionaryEntry', () => {
 
   it('rejects no-op replacements', () => {
     expect(validateDictionaryEntry({ from: 'same', to: 'Same' }, existing)).toMatch(/identical/);
+  });
+});
+
+describe('validateSnippet', () => {
+  const existing = [{ trigger: 'my email', expansion: 'me@example.com', wholeUtterance: true }];
+
+  it('accepts a valid snippet (including identical-looking expansions)', () => {
+    expect(
+      validateSnippet(
+        { trigger: 'sign off', expansion: 'Best,\nMe', wholeUtterance: false },
+        existing,
+      ),
+    ).toBeNull();
+  });
+
+  it('rejects empty trigger or expansion', () => {
+    expect(
+      validateSnippet({ trigger: '  ', expansion: 'x', wholeUtterance: false }, existing),
+    ).toMatch(/trigger phrase cannot be empty/);
+    expect(
+      validateSnippet({ trigger: 'x', expansion: '', wholeUtterance: false }, existing),
+    ).toMatch(/expansion cannot be empty/);
+  });
+
+  it('rejects duplicate triggers case-insensitively', () => {
+    expect(
+      validateSnippet({ trigger: 'My Email', expansion: 'y', wholeUtterance: false }, existing),
+    ).toMatch(/already a snippet/);
+  });
+
+  it('rejects an over-long expansion', () => {
+    expect(
+      validateSnippet(
+        { trigger: 'big', expansion: 'a'.repeat(4001), wholeUtterance: false },
+        existing,
+      ),
+    ).toMatch(/limited to 4000 characters/);
   });
 });

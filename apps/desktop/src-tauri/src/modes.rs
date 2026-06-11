@@ -6,6 +6,7 @@ pub const STANDARD_MODE_ID: &str = "standard";
 pub const EMAIL_MODE_ID: &str = "email";
 pub const NOTES_MODE_ID: &str = "notes";
 pub const LITERAL_MODE_ID: &str = "literal";
+pub const CODE_MODE_ID: &str = "code";
 
 /// Invariant. Appended to every mode prompt at call time; no mode or template
 /// can drop these — they protect the output contract and the injection
@@ -75,6 +76,18 @@ details: names, dates, numbers, decisions, action items."
         Mode {
             id: LITERAL_MODE_ID.into(),
             name: "Literal".into(),
+            built_in: true,
+            uses_llm: false,
+            transforms: false,
+            ai_profile_id: None,
+            stt_model_id: None,
+            language: None,
+            hotkey: None,
+            prompt: String::new(),
+        },
+        Mode {
+            id: CODE_MODE_ID.into(),
+            name: "Code".into(),
             built_in: true,
             uses_llm: false,
             transforms: false,

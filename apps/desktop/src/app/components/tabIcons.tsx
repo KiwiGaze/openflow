@@ -70,6 +70,18 @@ export const TAB_ICONS: Record<string, JSX.Element> = {
       </>
     </Icon>
   ),
+  // lightning (expansion)
+  snippets: (
+    <Icon>
+      <path d="M8.5 1.5 3.5 9h3.5l-1 5.5 5.5-7.5H8z" />
+    </Icon>
+  ),
+  // bar chart
+  insights: (
+    <Icon>
+      <path d="M3 13.5V9M7 13.5V5.5M11 13.5V7.5M14 13.5H2" />
+    </Icon>
+  ),
   // gear
   general: (
     <Icon>

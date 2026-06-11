@@ -6,9 +6,11 @@ import {
   COMMANDS,
   EVENTS,
   type AppInfo,
+  type DictionarySuggestion,
   type DownloadProgress,
   type FrontmostApp,
   type HistoryEntry,
+  type Insights,
   type LlmProfile,
   type LlmTestResult,
   type ModelInfo,
@@ -40,6 +42,11 @@ export const ipc = {
   clearHistory: (): Promise<void> => invoke(COMMANDS.clearHistory),
   reprocessHistory: (text: string, modeId: string): Promise<string> =>
     invoke(COMMANDS.reprocessHistory, { text, modeId }),
+  getInsights: (): Promise<Insights> => invoke(COMMANDS.getInsights),
+  listDictionarySuggestions: (): Promise<DictionarySuggestion[]> =>
+    invoke(COMMANDS.listDictionarySuggestions),
+  dismissDictionarySuggestion: (term: string): Promise<void> =>
+    invoke(COMMANDS.dismissDictionarySuggestion, { term }),
   copyText: (text: string): Promise<void> => invoke(COMMANDS.copyText, { text }),
   setChangesInteractive: (interactive: boolean): Promise<void> =>
     invoke(COMMANDS.setChangesInteractive, { interactive }),

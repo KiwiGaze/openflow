@@ -23,6 +23,8 @@ export function hudLabel(state: HudState): string {
     case 'refining':
       if (state.job === 'refineSelection') return 'Rewriting…';
       if (state.job === 'polishSelection') return 'Polishing selection…';
+      // Transforms carry their name in the message ("Concise…").
+      if (state.job === 'transform') return state.message ? `${state.message}…` : 'Transforming…';
       return 'Cleaning up…';
     case 'inserting':
       return 'Inserting…';

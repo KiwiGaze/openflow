@@ -61,6 +61,13 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
             label="Save history"
           />
         </Row>
+        <Row title="Show in Dock" hint="Keep a Dock icon. Off keeps OpenFlow in the menu bar only.">
+          <Toggle
+            checked={settings.showInDock}
+            onChange={(checked) => void update({ showInDock: checked })}
+            label="Show app in Dock"
+          />
+        </Row>
       </section>
 
       <section className="card">

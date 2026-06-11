@@ -4,6 +4,7 @@ import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
+import { Transforms } from '../components/Transforms.js';
 
 export function DictationTab({
   api,
@@ -115,6 +116,8 @@ export function DictationTab({
           />
         </Row>
       </section>
+
+      <Transforms api={api} />
     </div>
   );
 }

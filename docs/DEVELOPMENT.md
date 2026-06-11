@@ -82,6 +82,18 @@ Automated tests cover the logic; these flows need a human:
     next polish uses the newly selected profile; _Show in Finder_ opens `<app-data>/profiles/`.
 13. Put another app (Safari, an editor) in macOS full-screen, then hold `⌥Space` → the HUD pill
     shows over the full-screen app and the text still pastes into that app.
+14. Settings → Snippets: add `my email → me@example.com` (inline) → dictate "send it to my email"
+    → the address is inserted in place. Add a "spoken alone" snippet and confirm it expands only
+    when said by itself, not mid-sentence.
+15. Settings → Refine → Transforms: add the "Concise" template, assign a hotkey, select a wordy
+    sentence in any app, press it → the selection is rewritten; the HUD reads "Concise…". Assign
+    a hotkey already taken by dictation → clear error, the change is rolled back.
+16. Dictate a sentence naming a product (e.g. "we use TanStack and DeepSeek") → open Dictionary →
+    both appear under "Noticed while you spoke"; click one to add it ("kept as-is"), dismiss the
+    other → it disappears for the session. Insights → the words/pace/streak update after dictating.
+17. Tray → switch to Code mode → hold `⌥Space`, say "get user by id" → `getUserById` is inserted;
+    say "constant max retries" → `MAX_RETRIES`. Toggle Show in Dock on → a Dock icon appears and
+    survives closing Settings; off → menu-bar only.
 
 ## Repository layout
 

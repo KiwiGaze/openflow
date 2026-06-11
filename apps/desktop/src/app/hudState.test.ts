@@ -25,6 +25,9 @@ describe('hudLabel', () => {
     expect(hudLabel({ status: 'refining', job: 'polishSelection', message: null })).toBe(
       'Polishing selection…',
     );
+    // Transforms show their name from the message, with a generic fallback.
+    expect(hudLabel({ status: 'refining', job: 'transform', message: 'Concise' })).toBe('Concise…');
+    expect(hudLabel({ status: 'refining', job: 'transform', message: null })).toBe('Transforming…');
   });
 
   it('quotes the inserted text on the success flash and ellipsizes long previews', () => {

@@ -14,9 +14,10 @@ use crate::pipeline::Job;
 use crate::settings::Settings;
 use crate::state::AppState;
 
-/// (Re-)registers all three hotkeys from settings. Returns a user-readable
-/// error when an accelerator cannot be parsed or registered (e.g. taken by
-/// another app), leaving no partial registrations behind.
+/// (Re-)registers every hotkey from settings — the three fixed ones plus each
+/// bound transform. Returns a user-readable error when an accelerator cannot be
+/// parsed or registered (e.g. taken by another app) or two collide, leaving no
+/// partial registrations behind.
 pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     let shortcuts = app.global_shortcut();
     shortcuts
@@ -53,18 +54,29 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         )
     };
 
-    // Every accelerator — the globals, the optional see-changes hotkey, and
-    // every mode hotkey — must be pairwise distinct (07 §4). Compare by
-    // reference so the originals survive for registration below.
-    let mut all: Vec<&Shortcut> = vec![&dictation, &refine, &polish];
-    if let Some(changes) = changes.as_ref() {
-        all.push(changes);
+    // Transforms with a bound hotkey; unbound ones exist but never register.
+    let mut transforms: Vec<(String, Shortcut)> = Vec::new();
+    for t in &settings.transforms {
+        if t.hotkey.trim().is_empty() {
+            continue;
+        }
+        let sc = Shortcut::from_str(&t.hotkey)
+            .map_err(|e| format!("transform “{}” hotkey “{}”: {e}", t.name, t.hotkey))?;
+        transforms.push((t.id.clone(), sc));
     }
-    all.extend(mode_hotkeys.iter().map(|(_, sc)| sc));
+
+    // Every hotkey must be pairwise distinct — the three fixed ones, the
+    // optional see-changes key, each bound transform, and every mode hotkey
+    // (07 §4). (Shortcut is Copy, so collecting them here leaves the originals
+    // usable for registration below.)
+    let mut all: Vec<Shortcut> = vec![dictation, refine, polish];
+    all.extend(changes.iter().copied());
+    all.extend(transforms.iter().map(|(_, sc)| *sc));
+    all.extend(mode_hotkeys.iter().map(|(_, sc)| *sc));
     for i in 0..all.len() {
         for j in (i + 1)..all.len() {
             if all[i] == all[j] {
-                return Err("every hotkey, including per-mode hotkeys, must be different".into());
+                return Err("two hotkeys are the same — every hotkey must be different".into());
             }
         }
     }
@@ -94,6 +106,21 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         return Err(format!("polish hotkey “{}”: {e}", settings.polish_hotkey));
     }
 
+    // Each transform is a tap like polish; the handler resolves the instruction
+    // by id at trigger time, so edits don't require re-binding.
+    for (id, sc) in transforms {
+        if let Err(e) = shortcuts.on_shortcut(sc, move |app, _shortcut, event| {
+            if event.state() == ShortcutState::Pressed {
+                let pipeline = app.state::<AppState>().pipeline.clone();
+                let id = id.clone();
+                tauri::async_runtime::spawn_blocking(move || pipeline.run_transform(&id));
+            }
+        }) {
+            let _ = shortcuts.unregister_all();
+            return Err(format!("a transform hotkey could not be registered: {e}"));
+        }
+    }
+
     // See-changes is a tap: only Pressed matters, and it does no clipboard or
     // keystroke work, so it can run inline on the hotkey thread.
     if let Some(changes) = changes {
@@ -121,11 +148,16 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     }
 
     log::info!(
-        "hotkeys registered: dictation={} rewrite={} polish={} see-changes={} mode-hotkeys={}",
+        "hotkeys registered: dictation={} rewrite={} polish={} see-changes={} transforms={} mode-hotkeys={}",
         settings.dictation_hotkey,
         settings.refine_hotkey,
         settings.polish_hotkey,
         settings.change_overlay_hotkey,
+        settings
+            .transforms
+            .iter()
+            .filter(|t| !t.hotkey.trim().is_empty())
+            .count(),
         settings.modes.iter().filter(|m| m.hotkey.is_some()).count()
     );
     Ok(())
