@@ -35,7 +35,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let settings = state.settings.get();
 
     let menu = Menu::new(app)?;
-    let header = MenuItem::with_id(app, "header", "Mode", false, None::<&str>)?;
+    let header = MenuItem::with_id(app, "header", "Writing style", false, None::<&str>)?;
     menu.append(&header)?;
     for mode in &settings.modes {
         let item = CheckMenuItem::with_id(
@@ -61,7 +61,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     menu.append(&MenuItem::with_id(
         app,
         "copy-last",
-        "Copy Last Result",
+        "Copy last dictation",
         true,
         None::<&str>,
     )?)?;

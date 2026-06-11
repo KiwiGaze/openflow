@@ -10,12 +10,12 @@ export function hudLabel(state: PipelineState): string {
     case 'refining':
       if (state.job === 'refineSelection') return 'Rewriting…';
       if (state.job === 'polishSelection') return 'Polishing selection…';
-      return 'Polishing…';
+      return 'Cleaning up…';
     case 'inserting':
       return 'Inserting…';
     case 'notice':
     case 'error':
-      return state.message ?? 'Something went wrong';
+      return state.message ?? 'Something went wrong — your text is on the clipboard';
     case 'idle':
       return '';
   }

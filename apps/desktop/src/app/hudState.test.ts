@@ -15,7 +15,7 @@ describe('hudLabel', () => {
   });
 
   it('distinguishes the refining flows', () => {
-    expect(hudLabel({ status: 'refining', job: 'dictation', message: null })).toBe('Polishing…');
+    expect(hudLabel({ status: 'refining', job: 'dictation', message: null })).toBe('Cleaning up…');
     expect(hudLabel({ status: 'refining', job: 'refineSelection', message: null })).toBe(
       'Rewriting…',
     );

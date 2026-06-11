@@ -186,7 +186,8 @@ impl Pipeline {
             }
             Status::Idle | Status::Error | Status::Notice => {
                 if let Err(err) = self.start(job) {
-                    self.set_transient(Status::Error, err.to_string());
+                    log::warn!("could not start {job:?}: {err}");
+                    self.set_transient(Status::Error, err.user_message());
                 }
             }
             // Busy processing a previous utterance — ignore.
@@ -225,7 +226,9 @@ impl Pipeline {
         {
             let state = self.state();
             if !matches!(state.status, Status::Idle | Status::Error | Status::Notice) {
-                return Err(AppError::State("busy — try again in a moment".into()));
+                return Err(AppError::State(
+                    "Still finishing the last one — try again in a moment.".into(),
+                ));
             }
         }
 
@@ -233,7 +236,7 @@ impl Pipeline {
 
         if !self.models.is_installed(&settings.stt_model_id) {
             return Err(AppError::Model(
-                "speech model not downloaded yet — open Settings to install it".into(),
+                "No speech model yet — open Settings to download one.".into(),
             ));
         }
 
@@ -244,14 +247,14 @@ impl Pipeline {
                 .is_none()
             {
                 return Err(AppError::Llm(
-                    "rewriting needs an AI profile — add one in Settings".into(),
+                    "Rewrite needs an AI profile — add one in Settings.".into(),
                 ));
             }
             match self.output.capture_selection()? {
                 Some(text) => Some(text),
                 None => {
                     return Err(AppError::State(
-                        "select some text first, then hold the rewrite hotkey".into(),
+                        "Select some text first, then hold the rewrite hotkey.".into(),
                     ))
                 }
             }
@@ -321,7 +324,8 @@ impl Pipeline {
                     pipeline.set_transient(Status::Notice, message);
                 }
                 Err(err) => {
-                    pipeline.set_transient(Status::Error, err.to_string());
+                    log::warn!("job failed: {err}");
+                    pipeline.set_transient(Status::Error, err.user_message());
                 }
             }
         });
@@ -350,7 +354,7 @@ impl Pipeline {
         let Some(profile) = self.profiles.active(&settings.active_llm_profile_id) else {
             self.set_transient(
                 Status::Error,
-                "polishing needs an AI profile — add one in Settings".into(),
+                "Polishing needs an AI profile — add one in Settings.".into(),
             );
             return;
         };
@@ -364,12 +368,13 @@ impl Pipeline {
             Ok(None) => {
                 self.set_transient(
                     Status::Error,
-                    "select some text first, then press the polish hotkey".into(),
+                    "Select some text first, then press the polish hotkey.".into(),
                 );
                 return;
             }
             Err(err) => {
-                self.set_transient(Status::Error, err.to_string());
+                log::warn!("polish selection capture failed: {err}");
+                self.set_transient(Status::Error, err.user_message());
                 return;
             }
         };
@@ -394,7 +399,8 @@ impl Pipeline {
                     pipeline.set_transient(Status::Notice, message);
                 }
                 Err(err) => {
-                    pipeline.set_transient(Status::Error, err.to_string());
+                    log::warn!("job failed: {err}");
+                    pipeline.set_transient(Status::Error, err.user_message());
                 }
             }
         });
@@ -439,7 +445,9 @@ impl Pipeline {
 
         let cleaned = text::clean_transcript(&raw);
         if cleaned.is_empty() {
-            return Ok(ProcessOutcome::Notice("didn't catch anything".into()));
+            return Ok(ProcessOutcome::Notice(
+                "Didn't catch that — try again.".into(),
+            ));
         }
         let with_dictionary = text::apply_dictionary(&cleaned, &settings.dictionary);
 
@@ -494,9 +502,8 @@ impl Pipeline {
                     // Never lose a dictation to a flaky provider: fall back to
                     // the rules-based cleanup and tell the user.
                     log::warn!("LLM refinement failed, falling back to rules: {err}");
-                    llm_warning = Some(format!(
-                        "AI cleanup failed ({err}) — inserted plain transcript"
-                    ));
+                    llm_warning =
+                        Some("AI cleanup unavailable — inserted the plain transcript.".into());
                     text::apply_rules_cleanup(&transcript)
                 }
             }
@@ -531,7 +538,7 @@ impl Pipeline {
         // Re-resolved at use time: the profile may have changed mid-recording.
         let Some(profile) = self.profiles.active(&settings.active_llm_profile_id) else {
             return Err(AppError::Llm(
-                "rewriting needs an AI profile — add one in Settings".into(),
+                "Rewrite needs an AI profile — add one in Settings.".into(),
             ));
         };
         let system = modes::selection_system_prompt();

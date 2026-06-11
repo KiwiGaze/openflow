@@ -96,7 +96,9 @@ export function Onboarding({
           <h1>Accessibility access</h1>
           <p>
             OpenFlow pastes text by simulating ⌘V, which macOS gates behind the Accessibility
-            permission. Skip this and results are copied to the clipboard instead.
+            permission. It also lets OpenFlow read your selected text for the Rewrite and Polish
+            hotkeys. Skip this and results are copied to the clipboard, and Rewrite and Polish won't
+            work.
           </p>
           <div className="perm-status">
             Status:{' '}

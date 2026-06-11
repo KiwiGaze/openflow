@@ -46,14 +46,17 @@ export function GeneralTab({
         <h2>Hotkeys</h2>
         <Row
           title="Dictation"
-          hint="Hold and speak; release to insert. A quick tap latches hands-free mode."
+          hint="Hold to talk; release to insert. Tip: a quick tap keeps recording hands-free until you tap again."
         >
           <HotkeyRecorder
             value={settings.dictationHotkey}
             onChange={(accelerator) => void update({ dictationHotkey: accelerator })}
           />
         </Row>
-        <Row title="Dictation style" hint="How the dictation hotkey behaves.">
+        <Row
+          title="When I press the hotkey"
+          hint="Hold to talk, or tap once to start and again to stop."
+        >
           <select
             value={settings.dictationHotkeyBehavior}
             onChange={(e) =>
@@ -61,7 +64,7 @@ export function GeneralTab({
             }
           >
             <option value="hold">Hold to talk</option>
-            <option value="toggle">Press to start / stop</option>
+            <option value="toggle">Tap to start, tap to stop</option>
           </select>
         </Row>
         <Row
@@ -73,7 +76,10 @@ export function GeneralTab({
             onChange={(accelerator) => void update({ polishHotkey: accelerator })}
           />
         </Row>
-        <Row title="Rewrite selection" hint="Select text anywhere, hold, and say what to change.">
+        <Row
+          title="Rewrite selection"
+          hint="Select text, hold, and say the change. Needs an AI profile."
+        >
           <HotkeyRecorder
             value={settings.refineHotkey}
             onChange={(accelerator) => void update({ refineHotkey: accelerator })}
@@ -170,7 +176,10 @@ export function GeneralTab({
             <option value="clipboard">Copy to clipboard only</option>
           </select>
         </Row>
-        <Row title="Restore clipboard" hint="Put your previous clipboard back after pasting.">
+        <Row
+          title="Restore clipboard"
+          hint="After pasting, put back whatever you'd copied before. Turn off to keep the dictated text on the clipboard."
+        >
           <Toggle
             checked={settings.restoreClipboard}
             onChange={(checked) => void update({ restoreClipboard: checked })}

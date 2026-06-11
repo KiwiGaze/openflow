@@ -45,8 +45,8 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
       <section className="card">
         <h2>Modes</h2>
         <p className="row-hint">
-          The active mode shapes how transcripts are written out. Modes that use AI fall back to
-          rules-based cleanup when no provider is configured.
+          Output styles — how your dictation is written. Modes that use AI fall back to rules-based
+          cleanup when no AI profile is active.
         </p>
         <div className="mode-list">
           {settings.modes.map((mode) => (
@@ -99,7 +99,10 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
               />
             </Row>
           )}
-          <Row title="Uses AI" hint="Send the transcript to your AI provider with this prompt.">
+          <Row
+            title="Uses AI"
+            hint="Send the transcript to your active AI profile with this prompt."
+          >
             {selected.builtIn ? (
               <span className="row-hint">{selected.usesLlm ? 'Yes' : 'No'}</span>
             ) : (

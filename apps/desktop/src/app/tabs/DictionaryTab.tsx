@@ -67,7 +67,10 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
         {error && <p className="form-error">{error}</p>}
 
         {settings.dictionary.length === 0 ? (
-          <p className="row-hint">No entries yet.</p>
+          <p className="row-hint">
+            Nothing here yet. When a name or term gets misheard, add it — e.g. “open flow” →
+            “OpenFlow”.
+          </p>
         ) : (
           <div className="dict-list">
             {settings.dictionary.map((entry, index) => (
