@@ -662,6 +662,19 @@ button:focus-visible {
   flex: 1;
 }
 
+.advanced {
+  margin-top: var(--space-5);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+}
+
+.advanced summary {
+  cursor: pointer;
+  font-weight: var(--weight-medium);
+  font-size: var(--text-hint);
+  color: var(--text-dim);
+}
+
 .prompt-edit {
   margin-top: 10px;
 }

@@ -1,14 +1,33 @@
 import { useState, type JSX } from 'react';
-import { MODE_TEMPLATES, type Mode, type ModeTemplate } from '@openflow/core';
+import {
+  LANGUAGES,
+  languageLabel,
+  MODE_TEMPLATES,
+  type Mode,
+  type ModeTemplate,
+} from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
+import { useLlmProfiles, useModels } from '../hooks.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
 
 export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, save } = api;
+  const { profiles } = useLlmProfiles();
+  const { models } = useModels();
   const [selectedId, setSelectedId] = useState(settings.activeModeId);
   const [showGallery, setShowGallery] = useState(false);
   const selected = settings.modes.find((m) => m.id === selectedId) ?? settings.modes[0];
+
+  // Labels for the "Inherit — currently …" override rows (07 §7).
+  const inheritProfile =
+    profiles.find((p) => p.id === settings.activeLlmProfileId)?.name ?? 'No AI';
+  const inheritModel =
+    models.find((m) => m.id === settings.sttModelId)?.displayName ?? settings.sttModelId;
+  const inheritLanguage = languageLabel(settings.language);
+
+  // An empty select value means "inherit" → store null.
+  const orNull = (value: string): string | null => (value === '' ? null : value);
 
   const patchMode = (id: string, patch: Partial<Mode>): void => {
     void save({
@@ -211,6 +230,77 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
               </p>
             </div>
           )}
+          <details className="advanced">
+            <summary>Advanced — AI profile · Speech model · Language</summary>
+            {selected.builtIn ? (
+              <>
+                {selected.usesLlm && (
+                  <Row title="AI profile">
+                    <span className="row-hint">Inherit — currently {inheritProfile}</span>
+                  </Row>
+                )}
+                <Row title="Speech model">
+                  <span className="row-hint">Inherit — currently {inheritModel}</span>
+                </Row>
+                <Row title="Language">
+                  <span className="row-hint">Inherit — currently {inheritLanguage}</span>
+                </Row>
+                <p className="row-hint">Duplicate this mode to change these.</p>
+              </>
+            ) : (
+              <>
+                {selected.usesLlm && (
+                  <Row title="AI profile">
+                    <select
+                      value={selected.aiProfileId ?? ''}
+                      onChange={(e) => {
+                        patchMode(selected.id, { aiProfileId: orNull(e.target.value) });
+                      }}
+                    >
+                      <option value="">Inherit — currently {inheritProfile}</option>
+                      {profiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Row>
+                )}
+                <Row title="Speech model">
+                  <select
+                    value={selected.sttModelId ?? ''}
+                    onChange={(e) => {
+                      patchMode(selected.id, { sttModelId: orNull(e.target.value) });
+                    }}
+                  >
+                    <option value="">Inherit — currently {inheritModel}</option>
+                    {models
+                      .filter((model) => model.installed)
+                      .map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.displayName}
+                        </option>
+                      ))}
+                  </select>
+                </Row>
+                <Row title="Language">
+                  <select
+                    value={selected.language ?? ''}
+                    onChange={(e) => {
+                      patchMode(selected.id, { language: orNull(e.target.value) });
+                    }}
+                  >
+                    <option value="">Inherit — currently {inheritLanguage}</option>
+                    {LANGUAGES.map(([code, name]) => (
+                      <option key={code} value={code}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </Row>
+              </>
+            )}
+          </details>
           <div className="row-actions">
             <button
               className="btn"

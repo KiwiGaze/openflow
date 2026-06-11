@@ -5,6 +5,7 @@ import {
   formatProgress,
   type HotkeyBehavior,
   type InsertMethod,
+  LANGUAGES,
 } from '@openflow/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { usePipeline } from '../hooks.js';
@@ -12,23 +13,6 @@ import { Callout } from '../components/Callout.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
-
-const LANGUAGES: [string, string][] = [
-  ['auto', 'Auto-detect'],
-  ['en', 'English'],
-  ['zh', 'Chinese'],
-  ['es', 'Spanish'],
-  ['fr', 'French'],
-  ['de', 'German'],
-  ['ja', 'Japanese'],
-  ['ko', 'Korean'],
-  ['pt', 'Portuguese'],
-  ['ru', 'Russian'],
-  ['it', 'Italian'],
-  ['nl', 'Dutch'],
-  ['hi', 'Hindi'],
-  ['ar', 'Arabic'],
-];
 
 export function GeneralTab({
   api,
