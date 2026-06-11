@@ -53,8 +53,18 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
             <div
               key={mode.id}
               className={`mode-row ${selectedId === mode.id ? 'mode-selected' : ''}`}
+              role="button"
+              tabIndex={0}
               onClick={() => {
                 setSelectedId(mode.id);
+              }}
+              onKeyDown={(e) => {
+                // Keys on the nested radio bubble up here; leave those alone.
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedId(mode.id);
+                }
               }}
             >
               <label

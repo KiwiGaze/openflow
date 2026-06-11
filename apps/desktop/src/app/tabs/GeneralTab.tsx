@@ -63,7 +63,16 @@ export function GeneralTab({
             <option value="toggle">Press to start / stop</option>
           </select>
         </Row>
-        <Row title="Rewrite selection" hint="Select text anywhere, hold, and speak an instruction.">
+        <Row
+          title="Polish selection"
+          hint="Fix grammar and clarity in the selected text. No voice."
+        >
+          <HotkeyRecorder
+            value={settings.polishHotkey}
+            onChange={(accelerator) => void update({ polishHotkey: accelerator })}
+          />
+        </Row>
+        <Row title="Rewrite selection" hint="Select text anywhere, hold, and say what to change.">
           <HotkeyRecorder
             value={settings.refineHotkey}
             onChange={(accelerator) => void update({ refineHotkey: accelerator })}

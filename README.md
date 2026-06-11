@@ -25,6 +25,8 @@
 - **Dictate anywhere.** Hold `⌥ Space`, talk, release. OpenFlow transcribes your speech
   _on-device_ with whisper.cpp (Metal-accelerated), removes the "um"s, fixes punctuation, and
   pastes the result at your cursor. A quick tap latches hands-free mode.
+- **Polish selected text with one keystroke.** Select text in any app, tap `⌥⇧ P`, and the
+  selection is replaced with a grammar-, spelling-, and clarity-fixed version. No voice needed.
 - **Rewrite selected text by voice.** Select text in any app, hold `⌥⇧ Space`, and say what you
   want: _"make this more polite"_, _"fix the grammar"_, _"turn this into bullet points"_.
 - **Modes** shape the output — Standard, Email, Notes, Literal, or your own custom prompts.
@@ -80,9 +82,10 @@ Prerequisites: Xcode Command Line Tools, Rust (stable), Node 22+, pnpm 10+, CMak
 - **Switch modes** from the menu-bar icon (Standard / Email / Notes / Literal / custom).
 - **Hands-free:** tap the hotkey instead of holding; tap again to stop.
 - **Recover a result:** menu bar → _Copy Last Result_.
-- **AI provider:** Settings → AI Provider. With Ollama, `ollama pull qwen2.5:3b` is a fast,
-  high-quality default for cleanup.
-- Dictation works without any AI provider; the _rewrite selection_ feature requires one.
+- **AI profiles:** Settings → Refine. Each profile is a connection (provider, endpoint, model)
+  stored as a file under the app's `profiles/` folder; exactly one is active for refinement.
+  With Ollama, `ollama pull qwen2.5:3b` is a fast, high-quality default for cleanup.
+- Dictation works without any AI profile; _polish_ and _rewrite selection_ require one.
 
 ## Development
 

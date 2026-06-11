@@ -18,10 +18,9 @@ use crate::hud;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
 use crate::modes::{self, LITERAL_MODE_ID};
-use crate::output::{InsertOutcome, OutputSystem};
-use crate::settings::{
-    HotkeyBehavior, InsertMethod, LlmProviderKind, Settings, SettingsManager, MAX_RECORDING_SECS,
-};
+use crate::output::{CopyReason, InsertOutcome, OutputSystem};
+use crate::profiles::{LlmProfile, ProfileManager};
+use crate::settings::{HotkeyBehavior, Settings, SettingsManager, MAX_RECORDING_SECS};
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
 use crate::text;
 
@@ -53,6 +52,8 @@ pub enum Status {
 pub enum Job {
     Dictation,
     RefineSelection,
+    /// Refine the selection with the built-in instruction — no recording.
+    PolishSelection,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -89,6 +90,7 @@ pub struct Pipeline {
     output: Arc<OutputSystem>,
     settings: Arc<SettingsManager>,
     models: Arc<ModelManager>,
+    profiles: Arc<ProfileManager>,
     state: Mutex<PipelineState>,
     state_seq: AtomicU64,
     session: Mutex<Option<Session>>,
@@ -106,6 +108,7 @@ impl Pipeline {
         output: Arc<OutputSystem>,
         settings: Arc<SettingsManager>,
         models: Arc<ModelManager>,
+        profiles: Arc<ProfileManager>,
     ) -> Arc<Self> {
         Arc::new(Self {
             app,
@@ -115,6 +118,7 @@ impl Pipeline {
             output,
             settings,
             models,
+            profiles,
             state: Mutex::new(PipelineState {
                 status: Status::Idle,
                 job: None,
@@ -195,6 +199,8 @@ impl Pipeline {
             Job::Dictation => self.settings.get().dictation_hotkey_behavior,
             // Refinement is always push-to-talk style.
             Job::RefineSelection => HotkeyBehavior::Hold,
+            // Polish is a tap; there is no recording to stop.
+            Job::PolishSelection => return,
         };
         if behavior == HotkeyBehavior::Toggle {
             return;
@@ -232,9 +238,13 @@ impl Pipeline {
         }
 
         let selection = if job == Job::RefineSelection {
-            if settings.llm.provider == LlmProviderKind::None {
+            if self
+                .profiles
+                .active(&settings.active_llm_profile_id)
+                .is_none()
+            {
                 return Err(AppError::Llm(
-                    "rewriting needs an AI provider — configure one in Settings".into(),
+                    "rewriting needs an AI profile — add one in Settings".into(),
                 ));
             }
             match self.output.capture_selection()? {
@@ -324,6 +334,72 @@ impl Pipeline {
         self.set_state(Status::Idle, None, None);
     }
 
+    /// Tap entry point: refine the current selection with the built-in
+    /// instruction — no recording, no Session. Runs under the same busy-state
+    /// and generation contract as every other job; errors surface as
+    /// transient HUD states. Blocks on selection capture, so callers must
+    /// stay off the main thread (capture round-trips keystrokes through it).
+    pub fn polish(self: &Arc<Self>) {
+        if !matches!(
+            self.state().status,
+            Status::Idle | Status::Error | Status::Notice
+        ) {
+            return; // busy with another job
+        }
+        let settings = self.settings.get();
+        let Some(profile) = self.profiles.active(&settings.active_llm_profile_id) else {
+            self.set_transient(
+                Status::Error,
+                "polishing needs an AI profile — add one in Settings".into(),
+            );
+            return;
+        };
+
+        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        self.set_state(Status::Refining, Some(Job::PolishSelection), None);
+        hud::position_on_cursor_monitor(&self.app);
+
+        let selection = match self.output.capture_selection() {
+            Ok(Some(text)) => text,
+            Ok(None) => {
+                self.set_transient(
+                    Status::Error,
+                    "select some text first, then press the polish hotkey".into(),
+                );
+                return;
+            }
+            Err(err) => {
+                self.set_transient(Status::Error, err.to_string());
+                return;
+            }
+        };
+        if self.generation.load(Ordering::SeqCst) != generation {
+            return; // cancelled while capturing
+        }
+
+        let started = Instant::now();
+        let pipeline = Arc::clone(self);
+        tauri::async_runtime::spawn(async move {
+            let result = pipeline
+                .finish_polish(&settings, &profile, selection, started)
+                .await;
+            if pipeline.generation.load(Ordering::SeqCst) != generation {
+                return; // cancelled mid-flight; a newer job owns the UI now
+            }
+            match result {
+                Ok(ProcessOutcome::Inserted) => {
+                    pipeline.set_state(Status::Idle, None, None);
+                }
+                Ok(ProcessOutcome::Notice(message)) => {
+                    pipeline.set_transient(Status::Notice, message);
+                }
+                Err(err) => {
+                    pipeline.set_transient(Status::Error, err.to_string());
+                }
+            }
+        });
+    }
+
     // ---- Processing -----------------------------------------------------
 
     async fn process(self: &Arc<Self>, session: Session) -> AppResult<ProcessOutcome> {
@@ -381,6 +457,11 @@ impl Pipeline {
                 )
                 .await
             }
+            // Sessions are only created for recording jobs; polish runs
+            // through `polish()` without one.
+            Job::PolishSelection => Err(AppError::State(
+                "polish does not use a recording session".into(),
+            )),
         }
     }
 
@@ -391,14 +472,20 @@ impl Pipeline {
         started: Instant,
     ) -> AppResult<ProcessOutcome> {
         let mode = settings.active_mode();
-        let llm_available = settings.llm.provider != LlmProviderKind::None;
+        // The refine toggle is the master switch; the per-mode flag still
+        // decides whether this mode wants AI at all.
+        let profile = if mode.uses_llm && settings.refine_after_dictation {
+            self.profiles.active(&settings.active_llm_profile_id)
+        } else {
+            None
+        };
 
         let mut refined = false;
         let mut llm_warning: Option<String> = None;
-        let final_text = if mode.uses_llm && llm_available {
+        let final_text = if let Some(profile) = profile {
             self.set_state(Status::Refining, Some(Job::Dictation), None);
             let system = modes::dictation_system_prompt(&mode, &settings.dictionary);
-            match self.llm.chat(&settings.llm, &system, &transcript).await {
+            match self.llm.chat(&profile, &system, &transcript).await {
                 Ok(text) => {
                     refined = true;
                     text
@@ -441,13 +528,35 @@ impl Pipeline {
         started: Instant,
     ) -> AppResult<ProcessOutcome> {
         self.set_state(Status::Refining, Some(Job::RefineSelection), None);
+        // Re-resolved at use time: the profile may have changed mid-recording.
+        let Some(profile) = self.profiles.active(&settings.active_llm_profile_id) else {
+            return Err(AppError::Llm(
+                "rewriting needs an AI profile — add one in Settings".into(),
+            ));
+        };
         let system = modes::selection_system_prompt();
         let user = modes::selection_user_prompt(&selection, &instruction);
         // Unlike dictation there is no fallback: replacing the user's
         // selection with something other than what they asked for is worse
         // than doing nothing.
-        let rewritten = self.llm.chat(&settings.llm, &system, &user).await?;
+        let rewritten = self.llm.chat(&profile, &system, &user).await?;
         self.insert(settings, &instruction, rewritten, "refine", true, started)
+    }
+
+    async fn finish_polish(
+        self: &Arc<Self>,
+        settings: &Settings,
+        profile: &LlmProfile,
+        selection: String,
+        started: Instant,
+    ) -> AppResult<ProcessOutcome> {
+        let system = modes::selection_system_prompt();
+        // An empty instruction selects the built-in fix-grammar default.
+        let user = modes::selection_user_prompt(&selection, "");
+        // Like rewrite: no fallback — wrong text over the user's selection is
+        // worse than nothing.
+        let polished = self.llm.chat(profile, &system, &user).await?;
+        self.insert(settings, &selection, polished, "polish", true, started)
     }
 
     fn insert(
@@ -476,14 +585,22 @@ impl Pipeline {
         *self.last_result.lock().expect("pipeline state poisoned") = Some(result.clone());
         let _ = self.app.emit(RESULT_EVENT, &result);
 
-        let wanted_paste = settings.insert_method == InsertMethod::Paste;
-        if wanted_paste && outcome == InsertOutcome::CopiedToClipboard {
-            return Ok(ProcessOutcome::Notice(
-                "Copied to clipboard — press ⌘V to paste (grant Accessibility to auto-paste)"
-                    .into(),
-            ));
+        match outcome {
+            InsertOutcome::Pasted | InsertOutcome::CopiedToClipboard(CopyReason::ChosenMethod) => {
+                Ok(ProcessOutcome::Inserted)
+            }
+            InsertOutcome::CopiedToClipboard(CopyReason::NoAccessibility) => {
+                Ok(ProcessOutcome::Notice(
+                    "Copied to clipboard — press ⌘V to paste (grant Accessibility to auto-paste)"
+                        .into(),
+                ))
+            }
+            InsertOutcome::CopiedToClipboard(CopyReason::PasteFailed) => {
+                Ok(ProcessOutcome::Notice(
+                    "Paste didn't go through — the result is on the clipboard, press ⌘V".into(),
+                ))
+            }
         }
-        Ok(ProcessOutcome::Inserted)
     }
 }
 

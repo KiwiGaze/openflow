@@ -16,7 +16,7 @@ export type PipelineStatus =
   | 'error';
 
 /** What kind of job the pipeline is currently running. */
-export type PipelineJob = 'dictation' | 'refineSelection';
+export type PipelineJob = 'dictation' | 'refineSelection' | 'polishSelection';
 
 export interface PipelineState {
   status: PipelineStatus;
@@ -31,9 +31,18 @@ export type HotkeyBehavior = 'hold' | 'toggle';
 /** `paste` simulates Cmd+V into the active app; `clipboard` only copies. */
 export type InsertMethod = 'paste' | 'clipboard';
 
-export type LlmProviderKind = 'none' | 'ollama' | 'openaiCompatible';
+export type LlmProviderKind = 'ollama' | 'openaiCompatible';
 
-export interface LlmConfig {
+/**
+ * One refinement connection, stored as `<app-data>/profiles/<id>.json`.
+ * "No AI" is the absence of an active profile, not a provider kind.
+ */
+export interface LlmProfile {
+  /** Schema version of the profile file. */
+  version: number;
+  /** Identity; always equals the filename stem. */
+  id: string;
+  name: string;
   provider: LlmProviderKind;
   /** Base URL, e.g. `http://localhost:11434` for Ollama. */
   baseUrl: string;
@@ -71,6 +80,11 @@ export interface Settings {
   dictationHotkey: string;
   dictationHotkeyBehavior: HotkeyBehavior;
   refineHotkey: string;
+  polishHotkey: string;
+  /** Master switch: may dictation transcripts go to the active profile. */
+  refineAfterDictation: boolean;
+  /** Active profile id (a file under `<app-data>/profiles/`); "" = no AI. */
+  activeLlmProfileId: string;
   activeModeId: string;
   modes: Mode[];
   dictionary: DictionaryEntry[];
@@ -78,7 +92,6 @@ export interface Settings {
   sttModelId: string;
   /** ISO 639-1 code or `auto`. */
   language: string;
-  llm: LlmConfig;
   insertMethod: InsertMethod;
   restoreClipboard: boolean;
   launchAtLogin: boolean;
@@ -157,8 +170,13 @@ export const COMMANDS = {
   stopDictation: 'stop_dictation',
   cancelDictation: 'cancel_dictation',
   startRefineSelection: 'start_refine_selection',
+  startPolishSelection: 'start_polish_selection',
   getLastResult: 'get_last_result',
   testLlm: 'test_llm',
+  listLlmProfiles: 'list_llm_profiles',
+  saveLlmProfile: 'save_llm_profile',
+  deleteLlmProfile: 'delete_llm_profile',
+  revealLlmProfiles: 'reveal_llm_profiles',
   listOllamaModels: 'list_ollama_models',
   checkPermissions: 'check_permissions',
   requestMicrophonePermission: 'request_microphone_permission',

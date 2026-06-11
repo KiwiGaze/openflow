@@ -22,8 +22,9 @@ IPC. There is no other process — whisper.cpp is linked in.
                          │                     ▼                          │
                          │ output.rs (worker thread: arboard + enigo ⌘V)  │
                          │                                                │
-                         │ settings.rs · models.rs · permissions.rs       │
-                         │ tray.rs · hud.rs · commands.rs (IPC surface)   │
+                         │ settings.rs · profiles.rs · models.rs          │
+                         │ permissions.rs · tray.rs · hud.rs              │
+                         │ commands.rs (IPC surface)                      │
                          └───────△─────────────────────────△──────────────┘
                                  │ events (pipeline-state,  │ invoke (get/save settings,
                                  │ audio-level, downloads)  │ models, permissions, …)
@@ -89,16 +90,25 @@ codegen (specta/tauri-specta) was considered and skipped for the MVP — one mor
 | `spawn_blocking` pool       | whisper inference                            | CPU/GPU-bound; `WhisperContext` lives behind a `Mutex` and is reused across calls (loading maps hundreds of MB)                                                                        |
 
 Cross-thread communication is `std::sync::mpsc` channels with reply channels — no shared mutable
-state beyond the settings `RwLock`, the pipeline state `Mutex`, and the level atomic.
+state beyond the settings `RwLock`, the profile cache `RwLock`, the pipeline state `Mutex`, and
+the level atomic.
 
 ## 4. Data model and persistence
 
 One JSON file: `~/Library/Application Support/app.openflow.desktop/settings.json`
 (camelCase, schema-versioned, atomically written via temp-file + rename, corrupt files backed up
 to `.bak` and replaced with defaults). It holds hotkeys, modes, dictionary, model selection,
-language, LLM config, and output behavior. Models are ggml files under
+language, output behavior, and the active-profile pointer. Models are ggml files under
 `<app-data>/models/`, downloaded from the official `ggerganov/whisper.cpp` Hugging Face repo
 into `.part` files and renamed only when complete.
+
+LLM profiles are one JSON file each under `<app-data>/profiles/` (camelCase, schema-versioned,
+atomic writes, 0600 — they can hold API keys). The filename stem is the profile identity;
+hand-dropped files appear on the next scan, unreadable ones are skipped and never deleted.
+Exactly one profile may be active for refinement; `activeLlmProfileId` in settings points at
+it, and an empty id means "No AI". v1 installs carried the LLM config inline in settings; a
+one-time, self-erasing migration (`profiles::reconcile`) moves it into a profile file at
+startup.
 
 Nothing else is persisted: no audio, no transcripts, no history (the last result is in-memory
 only). That is a privacy feature, not an omission.

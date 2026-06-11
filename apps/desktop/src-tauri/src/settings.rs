@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 use crate::modes;
 
-pub const SETTINGS_VERSION: u32 = 1;
+pub const SETTINGS_VERSION: u32 = 2;
 pub const MAX_RECORDING_SECS: u64 = 300;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,34 +29,18 @@ pub enum InsertMethod {
     Clipboard,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum LlmProviderKind {
-    None,
-    Ollama,
-    OpenaiCompatible,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LlmConfig {
-    pub provider: LlmProviderKind,
+/// v1 embedded the LLM connection inline; kept deserialize-only so the
+/// one-time migration into a profile file (`profiles::reconcile`) can read
+/// it. Never serialized — persisting settings erases it from disk.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LegacyLlmConfig {
+    /// v1 wrote "none" | "ollama" | "openaiCompatible".
+    pub provider: String,
     pub base_url: String,
     pub api_key: String,
     pub model: String,
     pub timeout_secs: u64,
-}
-
-impl Default for LlmConfig {
-    fn default() -> Self {
-        Self {
-            provider: LlmProviderKind::None,
-            base_url: "http://localhost:11434".into(),
-            api_key: String::new(),
-            model: "qwen2.5:3b".into(),
-            timeout_secs: 30,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -83,12 +67,19 @@ pub struct Settings {
     pub dictation_hotkey: String,
     pub dictation_hotkey_behavior: HotkeyBehavior,
     pub refine_hotkey: String,
+    pub polish_hotkey: String,
+    /// Master switch: may dictation transcripts go to the active profile.
+    pub refine_after_dictation: bool,
+    /// Active profile id (a file under `<app-data>/profiles/`); "" = no AI.
+    pub active_llm_profile_id: String,
     pub active_mode_id: String,
     pub modes: Vec<Mode>,
     pub dictionary: Vec<DictionaryEntry>,
     pub stt_model_id: String,
     pub language: String,
-    pub llm: LlmConfig,
+    /// v1 migration only — see `profiles::reconcile`.
+    #[serde(skip_serializing)]
+    pub llm: Option<LegacyLlmConfig>,
     pub insert_method: InsertMethod,
     pub restore_clipboard: bool,
     pub launch_at_login: bool,
@@ -102,12 +93,15 @@ impl Default for Settings {
             dictation_hotkey: "Alt+Space".into(),
             dictation_hotkey_behavior: HotkeyBehavior::Hold,
             refine_hotkey: "Alt+Shift+Space".into(),
+            polish_hotkey: "Alt+Shift+P".into(),
+            refine_after_dictation: true,
+            active_llm_profile_id: String::new(),
             active_mode_id: modes::STANDARD_MODE_ID.into(),
             modes: modes::built_in_modes(),
             dictionary: Vec::new(),
             stt_model_id: "base.en".into(),
             language: "auto".into(),
-            llm: LlmConfig::default(),
+            llm: None,
             insert_method: InsertMethod::Paste,
             restore_clipboard: true,
             launch_at_login: false,
@@ -171,8 +165,13 @@ impl SettingsManager {
             path,
             current: RwLock::new(settings),
         };
-        if let Err(err) = manager.persist() {
-            log::warn!("could not persist settings on load: {err}");
+        // Defer the rewrite while a v1 LLM block is present: persisting now
+        // would erase it (the field is deserialize-only) before
+        // `profiles::reconcile` migrates it into a profile file.
+        if manager.get().llm.is_none() {
+            if let Err(err) = manager.persist() {
+                log::warn!("could not persist settings on load: {err}");
+            }
         }
         manager
     }
@@ -289,7 +288,34 @@ mod tests {
         let json = serde_json::to_string(&Settings::default()).unwrap();
         assert!(json.contains("\"dictationHotkey\""));
         assert!(json.contains("\"activeModeId\""));
-        assert!(json.contains("\"provider\":\"none\""));
+        assert!(json.contains("\"polishHotkey\":\"Alt+Shift+P\""));
+        assert!(json.contains("\"refineAfterDictation\":true"));
+        assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"insertMethod\":\"paste\""));
+        // The v1 LLM block is deserialize-only; it must never be written.
+        assert!(!json.contains("\"llm\""));
+    }
+
+    #[test]
+    fn legacy_llm_block_is_read_and_kept_on_disk_until_persisted() {
+        let dir = temp_dir("legacy-llm");
+        fs::write(
+            dir.join("settings.json"),
+            r#"{ "version": 1, "llm": { "provider": "ollama", "model": "qwen2.5:3b" } }"#,
+        )
+        .unwrap();
+        let manager = SettingsManager::load(&dir);
+        let legacy = manager.get().llm.expect("legacy block parsed");
+        assert_eq!(legacy.provider, "ollama");
+        assert_eq!(legacy.model, "qwen2.5:3b");
+        // Load deferred the rewrite, so migration can still read the file.
+        let raw = fs::read_to_string(manager.path()).unwrap();
+        assert!(raw.contains("\"llm\""));
+
+        let mut s = manager.get();
+        s.llm = None;
+        manager.set(s).unwrap();
+        let raw = fs::read_to_string(manager.path()).unwrap();
+        assert!(!raw.contains("\"llm\""));
     }
 }

@@ -5,13 +5,13 @@ import { AboutTab } from './tabs/AboutTab.js';
 import { DictionaryTab } from './tabs/DictionaryTab.js';
 import { GeneralTab } from './tabs/GeneralTab.js';
 import { ModesTab } from './tabs/ModesTab.js';
-import { ProviderTab } from './tabs/ProviderTab.js';
+import { RefineTab } from './tabs/RefineTab.js';
 
 const TABS = [
   { id: 'general', label: 'General' },
   { id: 'modes', label: 'Modes' },
   { id: 'dictionary', label: 'Dictionary' },
-  { id: 'ai', label: 'AI Provider' },
+  { id: 'refine', label: 'Refine' },
   { id: 'about', label: 'About' },
 ] as const;
 
@@ -58,7 +58,7 @@ export function App(): JSX.Element {
         {tab === 'general' && <GeneralTab api={api} modelsApi={modelsApi} />}
         {tab === 'modes' && <ModesTab api={api} />}
         {tab === 'dictionary' && <DictionaryTab api={api} />}
-        {tab === 'ai' && <ProviderTab api={api} />}
+        {tab === 'refine' && <RefineTab api={api} />}
         {tab === 'about' && <AboutTab />}
       </main>
     </div>
