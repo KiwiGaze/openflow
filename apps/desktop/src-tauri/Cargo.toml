@@ -45,6 +45,7 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
   "std",
   "NSResponder",
   "NSWindow",
+  "NSPanel",
 ] }
 block2 = "0.6"
 

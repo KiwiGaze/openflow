@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio;
+mod changes;
 mod commands;
 mod error;
 mod hud;
@@ -86,6 +87,7 @@ fn main() {
             });
 
             hud::init(&handle)?;
+            changes::init(&handle)?;
             tray::build(&handle)?;
 
             if let Err(err) = shortcuts::apply(&handle, &settings.get()) {
@@ -133,6 +135,8 @@ fn main() {
             commands::get_insights,
             commands::list_dictionary_suggestions,
             commands::dismiss_dictionary_suggestion,
+            commands::copy_text,
+            commands::set_changes_interactive,
             commands::test_llm,
             commands::list_llm_profiles,
             commands::save_llm_profile,

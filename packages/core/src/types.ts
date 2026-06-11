@@ -124,6 +124,8 @@ export interface Settings {
   dictationHotkeyBehavior: HotkeyBehavior;
   refineHotkey: string;
   polishHotkey: string;
+  /** Reveals the word-level diff of the last result. Empty disables it. */
+  changeOverlayHotkey: string;
   /** Master switch: may dictation transcripts go to the active profile. */
   refineAfterDictation: boolean;
   /** Active profile id (a file under `<app-data>/profiles/`); "" = no AI. */
@@ -171,6 +173,12 @@ export interface DownloadProgress {
 export interface TranscriptionResult {
   /** Raw whisper output after basic trimming. */
   raw: string;
+  /**
+   * The text the change is measured against for the "see changes" diff:
+   * the transcript for dictation, the original selection for polish/rewrite.
+   * Differs from `raw` only for rewrite, where `raw` is the spoken instruction.
+   */
+  original: string;
   /** Final text that was inserted. */
   text: string;
   modeId: string;
@@ -225,6 +233,7 @@ export const EVENTS = {
   modelDownload: 'model-download',
   settingsChanged: 'settings-changed',
   result: 'transcription-result',
+  changesToggle: 'changes-toggle',
 } as const;
 
 /** Tauri command names callable via `invoke`. */
@@ -245,6 +254,8 @@ export const COMMANDS = {
   getInsights: 'get_insights',
   listDictionarySuggestions: 'list_dictionary_suggestions',
   dismissDictionarySuggestion: 'dismiss_dictionary_suggestion',
+  copyText: 'copy_text',
+  setChangesInteractive: 'set_changes_interactive',
   testLlm: 'test_llm',
   listLlmProfiles: 'list_llm_profiles',
   saveLlmProfile: 'save_llm_profile',

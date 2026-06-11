@@ -30,6 +30,19 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         .map_err(|e| format!("rewrite hotkey “{}”: {e}", settings.refine_hotkey))?;
     let polish = Shortcut::from_str(&settings.polish_hotkey)
         .map_err(|e| format!("polish hotkey “{}”: {e}", settings.polish_hotkey))?;
+    // The see-changes hotkey is optional: an empty string disables it.
+    let changes = if settings.change_overlay_hotkey.trim().is_empty() {
+        None
+    } else {
+        Some(
+            Shortcut::from_str(&settings.change_overlay_hotkey).map_err(|e| {
+                format!(
+                    "see-changes hotkey “{}”: {e}",
+                    settings.change_overlay_hotkey
+                )
+            })?,
+        )
+    };
 
     // Transforms with a bound hotkey; unbound ones exist but never register.
     let mut transforms: Vec<(String, Shortcut)> = Vec::new();
@@ -42,9 +55,11 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         transforms.push((t.id.clone(), sc));
     }
 
-    // Every hotkey must be pairwise distinct (Shortcut is Copy, so collecting
-    // them here leaves the originals usable for registration below).
+    // Every hotkey must be pairwise distinct — the three fixed ones, the
+    // optional see-changes key, and each bound transform. (Shortcut is Copy, so
+    // collecting them here leaves the originals usable for registration below.)
     let mut all: Vec<Shortcut> = vec![dictation, refine, polish];
+    all.extend(changes.iter().copied());
     all.extend(transforms.iter().map(|(_, sc)| *sc));
     for i in 0..all.len() {
         for j in (i + 1)..all.len() {
@@ -94,8 +109,24 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         }
     }
 
+    // See-changes is a tap: only Pressed matters, and it does no clipboard or
+    // keystroke work, so it can run inline on the hotkey thread.
+    if let Some(changes) = changes {
+        if let Err(e) = shortcuts.on_shortcut(changes, move |app, _shortcut, event| {
+            if event.state() == ShortcutState::Pressed {
+                crate::changes::request_toggle(app);
+            }
+        }) {
+            let _ = shortcuts.unregister_all();
+            return Err(format!(
+                "see-changes hotkey “{}”: {e}",
+                settings.change_overlay_hotkey
+            ));
+        }
+    }
+
     log::info!(
-        "hotkeys registered: dictation={} rewrite={} polish={} transforms={}",
+        "hotkeys registered: dictation={} rewrite={} polish={} transforms={} see-changes={}",
         settings.dictation_hotkey,
         settings.refine_hotkey,
         settings.polish_hotkey,
@@ -104,6 +135,7 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
             .iter()
             .filter(|t| !t.hotkey.trim().is_empty())
             .count(),
+        settings.change_overlay_hotkey
     );
     Ok(())
 }

@@ -100,6 +100,8 @@ pub struct Settings {
     pub dictation_hotkey_behavior: HotkeyBehavior,
     pub refine_hotkey: String,
     pub polish_hotkey: String,
+    /// Reveals the word-level diff of the last result. "" disables it.
+    pub change_overlay_hotkey: String,
     /// Master switch: may dictation transcripts go to the active profile.
     pub refine_after_dictation: bool,
     /// Active profile id (a file under `<app-data>/profiles/`); "" = no AI.
@@ -130,6 +132,7 @@ impl Default for Settings {
             dictation_hotkey_behavior: HotkeyBehavior::Hold,
             refine_hotkey: "Alt+Shift+Space".into(),
             polish_hotkey: "Alt+Shift+P".into(),
+            change_overlay_hotkey: "Alt+O".into(),
             refine_after_dictation: true,
             active_llm_profile_id: String::new(),
             active_mode_id: modes::STANDARD_MODE_ID.into(),
@@ -333,6 +336,7 @@ mod tests {
         assert!(json.contains("\"dictationHotkey\""));
         assert!(json.contains("\"activeModeId\""));
         assert!(json.contains("\"polishHotkey\":\"Alt+Shift+P\""));
+        assert!(json.contains("\"changeOverlayHotkey\":\"Alt+O\""));
         assert!(json.contains("\"refineAfterDictation\":true"));
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"insertMethod\":\"paste\""));
