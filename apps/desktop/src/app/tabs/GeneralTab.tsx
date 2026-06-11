@@ -42,6 +42,8 @@ export function GeneralTab({
   const { lastResult } = usePipeline();
   // models is empty until the first list arrives; only warn once we know.
   const noModelInstalled = models.length > 0 && !models.some((m) => m.installed);
+  const activeModel = models.find((m) => m.id === settings.sttModelId);
+  const englishOnly = (activeModel && !activeModel.multilingual) ?? false;
 
   return (
     <div className="tab-body">
@@ -166,9 +168,17 @@ export function GeneralTab({
             );
           })}
         </div>
-        <Row title="Spoken language" hint="English-only models ignore this.">
+        <Row
+          title="Spoken language"
+          hint={
+            englishOnly
+              ? `${activeModel?.displayName ?? 'This model'} only transcribes English — switch to a multilingual model to dictate in another language.`
+              : 'The language you’ll speak, or Auto-detect.'
+          }
+        >
           <select
             value={settings.language}
+            disabled={englishOnly}
             onChange={(e) => void update({ language: e.target.value })}
           >
             {LANGUAGES.map(([code, name]) => (

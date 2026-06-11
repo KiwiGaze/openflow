@@ -115,6 +115,15 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
               />
             )}
           </Row>
+          {selected.usesLlm && settings.activeLlmProfileId === '' && (
+            <p className="row-hint row-hint-warn">
+              No AI profile is active — this mode falls back to rules cleanup. Add one in the Refine
+              tab.
+            </p>
+          )}
+          {!selected.builtIn && !selected.usesLlm && (
+            <p className="row-hint">Rules-based cleanup only — nothing is sent to AI.</p>
+          )}
           {selected.usesLlm && (
             <div className="prompt-edit">
               <div className="row-title">Prompt</div>
