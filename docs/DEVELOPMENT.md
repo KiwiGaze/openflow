@@ -26,11 +26,20 @@ pnpm dev                     # tauri dev: starts Vite, builds Rust, launches the
 ### Checks (run all before a PR)
 
 ```sh
+pnpm check:all               # everything CI runs, in CI order — the one command you need
+```
+
+Which expands to (run individually when iterating):
+
+```sh
+pnpm -r build                # core dist + desktop web assets (typecheck/lint need core's dist)
+pnpm check:ipc               # Rust ↔ TS IPC contract drift guard (scripts/check-ipc.mjs)
+pnpm check:privacy           # privacy tripwires (scripts/check-privacy.mjs)
 pnpm lint                    # eslint (type-checked, strict)
 pnpm format:check            # prettier
 pnpm typecheck               # tsc across packages
 pnpm -r test                 # vitest: packages/core + apps/desktop
-cd apps/desktop/src-tauri
+cd apps/desktop/src-tauri    # (pnpm check:rust runs these four)
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
@@ -101,12 +110,14 @@ Automated tests cover the logic; these flows need a human:
 packages/core/            TS contract (mirrors Rust serde structs) + pure utils + tests
 apps/desktop/src/         React: main settings app (index.html) + HUD (hud.html)
 apps/desktop/src-tauri/   Rust core — see docs/ARCHITECTURE.md §2 for the module map
-scripts/                  generate-icon.mjs (app + tray icons), release helpers
+scripts/                  check-ipc.mjs + check-privacy.mjs (CI guards), generate-icon.mjs, release.sh
 ```
 
 Keep the IPC contract in sync: any change to a serde struct in
 `src-tauri/src/settings.rs` / `pipeline.rs` / `models.rs` must be mirrored in
 `packages/core/src/types.ts` (field names are camelCase on the wire).
+`pnpm check:ipc` catches name-level drift; the full rules and add-a-command
+checklist live in `docs/engineering/ipc-contract-conventions.md`.
 
 ## Releasing (maintainers)
 
