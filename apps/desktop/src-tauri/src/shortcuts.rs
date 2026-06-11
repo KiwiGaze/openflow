@@ -14,9 +14,9 @@ use crate::pipeline::Job;
 use crate::settings::Settings;
 use crate::state::AppState;
 
-/// (Re-)registers both hotkeys from settings. Returns a user-readable error
-/// when an accelerator cannot be parsed or registered (e.g. taken by another
-/// app), leaving no partial registrations behind.
+/// (Re-)registers all three hotkeys from settings. Returns a user-readable
+/// error when an accelerator cannot be parsed or registered (e.g. taken by
+/// another app), leaving no partial registrations behind.
 pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     let shortcuts = app.global_shortcut();
     shortcuts
@@ -27,8 +27,10 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         .map_err(|e| format!("dictation hotkey “{}”: {e}", settings.dictation_hotkey))?;
     let refine = Shortcut::from_str(&settings.refine_hotkey)
         .map_err(|e| format!("rewrite hotkey “{}”: {e}", settings.refine_hotkey))?;
-    if dictation == refine {
-        return Err("the dictation and rewrite hotkeys must be different".into());
+    let polish = Shortcut::from_str(&settings.polish_hotkey)
+        .map_err(|e| format!("polish hotkey “{}”: {e}", settings.polish_hotkey))?;
+    if dictation == refine || dictation == polish || refine == polish {
+        return Err("the dictation, rewrite, and polish hotkeys must all be different".into());
     }
 
     shortcuts
@@ -44,10 +46,23 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         return Err(format!("rewrite hotkey “{}”: {e}", settings.refine_hotkey));
     }
 
+    // Polish is a tap: only Pressed matters, Released is a no-op.
+    if let Err(e) = shortcuts.on_shortcut(polish, move |app, _shortcut, event| {
+        if event.state() == ShortcutState::Pressed {
+            let pipeline = app.state::<AppState>().pipeline.clone();
+            // Same offload as dispatch(): polish blocks on selection capture.
+            tauri::async_runtime::spawn_blocking(move || pipeline.polish());
+        }
+    }) {
+        let _ = shortcuts.unregister_all();
+        return Err(format!("polish hotkey “{}”: {e}", settings.polish_hotkey));
+    }
+
     log::info!(
-        "hotkeys registered: dictation={} rewrite={}",
+        "hotkeys registered: dictation={} rewrite={} polish={}",
         settings.dictation_hotkey,
-        settings.refine_hotkey
+        settings.refine_hotkey,
+        settings.polish_hotkey
     );
     Ok(())
 }

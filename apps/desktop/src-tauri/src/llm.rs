@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
-use crate::settings::{LlmConfig, LlmProviderKind};
+use crate::profiles::{LlmProfile, LlmProviderKind};
 
 #[derive(Debug, Serialize)]
 struct ChatRequest<'a> {
@@ -103,16 +103,13 @@ impl LlmClient {
     }
 
     /// One chat completion; returns the assistant text.
-    pub async fn chat(&self, cfg: &LlmConfig, system: &str, user: &str) -> AppResult<String> {
-        if cfg.provider == LlmProviderKind::None {
-            return Err(AppError::Llm("no AI provider configured".into()));
-        }
-        if cfg.model.trim().is_empty() {
+    pub async fn chat(&self, profile: &LlmProfile, system: &str, user: &str) -> AppResult<String> {
+        if profile.model.trim().is_empty() {
             return Err(AppError::Llm("no model configured".into()));
         }
 
         let body = ChatRequest {
-            model: &cfg.model,
+            model: &profile.model,
             messages: vec![
                 ChatMessage {
                     role: "system",
@@ -130,18 +127,21 @@ impl LlmClient {
 
         let mut request = self
             .http
-            .post(chat_completions_url(&cfg.base_url))
-            .timeout(std::time::Duration::from_secs(cfg.timeout_secs.max(5)))
+            .post(chat_completions_url(&profile.base_url))
+            .timeout(std::time::Duration::from_secs(profile.timeout_secs.max(5)))
             .json(&body);
-        if !cfg.api_key.trim().is_empty() {
-            request = request.bearer_auth(cfg.api_key.trim());
+        if !profile.api_key.trim().is_empty() {
+            request = request.bearer_auth(profile.api_key.trim());
         }
 
         let response = request.send().await.map_err(|e| {
             if e.is_timeout() {
-                AppError::Llm(format!("provider timed out after {}s", cfg.timeout_secs))
+                AppError::Llm(format!(
+                    "provider timed out after {}s",
+                    profile.timeout_secs
+                ))
             } else if e.is_connect() {
-                AppError::Llm(connect_hint(cfg))
+                AppError::Llm(connect_hint(profile))
             } else {
                 AppError::Llm(format!("request failed: {e}"))
             }
@@ -179,10 +179,10 @@ impl LlmClient {
         Ok(cleaned)
     }
 
-    pub async fn test(&self, cfg: &LlmConfig) -> LlmTestResult {
+    pub async fn test(&self, profile: &LlmProfile) -> LlmTestResult {
         match self
             .chat(
-                cfg,
+                profile,
                 "You are a connectivity check. Reply with exactly: OK",
                 "ping",
             )
@@ -190,7 +190,7 @@ impl LlmClient {
         {
             Ok(_) => LlmTestResult {
                 ok: true,
-                message: format!("Connected — {} responded.", cfg.model),
+                message: format!("Connected — {} responded.", profile.model),
             },
             Err(err) => LlmTestResult {
                 ok: false,
@@ -225,15 +225,17 @@ impl LlmClient {
     }
 }
 
-fn connect_hint(cfg: &LlmConfig) -> String {
-    match cfg.provider {
+fn connect_hint(profile: &LlmProfile) -> String {
+    match profile.provider {
         LlmProviderKind::Ollama => {
             format!(
                 "could not connect to Ollama at {} — is `ollama serve` running?",
-                cfg.base_url
+                profile.base_url
             )
         }
-        _ => format!("could not connect to {}", cfg.base_url),
+        LlmProviderKind::OpenaiCompatible => {
+            format!("could not connect to {}", profile.base_url)
+        }
     }
 }
 

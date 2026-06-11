@@ -13,6 +13,16 @@ describe('hudLabel', () => {
     expect(hudLabel({ status: 'error', job: null, message: 'mic missing' })).toBe('mic missing');
     expect(hudLabel({ status: 'idle', job: null, message: null })).toBe('');
   });
+
+  it('distinguishes the refining flows', () => {
+    expect(hudLabel({ status: 'refining', job: 'dictation', message: null })).toBe('Polishing…');
+    expect(hudLabel({ status: 'refining', job: 'refineSelection', message: null })).toBe(
+      'Rewriting…',
+    );
+    expect(hudLabel({ status: 'refining', job: 'polishSelection', message: null })).toBe(
+      'Polishing selection…',
+    );
+  });
 });
 
 describe('hudVisible', () => {

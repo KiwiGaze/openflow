@@ -11,6 +11,7 @@ mod modes;
 mod output;
 mod permissions;
 mod pipeline;
+mod profiles;
 mod resample;
 mod settings;
 mod shortcuts;
@@ -52,6 +53,10 @@ fn main() {
             let data_dir = app.path().app_data_dir()?;
 
             let settings = Arc::new(settings::SettingsManager::load(&config_dir));
+            let profiles = Arc::new(profiles::ProfileManager::new(data_dir.join("profiles")));
+            // Moves a v1 inline LLM config into a profile file and repairs a
+            // dangling active-profile pointer.
+            profiles::reconcile(&settings, &profiles);
             let models = Arc::new(models::ModelManager::new(data_dir.join("models")));
             let stt = Arc::new(stt::SttEngine::new());
             let llm = Arc::new(llm::LlmClient::new());
@@ -65,10 +70,12 @@ fn main() {
                 Arc::clone(&output),
                 Arc::clone(&settings),
                 Arc::clone(&models),
+                Arc::clone(&profiles),
             );
 
             app.manage(AppState {
                 settings: Arc::clone(&settings),
+                profiles,
                 models,
                 stt,
                 llm,
@@ -115,8 +122,13 @@ fn main() {
             commands::stop_dictation,
             commands::cancel_dictation,
             commands::start_refine_selection,
+            commands::start_polish_selection,
             commands::get_last_result,
             commands::test_llm,
+            commands::list_llm_profiles,
+            commands::save_llm_profile,
+            commands::delete_llm_profile,
+            commands::reveal_llm_profiles,
             commands::list_ollama_models,
             commands::check_permissions,
             commands::request_microphone_permission,
