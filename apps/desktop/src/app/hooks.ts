@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
+  DictionarySuggestion,
   DownloadProgress,
+  Insights,
   LlmProfile,
   ModelInfo,
   PermissionsState,
@@ -146,6 +148,50 @@ export function useLlmProfiles(): LlmProfilesApi {
     remove: async (id) => {
       setProfiles(await ipc.deleteLlmProfile(id));
     },
+  };
+}
+
+/** Session usage aggregates; refetched after each completed dictation. */
+export function useInsights(): Insights | null {
+  const [insights, setInsights] = useState<Insights | null>(null);
+
+  useEffect(() => {
+    void ipc.getInsights().then(setInsights);
+    return subscribe(
+      events.onResult(() => {
+        void ipc.getInsights().then(setInsights);
+      }),
+    );
+  }, []);
+
+  return insights;
+}
+
+export interface DictionarySuggestionsApi {
+  suggestions: DictionarySuggestion[];
+  dismiss: (term: string) => void;
+  refresh: () => void;
+}
+
+/** Session dictionary suggestions; refetched after each completed dictation. */
+export function useDictionarySuggestions(): DictionarySuggestionsApi {
+  const [suggestions, setSuggestions] = useState<DictionarySuggestion[]>([]);
+
+  const refresh = useCallback(() => {
+    void ipc.listDictionarySuggestions().then(setSuggestions);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    return subscribe(events.onResult(refresh));
+  }, [refresh]);
+
+  return {
+    suggestions,
+    dismiss: (term) => {
+      void ipc.dismissDictionarySuggestion(term).then(refresh);
+    },
+    refresh,
   };
 }
 

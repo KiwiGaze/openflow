@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 use crate::modes;
 
-pub const SETTINGS_VERSION: u32 = 2;
+pub const SETTINGS_VERSION: u32 = 3;
 pub const MAX_RECORDING_SECS: u64 = 300;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +60,38 @@ pub struct DictionaryEntry {
     pub to: String,
 }
 
+/// A spoken shorthand that expands into a longer block on insert. Unlike a
+/// dictionary entry (which fixes a misheard word) a snippet is intentional
+/// abbreviation: short trigger → long, possibly multi-line, verbatim text.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Snippet {
+    /// The spoken phrase that triggers expansion, e.g. "my email".
+    pub trigger: String,
+    /// Text inserted in place of the trigger; may span multiple lines.
+    pub expansion: String,
+    /// When true, expand only if the trigger is the whole dictation — for
+    /// triggers that also occur in ordinary prose ("my email").
+    pub whole_utterance: bool,
+}
+
+/// A named, one-tap text operation applied to the current selection — a saved
+/// Rewrite instruction with its own hotkey. Polish is the built-in default of
+/// the same shape; a transform just carries a user-chosen instruction.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Transform {
+    /// Stable identity (a UUID from the UI); the hotkey handler looks the
+    /// instruction up by this so edits take effect without re-binding.
+    pub id: String,
+    pub name: String,
+    /// Instruction sent to the active profile alongside the selection.
+    pub instruction: String,
+    /// Accelerator that applies it to the selection; empty = not yet bound
+    /// (the transform exists but can't fire until the user assigns a key).
+    pub hotkey: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -77,6 +109,8 @@ pub struct Settings {
     pub active_mode_id: String,
     pub modes: Vec<Mode>,
     pub dictionary: Vec<DictionaryEntry>,
+    pub snippets: Vec<Snippet>,
+    pub transforms: Vec<Transform>,
     pub stt_model_id: String,
     pub language: String,
     /// v1 migration only — see `profiles::reconcile`.
@@ -85,6 +119,8 @@ pub struct Settings {
     pub insert_method: InsertMethod,
     pub restore_clipboard: bool,
     pub launch_at_login: bool,
+    /// Keep a Dock icon (Regular activation). Off = menu-bar-only (Accessory).
+    pub show_in_dock: bool,
     pub onboarding_completed: bool,
 }
 
@@ -102,12 +138,15 @@ impl Default for Settings {
             active_mode_id: modes::STANDARD_MODE_ID.into(),
             modes: modes::built_in_modes(),
             dictionary: Vec::new(),
+            snippets: Vec::new(),
+            transforms: Vec::new(),
             stt_model_id: "base.en".into(),
             language: "auto".into(),
             llm: None,
             insert_method: InsertMethod::Paste,
             restore_clipboard: true,
             launch_at_login: false,
+            show_in_dock: false,
             onboarding_completed: false,
         }
     }
@@ -135,6 +174,13 @@ impl Settings {
         }
         self.dictionary
             .retain(|e| !e.from.trim().is_empty() && !e.to.trim().is_empty());
+        self.snippets
+            .retain(|s| !s.trigger.trim().is_empty() && !s.expansion.is_empty());
+        // Transforms are created and removed explicitly in the UI, which saves
+        // on every keystroke — so never drop one because a field is transiently
+        // blank mid-edit (that would lose its instruction and hotkey while the
+        // user renames it). Only drop structurally-invalid rows with no id.
+        self.transforms.retain(|t| !t.id.trim().is_empty());
         self.version = SETTINGS_VERSION;
     }
 }
@@ -296,8 +342,76 @@ mod tests {
         assert!(json.contains("\"refineAfterDictation\":true"));
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"insertMethod\":\"paste\""));
+        assert!(json.contains("\"snippets\":[]"));
+        assert!(json.contains("\"showInDock\":false"));
         // The v1 LLM block is deserialize-only; it must never be written.
         assert!(!json.contains("\"llm\""));
+    }
+
+    #[test]
+    fn normalize_drops_blank_snippets_and_keeps_valid_ones() {
+        let dir = temp_dir("snippets");
+        let manager = SettingsManager::load(&dir);
+        let mut s = manager.get();
+        s.snippets = vec![
+            Snippet {
+                trigger: "my email".into(),
+                expansion: "me@example.com".into(),
+                whole_utterance: true,
+            },
+            Snippet {
+                trigger: "  ".into(),
+                expansion: "dropped — blank trigger".into(),
+                whole_utterance: false,
+            },
+            Snippet {
+                trigger: "empty".into(),
+                expansion: String::new(),
+                whole_utterance: false,
+            },
+        ];
+        let fixed = manager.set(s).unwrap();
+        assert_eq!(fixed.snippets.len(), 1);
+        assert_eq!(fixed.snippets[0].trigger, "my email");
+
+        let reloaded = SettingsManager::load(&dir).get();
+        assert_eq!(reloaded.snippets.len(), 1);
+        assert!(reloaded.snippets[0].whole_utterance);
+    }
+
+    #[test]
+    fn normalize_keeps_transforms_being_edited_drops_only_idless_rows() {
+        let dir = temp_dir("transforms");
+        let manager = SettingsManager::load(&dir);
+        let mut s = manager.get();
+        s.transforms = vec![
+            Transform {
+                id: "a".into(),
+                name: "Concise".into(),
+                instruction: "Tighten the wording.".into(),
+                hotkey: "Alt+1".into(),
+            },
+            // Mid-rename: the name is transiently blank but the instruction and
+            // hotkey must survive (a keystroke must not delete the transform).
+            Transform {
+                id: "b".into(),
+                name: "  ".into(),
+                instruction: "Make it friendlier.".into(),
+                hotkey: "Alt+2".into(),
+            },
+            // Structurally invalid (no id, e.g. a bad hand-edited file) → dropped.
+            Transform {
+                id: " ".into(),
+                name: "Orphan".into(),
+                instruction: "x".into(),
+                hotkey: String::new(),
+            },
+        ];
+        let fixed = manager.set(s).unwrap();
+        assert_eq!(fixed.transforms.len(), 2);
+        let renamed = fixed.transforms.iter().find(|t| t.id == "b").unwrap();
+        assert_eq!(renamed.instruction, "Make it friendlier.");
+        assert_eq!(renamed.hotkey, "Alt+2");
     }
 
     #[test]

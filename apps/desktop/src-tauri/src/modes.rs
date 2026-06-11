@@ -6,6 +6,7 @@ pub const STANDARD_MODE_ID: &str = "standard";
 pub const EMAIL_MODE_ID: &str = "email";
 pub const NOTES_MODE_ID: &str = "notes";
 pub const LITERAL_MODE_ID: &str = "literal";
+pub const CODE_MODE_ID: &str = "code";
 
 const SHARED_RULES: &str = "Rules:\n\
 - Output ONLY the resulting text. No preamble, no quotes, no explanations.\n\
@@ -55,6 +56,13 @@ details: names, dates, numbers, decisions, action items.\n\n{SHARED_RULES}"
         Mode {
             id: LITERAL_MODE_ID.into(),
             name: "Literal".into(),
+            built_in: true,
+            uses_llm: false,
+            prompt: String::new(),
+        },
+        Mode {
+            id: CODE_MODE_ID.into(),
+            name: "Code".into(),
             built_in: true,
             uses_llm: false,
             prompt: String::new(),

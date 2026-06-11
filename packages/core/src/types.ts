@@ -16,7 +16,7 @@ export type PipelineStatus =
   | 'error';
 
 /** What kind of job the pipeline is currently running. */
-export type PipelineJob = 'dictation' | 'refineSelection' | 'polishSelection';
+export type PipelineJob = 'dictation' | 'refineSelection' | 'polishSelection' | 'transform';
 
 export interface PipelineState {
   status: PipelineStatus;
@@ -70,8 +70,51 @@ export interface Mode {
 export interface DictionaryEntry {
   /** What the transcriber tends to produce, e.g. "open flow". */
   from: string;
-  /** The replacement, e.g. "OpenFlow". */
+  /** The replacement, e.g. "OpenFlow". When equal to `from`, the entry is a
+   * pure vocabulary hint (preserve this spelling) rather than a replacement. */
   to: string;
+}
+
+/**
+ * A term OpenFlow noticed you dictate — a distinctive product/proper name —
+ * offered as a one-click dictionary addition. Computed from in-memory,
+ * session-only counts; never persisted or transmitted.
+ */
+export interface DictionarySuggestion {
+  term: string;
+  count: number;
+}
+
+/**
+ * A spoken shorthand that expands into a longer block on insert. Unlike a
+ * dictionary entry (which fixes a misheard word), a snippet is intentional
+ * abbreviation: short trigger → long, possibly multi-line, verbatim text.
+ */
+export interface Snippet {
+  /** The spoken phrase that triggers expansion, e.g. "my email". */
+  trigger: string;
+  /** Text inserted in place of the trigger; may span multiple lines. */
+  expansion: string;
+  /**
+   * When true, expand only if the trigger is the whole dictation — for
+   * triggers that also occur in ordinary prose ("my email").
+   */
+  wholeUtterance: boolean;
+}
+
+/**
+ * A named, one-tap text operation applied to the current selection — a saved
+ * Rewrite instruction with its own hotkey. Polish is the built-in default of
+ * the same shape.
+ */
+export interface Transform {
+  /** Stable identity (a UUID); the hotkey resolves the instruction by this. */
+  id: string;
+  name: string;
+  /** Instruction sent to the active profile alongside the selection. */
+  instruction: string;
+  /** Accelerator that applies it; empty = not yet bound (can't fire). */
+  hotkey: string;
 }
 
 export interface Settings {
@@ -90,6 +133,10 @@ export interface Settings {
   activeModeId: string;
   modes: Mode[];
   dictionary: DictionaryEntry[];
+  /** Spoken shorthands expanded into longer blocks on insert (dictation only). */
+  snippets: Snippet[];
+  /** Named, hotkey-bound text operations applied to a selection. */
+  transforms: Transform[];
   /** Whisper model id from the model registry, e.g. `base.en`. */
   sttModelId: string;
   /** ISO 639-1 code or `auto`. */
@@ -97,6 +144,8 @@ export interface Settings {
   insertMethod: InsertMethod;
   restoreClipboard: boolean;
   launchAtLogin: boolean;
+  /** Keep a Dock icon (vs menu-bar-only). */
+  showInDock: boolean;
   onboardingCompleted: boolean;
 }
 
@@ -136,6 +185,27 @@ export interface TranscriptionResult {
   /** Whether an LLM pass ran (false means rules-based cleanup only). */
   refined: boolean;
   durationMs: number;
+}
+
+export interface ModeCount {
+  modeId: string;
+  count: number;
+}
+
+/**
+ * Session-only usage aggregates for the Insights view. Counts and sums only —
+ * never transcripts or audio — held in memory and reset on quit. Mirrors the
+ * Rust `Insights` in `stats.rs`.
+ */
+export interface Insights {
+  totalWords: number;
+  dictations: number;
+  /** Average speaking pace this session; 0 until some speech is recorded. */
+  wordsPerMinute: number;
+  /** Percent of dictations that went through the LLM (vs rules cleanup). */
+  refinedPercent: number;
+  /** Most-used modes, highest first (up to 3). */
+  topModes: ModeCount[];
 }
 
 export type MicrophonePermission = 'granted' | 'denied' | 'undetermined' | 'unknown';
@@ -181,6 +251,9 @@ export const COMMANDS = {
   startRefineSelection: 'start_refine_selection',
   startPolishSelection: 'start_polish_selection',
   getLastResult: 'get_last_result',
+  getInsights: 'get_insights',
+  listDictionarySuggestions: 'list_dictionary_suggestions',
+  dismissDictionarySuggestion: 'dismiss_dictionary_suggestion',
   copyText: 'copy_text',
   setChangesInteractive: 'set_changes_interactive',
   testLlm: 'test_llm',

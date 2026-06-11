@@ -17,7 +17,9 @@ mod resample;
 mod settings;
 mod shortcuts;
 mod state;
+mod stats;
 mod stt;
+mod suggestions;
 mod text;
 mod tray;
 
@@ -93,6 +95,10 @@ fn main() {
                 log::warn!("hotkey registration failed: {err}");
             }
 
+            // Apply the persistent Dock preference now that settings are loaded
+            // (the default above is Accessory; this upgrades to Regular if set).
+            commands::apply_dock_policy(&handle, settings.get().show_in_dock);
+
             if !settings.get().onboarding_completed {
                 tray::show_settings_window(&handle);
             }
@@ -105,10 +111,10 @@ fn main() {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
-                    #[cfg(target_os = "macos")]
-                    let _ = window
-                        .app_handle()
-                        .set_activation_policy(tauri::ActivationPolicy::Accessory);
+                    // Drop the Dock icon on close — unless the user pinned it.
+                    let app = window.app_handle();
+                    let show_in_dock = app.state::<AppState>().settings.get().show_in_dock;
+                    commands::apply_dock_policy(app, show_in_dock);
                 }
             }
         })
@@ -126,6 +132,9 @@ fn main() {
             commands::start_refine_selection,
             commands::start_polish_selection,
             commands::get_last_result,
+            commands::get_insights,
+            commands::list_dictionary_suggestions,
+            commands::dismiss_dictionary_suggestion,
             commands::copy_text,
             commands::set_changes_interactive,
             commands::test_llm,

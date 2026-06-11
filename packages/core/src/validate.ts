@@ -1,4 +1,4 @@
-import type { DictionaryEntry } from './types.js';
+import type { DictionaryEntry, Snippet } from './types.js';
 
 /** Trim and strip trailing slashes so `http://x:11434/` equals `http://x:11434`. */
 export function normalizeBaseUrl(url: string): string {
@@ -41,5 +41,22 @@ export function validateDictionaryEntry(
   }
   const duplicate = existing.some((e) => e.from.trim().toLowerCase() === from.toLowerCase());
   if (duplicate) return `“${from}” is already in the dictionary.`;
+  return null;
+}
+
+/** Max characters for a snippet expansion — long enough for canned replies. */
+export const MAX_SNIPPET_EXPANSION = 4000;
+
+/** Returns an error message, or null when the snippet is valid. */
+export function validateSnippet(snippet: Snippet, existing: readonly Snippet[]): string | null {
+  const trigger = snippet.trigger.trim();
+  if (trigger.length === 0) return 'The trigger phrase cannot be empty.';
+  if (snippet.expansion.length === 0) return 'The expansion cannot be empty.';
+  if (trigger.length > 100) return 'Triggers are limited to 100 characters.';
+  if (snippet.expansion.length > MAX_SNIPPET_EXPANSION) {
+    return `Expansions are limited to ${String(MAX_SNIPPET_EXPANSION)} characters.`;
+  }
+  const duplicate = existing.some((s) => s.trigger.trim().toLowerCase() === trigger.toLowerCase());
+  if (duplicate) return `“${trigger}” is already a snippet.`;
   return null;
 }

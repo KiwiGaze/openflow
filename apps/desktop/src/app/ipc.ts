@@ -6,7 +6,9 @@ import {
   COMMANDS,
   EVENTS,
   type AppInfo,
+  type DictionarySuggestion,
   type DownloadProgress,
+  type Insights,
   type LlmProfile,
   type LlmTestResult,
   type ModelInfo,
@@ -32,6 +34,11 @@ export const ipc = {
   startRefineSelection: (): Promise<void> => invoke(COMMANDS.startRefineSelection),
   startPolishSelection: (): Promise<void> => invoke(COMMANDS.startPolishSelection),
   getLastResult: (): Promise<TranscriptionResult | null> => invoke(COMMANDS.getLastResult),
+  getInsights: (): Promise<Insights> => invoke(COMMANDS.getInsights),
+  listDictionarySuggestions: (): Promise<DictionarySuggestion[]> =>
+    invoke(COMMANDS.listDictionarySuggestions),
+  dismissDictionarySuggestion: (term: string): Promise<void> =>
+    invoke(COMMANDS.dismissDictionarySuggestion, { term }),
   copyText: (text: string): Promise<void> => invoke(COMMANDS.copyText, { text }),
   setChangesInteractive: (interactive: boolean): Promise<void> =>
     invoke(COMMANDS.setChangesInteractive, { interactive }),

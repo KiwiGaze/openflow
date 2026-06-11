@@ -47,7 +47,7 @@ export function HotkeyRecorder({ value, onChange }: Props): JSX.Element {
       }}
       title="Click, then press the new shortcut. Esc to cancel."
     >
-      {recording ? 'Press shortcut…' : formatAcceleratorMac(value)}
+      {recording ? 'Press shortcut…' : value ? formatAcceleratorMac(value) : 'Set shortcut'}
     </button>
   );
 }
