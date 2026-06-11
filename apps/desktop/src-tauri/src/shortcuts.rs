@@ -29,8 +29,27 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         .map_err(|e| format!("rewrite hotkey “{}”: {e}", settings.refine_hotkey))?;
     let polish = Shortcut::from_str(&settings.polish_hotkey)
         .map_err(|e| format!("polish hotkey “{}”: {e}", settings.polish_hotkey))?;
-    if dictation == refine || dictation == polish || refine == polish {
-        return Err("the dictation, rewrite, and polish hotkeys must all be different".into());
+    // Parse every non-null mode hotkey alongside the globals.
+    let mut mode_hotkeys: Vec<(String, Shortcut)> = Vec::new();
+    for mode in &settings.modes {
+        if let Some(hk) = mode.hotkey.as_deref().filter(|h| !h.is_empty()) {
+            let shortcut = Shortcut::from_str(hk)
+                .map_err(|e| format!("mode “{}” hotkey “{hk}”: {e}", mode.name))?;
+            mode_hotkeys.push((mode.id.clone(), shortcut));
+        }
+    }
+
+    // Every accelerator — the three globals and every mode hotkey — must be
+    // pairwise distinct (07 §4). Compare by reference so the originals survive
+    // for registration below.
+    let mut all: Vec<&Shortcut> = vec![&dictation, &refine, &polish];
+    all.extend(mode_hotkeys.iter().map(|(_, sc)| sc));
+    for i in 0..all.len() {
+        for j in (i + 1)..all.len() {
+            if all[i] == all[j] {
+                return Err("every hotkey, including per-mode hotkeys, must be different".into());
+            }
+        }
     }
 
     shortcuts
@@ -58,11 +77,22 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         return Err(format!("polish hotkey “{}”: {e}", settings.polish_hotkey));
     }
 
+    // Per-mode hotkeys: one-shot dictation in that mode.
+    for (mode_id, shortcut) in mode_hotkeys {
+        if let Err(e) = shortcuts.on_shortcut(shortcut, move |app, _shortcut, event| {
+            dispatch_mode(app, mode_id.clone(), event.state());
+        }) {
+            let _ = shortcuts.unregister_all();
+            return Err(format!("could not register a mode hotkey: {e}"));
+        }
+    }
+
     log::info!(
-        "hotkeys registered: dictation={} rewrite={} polish={}",
+        "hotkeys registered: dictation={} rewrite={} polish={} mode-hotkeys={}",
         settings.dictation_hotkey,
         settings.refine_hotkey,
-        settings.polish_hotkey
+        settings.polish_hotkey,
+        settings.modes.iter().filter(|m| m.hotkey.is_some()).count()
     );
     Ok(())
 }
@@ -105,7 +135,17 @@ fn dispatch(app: &AppHandle, job: Job, state: ShortcutState) {
     // within that window — and sub-threshold taps already treat Released as a
     // no-op.
     tauri::async_runtime::spawn_blocking(move || match state {
-        ShortcutState::Pressed => pipeline.on_hotkey_pressed(job),
+        ShortcutState::Pressed => pipeline.on_hotkey_pressed(job, None),
         ShortcutState::Released => pipeline.on_hotkey_released(job),
+    });
+}
+
+/// A per-mode hotkey: dictates once in `mode_id` without changing the active
+/// mode (one-shot, 07 §4). Same record/finish flow as the plain dictation key.
+fn dispatch_mode(app: &AppHandle, mode_id: String, state: ShortcutState) {
+    let pipeline = app.state::<AppState>().pipeline.clone();
+    tauri::async_runtime::spawn_blocking(move || match state {
+        ShortcutState::Pressed => pipeline.on_hotkey_pressed(Job::Dictation, Some(mode_id)),
+        ShortcutState::Released => pipeline.on_hotkey_released(Job::Dictation),
     });
 }

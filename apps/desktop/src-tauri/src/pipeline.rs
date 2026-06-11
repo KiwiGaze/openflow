@@ -86,6 +86,9 @@ struct Session {
     started: Instant,
     /// Captured before recording starts (refine job only).
     selection: Option<String>,
+    /// Mode id from a per-mode hotkey, used for this job only without changing
+    /// the persistent active mode (one-shot, 07 §4). None = use the active mode.
+    mode_override: Option<String>,
 }
 
 pub struct Pipeline {
@@ -187,7 +190,7 @@ impl Pipeline {
 
     // ---- Hotkey entry points -------------------------------------------
 
-    pub fn on_hotkey_pressed(self: &Arc<Self>, job: Job) {
+    pub fn on_hotkey_pressed(self: &Arc<Self>, job: Job, mode_override: Option<String>) {
         let status = self.state().status;
         match status {
             Status::Recording => {
@@ -204,7 +207,7 @@ impl Pipeline {
                 }
             }
             Status::Idle | Status::Error | Status::Notice => {
-                if let Err(err) = self.start(job) {
+                if let Err(err) = self.start(job, mode_override) {
                     log::warn!("could not start {job:?}: {err}");
                     self.set_transient(Status::Error, err.user_message());
                 }
@@ -241,7 +244,7 @@ impl Pipeline {
 
     // ---- Lifecycle ------------------------------------------------------
 
-    pub fn start(self: &Arc<Self>, job: Job) -> AppResult<()> {
+    pub fn start(self: &Arc<Self>, job: Job, mode_override: Option<String>) -> AppResult<()> {
         {
             let state = self.state();
             if !matches!(state.status, Status::Idle | Status::Error | Status::Notice) {
@@ -281,6 +284,20 @@ impl Pipeline {
             None
         };
 
+        // Name the mode in the listening label so the user sees which mode will
+        // write before speaking (07 §5) — the override mode for a mode hotkey,
+        // else the active mode. Rewrite is an action, not a mode.
+        let recording_label = if job == Job::Dictation {
+            let mode_name = mode_override
+                .as_ref()
+                .and_then(|id| settings.modes.iter().find(|m| &m.id == id))
+                .map(|m| m.name.clone())
+                .unwrap_or_else(|| settings.active_mode().name);
+            Some(truncate_mode_name(&mode_name))
+        } else {
+            None
+        };
+
         self.audio.start()?;
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         *self.session.lock().expect("pipeline state poisoned") = Some(Session {
@@ -288,14 +305,8 @@ impl Pipeline {
             generation,
             started: Instant::now(),
             selection,
+            mode_override,
         });
-        // Name the mode in the listening label so the user sees which mode will
-        // write before speaking (07 §5). Rewrite is an action, not a mode.
-        let recording_label = if job == Job::Dictation {
-            Some(truncate_mode_name(&settings.active_mode().name))
-        } else {
-            None
-        };
         self.set_state(Status::Recording, Some(job), recording_label);
         // Bind Esc so a recording started by mistake has a "never mind".
         shortcuts::set_cancel_key(&self.app, true);
@@ -512,10 +523,16 @@ impl Pipeline {
         let job = session.job;
         let started = session.started;
 
-        // Resolve mode overrides once, up front (dictation only). Rewrite uses
-        // the global speech model + language to hear the spoken instruction.
+        // Resolve mode overrides once, up front (dictation only). A per-mode
+        // hotkey resolves its own mode for this job only; otherwise the active
+        // mode. Rewrite uses the global speech model + language.
         let resolved = if job == Job::Dictation {
-            Some(self.resolve_dictation(&settings, &settings.active_mode()))
+            let mode = session
+                .mode_override
+                .as_ref()
+                .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
+                .unwrap_or_else(|| settings.active_mode());
+            Some(self.resolve_dictation(&settings, &mode))
         } else {
             None
         };

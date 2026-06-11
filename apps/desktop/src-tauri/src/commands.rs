@@ -33,18 +33,47 @@ pub fn save_settings(
     settings: Settings,
 ) -> AppResult<Settings> {
     let previous = state.settings.get();
+
+    // Cap per-mode hotkeys before persisting (07 §4); the optimistic UI reverts
+    // on the error.
+    let mode_hotkey_count = settings
+        .modes
+        .iter()
+        .filter(|m| m.hotkey.as_deref().is_some_and(|h| !h.is_empty()))
+        .count();
+    if mode_hotkey_count > 5 {
+        return Err(AppError::Settings(
+            "At most 5 modes can have their own hotkey. Remove one first.".into(),
+        ));
+    }
+
     let saved = state.settings.set(settings)?;
 
+    let mode_hotkeys = |s: &Settings| -> Vec<(String, String)> {
+        s.modes
+            .iter()
+            .filter_map(|m| m.hotkey.as_deref().map(|h| (m.id.clone(), h.to_string())))
+            .collect()
+    };
     let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
         || previous.refine_hotkey != saved.refine_hotkey
-        || previous.polish_hotkey != saved.polish_hotkey;
+        || previous.polish_hotkey != saved.polish_hotkey
+        || mode_hotkeys(&previous) != mode_hotkeys(&saved);
     if hotkeys_changed {
         if let Err(message) = shortcuts::apply(&app, &saved) {
-            // Roll the hotkeys back to the last working set.
+            // Roll every hotkey — the three globals AND each mode hotkey — back
+            // to the last working set as one atomic unit.
             let mut reverted = saved.clone();
             reverted.dictation_hotkey = previous.dictation_hotkey.clone();
             reverted.refine_hotkey = previous.refine_hotkey.clone();
             reverted.polish_hotkey = previous.polish_hotkey.clone();
+            for mode in &mut reverted.modes {
+                mode.hotkey = previous
+                    .modes
+                    .iter()
+                    .find(|m| m.id == mode.id)
+                    .and_then(|m| m.hotkey.clone());
+            }
             let restored = state.settings.set(reverted)?;
             let _ = shortcuts::apply(&app, &restored);
             let _ = app.emit("settings-changed", &restored);
@@ -115,7 +144,7 @@ pub fn get_pipeline_state(state: State<'_, AppState>) -> PipelineState {
 
 #[tauri::command]
 pub fn start_dictation(state: State<'_, AppState>) -> AppResult<()> {
-    state.pipeline.start(Job::Dictation)
+    state.pipeline.start(Job::Dictation, None)
 }
 
 #[tauri::command]
@@ -134,7 +163,7 @@ pub async fn start_refine_selection(state: State<'_, AppState>) -> AppResult<()>
     // on the output worker (selection capture), which round-trips keystrokes
     // through the main thread — running it inline would deadlock.
     let pipeline = state.pipeline.clone();
-    tauri::async_runtime::spawn_blocking(move || pipeline.start(Job::RefineSelection))
+    tauri::async_runtime::spawn_blocking(move || pipeline.start(Job::RefineSelection, None))
         .await
         .map_err(|e| AppError::State(format!("refine task failed: {e}")))?
 }
