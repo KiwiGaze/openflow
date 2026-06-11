@@ -24,6 +24,8 @@ jobs:
       # Build first: @openflow/desktop imports @openflow/core from its dist,
       # so type-aware lint, typecheck, and tests all need it present.
       - run: pnpm -r build
+      - run: pnpm check:ipc
+      - run: pnpm check:privacy
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck

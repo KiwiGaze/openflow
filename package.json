@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Local-first AI voice input for macOS: hold a key, speak, get clean text in any app.",
   "license": "MIT",
-  "packageManager": "pnpm@10.9.0",
+  "packageManager": "pnpm@10.34.2",
   "engines": {
     "node": ">=22",
     "pnpm": ">=10"
@@ -17,6 +17,11 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "check:ipc": "node scripts/check-ipc.mjs",
+    "check:privacy": "node scripts/check-privacy.mjs",
+    "check": "pnpm -r build && pnpm check:ipc && pnpm check:privacy && pnpm lint && pnpm format:check && pnpm typecheck && pnpm -r test",
+    "check:rust": "pnpm --filter @openflow/desktop build && cd apps/desktop/src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test",
+    "check:all": "pnpm check && pnpm check:rust",
     "tauri": "pnpm --filter @openflow/desktop tauri",
     "dev": "pnpm --filter @openflow/desktop tauri dev"
   },
