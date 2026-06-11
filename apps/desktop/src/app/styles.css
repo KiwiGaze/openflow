@@ -829,6 +829,32 @@ button:focus-visible {
   padding-top: 14px;
 }
 
+.youre-set-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+.tryit-field {
+  margin: var(--space-4) 0;
+}
+
+.diff-panel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.diff-panel > div {
+  flex: 1;
+}
+
+.diff-panel .dict-arrow {
+  flex: 0 0 auto;
+}
+
 /* ---- HUD ---- */
 
 .hud-body {

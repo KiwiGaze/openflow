@@ -215,6 +215,11 @@ export function GeneralTab({
             <option value="dark">Dark</option>
           </select>
         </Row>
+        <Row title="Welcome tour" hint="Replay the first-run setup guide.">
+          <button className="btn" onClick={() => void update({ onboardingCompleted: false })}>
+            Show again
+          </button>
+        </Row>
       </section>
 
       <section className="card">
