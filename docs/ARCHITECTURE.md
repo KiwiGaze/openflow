@@ -153,7 +153,9 @@ community fix (`tauri-nspanel`) is a git-only dependency. Instead, the HUD windo
 once at startup, transparent, ignoring cursor events, on all workspaces — and **never hidden or
 shown again**; the webview content fades in/out on pipeline events. Zero focus churn, zero
 extra dependencies. Tradeoff: a 280×72 invisible window always exists at the bottom of the
-screen (click-through, so inert).
+screen (click-through, so inert). To float over other apps' _native full-screen_ Spaces and not
+just ordinary ones, `hud.rs` adds `NSWindowCollectionBehaviorFullScreenAuxiliary` to the window
+(a flag Tauri/tao expose no setting for), reusing `objc2-app-kit` — already in the tree via tao.
 
 ### Carbon hotkeys over CGEventTap
 

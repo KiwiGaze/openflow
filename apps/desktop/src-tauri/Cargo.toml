@@ -39,6 +39,13 @@ objc2-av-foundation = { version = "0.3", default-features = false, features = [
   "AVCaptureDevice",
   "AVMediaFormat",
 ] }
+# Already in the tree via tao; used to add the HUD's full-screen-overlay
+# collection behavior, which Tauri/tao expose no setting for (see hud.rs).
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "std",
+  "NSResponder",
+  "NSWindow",
+] }
 block2 = "0.6"
 
 [dev-dependencies]

@@ -71,6 +71,8 @@ Automated tests cover the logic; these flows need a human:
 6. Select a sentence in a browser, hold `⌥⇧Space`, say "make this formal" → selection replaced.
 7. Revoke Accessibility → dictate → clipboard-only notice appears.
 8. Settings: change hotkey to a taken combo (e.g. `Cmd+Space`) → clear error, old hotkey kept.
+9. Put another app (Safari, an editor) in macOS full-screen, then hold `⌥Space` → the HUD pill
+   shows over the full-screen app and the text still pastes into that app.
 
 ## Repository layout
 
