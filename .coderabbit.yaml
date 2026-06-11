@@ -9,11 +9,9 @@ language: en-US
 
 # How CodeRabbit should write its comments (mirrors this repo's house style).
 tone_instructions: >-
-  Write plain English with short sentences so ESL readers can follow, and cite
-  file:line. Favor the smallest change that solves the problem. Do not suggest
-  speculative abstractions, configurability, or future-proofing; do not request
-  defensive code for states the types already rule out; do not propose renames
-  that are cosmetic rather than semantic.
+  Use plain, ESL-friendly English; cite file:line. Prefer the smallest fix.
+  Avoid speculative abstractions, configurability, future-proofing, defensive
+  code for impossible states, and cosmetic renames.
 
 reviews:
   # chill: surface only higher-impact issues, fewer nitpicks.
