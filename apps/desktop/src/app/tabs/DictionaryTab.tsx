@@ -30,11 +30,22 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
     });
   };
 
-  // A suggested term is a vocabulary hint: keep this spelling (from === to).
+  // A suggested term is a vocabulary hint: keep this spelling (from === to, so
+  // validateDictionaryEntry — which rejects no-op replacements — does not apply
+  // here). Suggestions already exclude dictionary terms, but the list can lag a
+  // manual add, so guard against creating a duplicate entry.
   const accept = (term: string): void => {
+    const trimmed = term.trim();
+    const exists = settings.dictionary.some(
+      (e) => e.from.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (exists) {
+      refresh();
+      return;
+    }
     void save({
       ...settings,
-      dictionary: [...settings.dictionary, { from: term, to: term }],
+      dictionary: [...settings.dictionary, { from: trimmed, to: trimmed }],
     }).then(refresh);
   };
 

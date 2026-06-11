@@ -20,8 +20,9 @@ export function InsightsTab({ api }: { api: SettingsApi }): JSX.Element {
       <section className="card">
         <h2>Insights</h2>
         <p className="row-hint">
-          Your usage this session — computed and kept only on this Mac. Nothing is saved or
-          uploaded, and quitting resets it. Verify with Little Snitch: zero connections.
+          Your usage this session — tallied in memory on this Mac, never written to disk or
+          uploaded, and reset on quit. (Dictation only touches the network if you opt in: a cloud AI
+          profile, or a model download.)
         </p>
 
         {!insights || insights.dictations === 0 ? (

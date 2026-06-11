@@ -42,7 +42,7 @@ A local-only **Insights** view: words dictated, an average speaking pace (words 
 seconds), the mode you use most, where your dictation lands (which app categories), and a streak.
 All of it derived from counters, all of it on this Mac, none of it uploaded — ever.
 
-```
+```text
 Insights                          Computed and stored only on this Mac · no account, no upload
 
    22,295            72 wpm              ✦ 3-day streak   (longest 44)
@@ -96,8 +96,10 @@ dashboard wearing a privacy hat:
 - **Opt-in, and off by default** for anything written to disk; Tier 1 writes nothing.
 - **Aggregates only.** No text, no audio, no per-event content timestamps — enforced by the
   schema, which has nowhere to put them.
-- **Resettable** in one click, and **verifiable**: the view itself states "zero connections,
-  check with Little Snitch," turning the privacy claim into something the user can test.
+- **Verifiable**: the view states the stats are tallied in memory and never written or uploaded,
+  and is explicit that the network is touched only on an opt-in (a cloud profile or a model
+  download) — so the privacy claim is scoped and testable rather than an over-broad "zero
+  connections."
 - App attribution is **bucketed**, so "where it goes" never becomes "a log of every app you used."
 
 ## Open questions

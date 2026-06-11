@@ -21,7 +21,7 @@ A **snippet** is a `trigger → expansion` pair. When a trigger phrase appears i
 transcript, it is replaced by its expansion just before the text is inserted. Expansions can be
 long and multi-line; triggers are short spoken phrases the user chooses.
 
-```
+```text
 spoken:    "sign off and my email"
 expansion: "sign off"  → "Best,\nYijiazhen"
            "my email"  → "yijiazhen@example.com"
@@ -45,7 +45,7 @@ It is deliberately close to the dictionary in mechanism — whole-phrase, case-i
 A new **Snippets** tab (or a section under Dictionary), one flat row per snippet, matching the
 existing settings idiom — name states what it does, no nested descriptions.
 
-```
+```text
 Snippets                                              [ + New snippet ]
 
   my email        → yijiazhen@example.com
@@ -83,7 +83,7 @@ applied on the **dictation path only**, on the _final_ text — after the LLM or
 the expansion is verbatim and never reworded, and so the selection-edit jobs (Rewrite, Polish)
 that operate on the user's existing text are untouched:
 
-```
+```text
 dictation:  clean → (LLM | rules | literal) → apply_dictionary → apply_snippets → insert
 rewrite/polish:  (no snippet expansion — editing existing text)
 ```

@@ -54,7 +54,7 @@ exporting the state that produced it is not.
 Suggestions should be quiet and dismissible — a tool that nags about its dictionary is worse than
 one that stays silent. Candidate surfaces, lightest to heaviest:
 
-```
+```text
 Dictionary                                                   [ + Add ]
 
   Suggested for you  (seen this session — nothing was saved)

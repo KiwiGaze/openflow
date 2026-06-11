@@ -29,7 +29,7 @@ instruction with a hotkey.** Nothing new in the pipeline — the selection-captu
 insert chain is exactly today's, only the instruction comes from a saved transform instead of
 `DEFAULT_REFINE_INSTRUCTION` or a spoken phrase.
 
-```
+```text
 Modes      = how DICTATION becomes written text        (Standard, Email, Notes, Literal)
 Transforms = how an EXISTING SELECTION is rewritten    (Polish, Concise, Bullets, …)
   Polish   = the default transform (fixed instruction)
@@ -43,7 +43,7 @@ One axis (selection refinement), several saved instructions — not a second swi
 A shelf under **Refine**, next to Polish. A few ship as starting points; "Create your own" is a
 blank prompt plus a hotkey picker.
 
-```
+```text
 Transforms                                            [ + Create your own ]
 
   ⌥⇧P   Polish        Fix grammar, spelling, clarity.        (built-in)
@@ -98,7 +98,7 @@ Not every tone shift needs an LLM round-trip. A **register** is a cheap, offline
 adjustment — capitalization on/off, punctuation density, exclamation level — applied in
 `text.rs` rules cleanup:
 
-```
+```text
 formal       → Caps + full punctuation.     "Hey, are you free tomorrow?"
 casual       → Caps + light punctuation.     "Hey are you free tomorrow"
 very casual  → no caps + light punctuation.  "hey are you free tomorrow"

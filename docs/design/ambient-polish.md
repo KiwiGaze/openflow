@@ -43,7 +43,7 @@ Complements, not replaces, the HUD and the tray's "Copy last dictation."
 
 Small expected toggles for people who like to tune their setup:
 
-```
+```text
   Show app in Dock                         [ off ]   ← menu-bar-only by default
   Keep the recording indicator visible     [ off ]   ← always-on status vs. on-demand
 ```

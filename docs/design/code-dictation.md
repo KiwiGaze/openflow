@@ -31,7 +31,7 @@ Two tiers, deterministic first:
 
 A bounded spoken vocabulary, handled in `text.rs`, fast and predictable:
 
-```
+```text
 "open paren" "close paren"   → ( )
 "dot"  "comma"  "semicolon"  → .  ,  ;
 "new line"                   → \n              (already understood today)
