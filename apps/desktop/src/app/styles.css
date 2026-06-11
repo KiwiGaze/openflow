@@ -218,6 +218,12 @@ button:focus-visible {
   padding: 4px 10px 14px;
 }
 
+.sidebar-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .sidebar-item {
   text-align: left;
   border: none;
