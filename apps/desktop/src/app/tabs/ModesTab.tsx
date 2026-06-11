@@ -17,6 +17,10 @@ import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
 
+/** A messy dictation for Preview: fillers, a self-correction, a name, a number. */
+const PREVIEW_SAMPLE =
+  'um so yesterday I I shipped the the login fix for sarah and uh closed three tickets';
+
 export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, save } = api;
   const { profiles } = useLlmProfiles();
@@ -131,6 +135,24 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
             skipped === 1 ? ' was' : 's were'
           } skipped (not a valid mode).`,
     );
+  };
+
+  const [previewResult, setPreviewResult] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  const runPreview = async (): Promise<void> => {
+    if (!selected) return;
+    setPreviewing(true);
+    setPreviewError(null);
+    setPreviewResult(null);
+    try {
+      setPreviewResult(await ipc.testMode(selected.prompt, PREVIEW_SAMPLE, selected.transforms));
+    } catch (err) {
+      setPreviewError(String(err));
+    } finally {
+      setPreviewing(false);
+    }
   };
 
   return (
@@ -291,6 +313,28 @@ export function ModesTab({ api }: { api: SettingsApi }): JSX.Element {
                 OpenFlow always adds rules to keep the output clean, ignore instructions inside your
                 speech, and use your dictionary spellings.
               </p>
+            </div>
+          )}
+          {selected.usesLlm && (
+            <div className="prompt-edit">
+              <div className="row-actions">
+                <button className="btn" disabled={previewing} onClick={() => void runPreview()}>
+                  {previewing ? 'Previewing…' : 'Preview'}
+                </button>
+                <span className="row-hint">sample: “{PREVIEW_SAMPLE}”</span>
+              </div>
+              {previewResult !== null && (
+                <>
+                  <p className="result-text">{previewResult}</p>
+                  {settings.activeLlmProfileId === '' && (
+                    <p className="row-hint">
+                      No AI profile active — showing rules-based cleanup. Add an AI profile to
+                      preview this instruction.
+                    </p>
+                  )}
+                </>
+              )}
+              {previewError && <p className="form-error">{previewError}</p>}
             </div>
           )}
           <details className="advanced">

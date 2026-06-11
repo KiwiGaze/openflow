@@ -11,7 +11,7 @@ use crate::pipeline::{Job, PipelineState, TranscriptionResult};
 use crate::profiles::LlmProfile;
 use crate::settings::Settings;
 use crate::state::AppState;
-use crate::{shortcuts, tray};
+use crate::{modes, shortcuts, text, tray};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -195,6 +195,25 @@ pub async fn test_llm(
 #[tauri::command]
 pub fn list_llm_profiles(state: State<'_, AppState>) -> Vec<LlmProfile> {
     state.profiles.list()
+}
+
+/// Mode editor Preview (06 §6): builds the full system prompt exactly as the
+/// pipeline would, then refines a sample through the active profile — or runs
+/// the same rules-based cleanup the pipeline uses when there is no profile, so
+/// the preview is the genuine path, never a mock.
+#[tauri::command]
+pub async fn test_mode(
+    state: State<'_, AppState>,
+    prompt: String,
+    sample: String,
+    transforms: bool,
+) -> Result<String, AppError> {
+    let settings = state.settings.get();
+    let system = modes::preview_system_prompt(&prompt, transforms, &settings.dictionary);
+    match state.profiles.active(&settings.active_llm_profile_id) {
+        Some(profile) => state.llm.chat(&profile, &system, &sample).await,
+        None => Ok(text::apply_rules_cleanup(&sample)),
+    }
 }
 
 #[tauri::command]

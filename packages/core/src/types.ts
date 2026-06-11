@@ -208,6 +208,7 @@ export const COMMANDS = {
   startPolishSelection: 'start_polish_selection',
   getLastResult: 'get_last_result',
   testLlm: 'test_llm',
+  testMode: 'test_mode',
   listLlmProfiles: 'list_llm_profiles',
   saveLlmProfile: 'save_llm_profile',
   deleteLlmProfile: 'delete_llm_profile',

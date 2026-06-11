@@ -91,20 +91,31 @@ details: names, dates, numbers, decisions, action items."
 /// rules (always), the soft default-behavior line (unless the mode
 /// `transforms`), and the user's vocabulary so the LLM keeps custom spellings.
 pub fn dictation_system_prompt(mode: &Mode, dictionary: &[DictionaryEntry]) -> String {
-    let mut prompt = mode.prompt.clone();
-    prompt.push_str("\n\n");
-    prompt.push_str(SAFETY_RULES);
-    if !mode.transforms {
-        prompt.push_str(DEFAULT_BEHAVIOR);
+    preview_system_prompt(&mode.prompt, mode.transforms, dictionary)
+}
+
+/// The same construction as `dictation_system_prompt` but from a draft prompt +
+/// transforms flag — used by the mode editor's Preview (06 §6) so the preview
+/// matches exactly what the pipeline would send.
+pub fn preview_system_prompt(
+    prompt: &str,
+    transforms: bool,
+    dictionary: &[DictionaryEntry],
+) -> String {
+    let mut out = prompt.to_string();
+    out.push_str("\n\n");
+    out.push_str(SAFETY_RULES);
+    if !transforms {
+        out.push_str(DEFAULT_BEHAVIOR);
     }
     if !dictionary.is_empty() {
         let vocabulary: Vec<&str> = dictionary.iter().map(|e| e.to.as_str()).collect();
-        prompt.push_str(&format!(
+        out.push_str(&format!(
             "\n\nVocabulary — keep these exact spellings: {}.",
             vocabulary.join(", ")
         ));
     }
-    prompt
+    out
 }
 
 pub const DEFAULT_REFINE_INSTRUCTION: &str =

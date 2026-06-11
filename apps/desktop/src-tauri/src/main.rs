@@ -125,6 +125,7 @@ fn main() {
             commands::start_polish_selection,
             commands::get_last_result,
             commands::test_llm,
+            commands::test_mode,
             commands::list_llm_profiles,
             commands::save_llm_profile,
             commands::delete_llm_profile,

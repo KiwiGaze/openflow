@@ -33,6 +33,8 @@ export const ipc = {
   startPolishSelection: (): Promise<void> => invoke(COMMANDS.startPolishSelection),
   getLastResult: (): Promise<TranscriptionResult | null> => invoke(COMMANDS.getLastResult),
   testLlm: (profile: LlmProfile): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { profile }),
+  testMode: (prompt: string, sample: string, transforms: boolean): Promise<string> =>
+    invoke(COMMANDS.testMode, { prompt, sample, transforms }),
   listLlmProfiles: (): Promise<LlmProfile[]> => invoke(COMMANDS.listLlmProfiles),
   saveLlmProfile: (profile: LlmProfile): Promise<LlmProfile[]> =>
     invoke(COMMANDS.saveLlmProfile, { profile }),
