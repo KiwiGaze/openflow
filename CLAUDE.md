@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-OpenFlow is a local-first macOS dictation app (Tauri 2 + Rust + whisper.cpp + React). Hold `⌥Space` → record → on-device whisper STT → rules/LLM cleanup → paste into the active app. A second hotkey (`⌥⇧Space`) rewrites selected text from a spoken instruction; a third (`⌥⇧P`, tap) polishes the selection with a built-in fix-grammar instruction — no recording. Privacy is the product: audio never leaves the machine, there is no telemetry code, and PRs that add telemetry, default-on network calls, or audio persistence will not be merged. Cloud anything must be opt-in and BYO-key.
+OpenFlow is a local-first macOS dictation app (Tauri 2 + Rust + whisper.cpp + React). Hold `⌥Space` → record → on-device whisper STT → rules/LLM cleanup → paste into the active app. A second hotkey (`⌥⇧Space`) rewrites selected text from a spoken instruction; a third (`⌥⇧P`, tap) polishes the selection with a built-in fix-grammar instruction — no recording. Privacy is the product: **by default** OpenFlow transcribes entirely on your Mac and your audio never leaves the device. There is no telemetry code, and PRs that add telemetry, default-on network calls, or audio persistence will not be merged. Cloud anything is opt-in and BYO-key — cloud speech engines (off unless you add one) upload your audio to that provider, and OpenFlow tells you clearly (a consent gate) before it ever does.
 
 ## Commands
 

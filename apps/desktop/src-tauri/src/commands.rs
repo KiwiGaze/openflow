@@ -11,6 +11,7 @@ use crate::pipeline::{Job, PipelineState, TranscriptionResult};
 use crate::profiles::LlmProfile;
 use crate::settings::Settings;
 use crate::state::AppState;
+use crate::stt_profiles::SttProfile;
 use crate::{modes, shortcuts, text, tray};
 
 #[derive(Serialize)]
@@ -297,6 +298,47 @@ pub fn delete_llm_profile(
         let _ = app.emit("settings-changed", &saved);
     }
     Ok(list)
+}
+
+#[tauri::command]
+pub fn list_stt_profiles(state: State<'_, AppState>) -> Vec<SttProfile> {
+    state.stt_profiles.list()
+}
+
+#[tauri::command]
+pub fn save_stt_profile(
+    state: State<'_, AppState>,
+    profile: SttProfile,
+) -> AppResult<Vec<SttProfile>> {
+    state.stt_profiles.save(profile)
+}
+
+#[tauri::command]
+pub fn delete_stt_profile(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<Vec<SttProfile>> {
+    let list = state.stt_profiles.delete(&id)?;
+    // If the deleted profile was the active speech engine, fall back to the
+    // on-device default so dictation keeps working.
+    let settings = state.settings.get();
+    if settings.stt_model_id == format!("cloud:{id}") {
+        let mut next = settings;
+        next.stt_model_id = "base.en".into();
+        let saved = state.settings.set(next)?;
+        let _ = app.emit("settings-changed", &saved);
+    }
+    Ok(list)
+}
+
+#[tauri::command]
+pub fn reveal_stt_profiles(app: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    let dir = state.stt_profiles.dir();
+    std::fs::create_dir_all(dir)?;
+    tauri_plugin_opener::OpenerExt::opener(&app)
+        .open_path(dir.display().to_string(), None::<&str>)
+        .map_err(|e| AppError::Settings(format!("could not open the STT profiles folder: {e}")))
 }
 
 #[tauri::command]

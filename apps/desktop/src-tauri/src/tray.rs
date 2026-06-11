@@ -48,6 +48,26 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         )?;
         menu.append(&item)?;
     }
+    // Always-visible speech locality (08 §3.3): on-device by default, or the
+    // active cloud engine with a warning glyph. Disabled — a status, not a control.
+    let speech_label = match settings.stt_model_id.strip_prefix("cloud:") {
+        Some(pid) => {
+            let name = state
+                .stt_profiles
+                .get(pid)
+                .map(|p| p.name)
+                .unwrap_or_else(|| "cloud".into());
+            format!("Speech: cloud — {name} ⚠")
+        }
+        None => "Speech: on-device".to_string(),
+    };
+    menu.append(&MenuItem::with_id(
+        app,
+        "speech-status",
+        &speech_label,
+        false,
+        None::<&str>,
+    )?)?;
     menu.append(&PredefinedMenuItem::separator(app)?)?;
     menu.append(&CheckMenuItem::with_id(
         app,

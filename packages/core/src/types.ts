@@ -63,6 +63,26 @@ export interface LlmProfile {
   presetId: string;
 }
 
+/** Which STT client transcribes. Only `openaiAudio` ships now (08 §2). */
+export type SttEngineKind = 'openaiAudio';
+
+/**
+ * One cloud/remote STT connection, stored as `<app-data>/stt-profiles/<id>.json`.
+ * The on-device whisper default needs no profile.
+ */
+export interface SttProfile {
+  version: number;
+  id: string;
+  name: string;
+  engine: SttEngineKind;
+  /** Display/prefill only; never changes request behavior. */
+  presetId: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  timeoutSecs: number;
+}
+
 export interface Mode {
   id: string;
   name: string;
@@ -138,6 +158,8 @@ export interface Settings {
   historyEnabled: boolean;
   /** Per-app rules: dictate in a chosen mode when an app is frontmost. */
   appRules: AppRule[];
+  /** STT profile ids whose 'audio leaves the Mac' consent the user confirmed. */
+  confirmedSttProfiles: string[];
   /** Master switch for one-time feature tips. */
   tipsEnabled: boolean;
   /** Tip ids already shown; never re-shown. */
@@ -244,6 +266,10 @@ export const COMMANDS = {
   saveLlmProfile: 'save_llm_profile',
   deleteLlmProfile: 'delete_llm_profile',
   revealLlmProfiles: 'reveal_llm_profiles',
+  listSttProfiles: 'list_stt_profiles',
+  saveSttProfile: 'save_stt_profile',
+  deleteSttProfile: 'delete_stt_profile',
+  revealSttProfiles: 'reveal_stt_profiles',
   exportMode: 'export_mode',
   exportDictionary: 'export_dictionary',
   listOllamaModels: 'list_ollama_models',

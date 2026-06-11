@@ -37,16 +37,18 @@
 
 ## Why OpenFlow
 
-|                  | Cloud dictation apps | OpenFlow                              |
-| ---------------- | -------------------- | ------------------------------------- |
-| Where audio goes | Their servers        | **Never leaves your Mac**             |
-| Price            | $8–15/month          | **Free, MIT-licensed**                |
-| Word limits      | Capped free tiers    | **Unlimited**                         |
-| Auditability     | Trust the policy     | **Read the source, firewall the app** |
+|                  | Cloud dictation apps | OpenFlow                                         |
+| ---------------- | -------------------- | ------------------------------------------------ |
+| Where audio goes | Their servers        | **On your Mac by default** (cloud STT is opt-in) |
+| Price            | $8–15/month          | **Free, MIT-licensed**                           |
+| Word limits      | Capped free tiers    | **Unlimited**                                    |
+| Auditability     | Trust the policy     | **Read the source, firewall the app**            |
 
-Privacy here is architectural, not contractual: transcription is in-process whisper.cpp, audio
-lives only in memory, and there is no telemetry code at all. After downloading a model you can
-block the app's network access entirely — dictation keeps working.
+Privacy here is architectural, not contractual: by default transcription is in-process
+whisper.cpp, audio lives only in memory, and there is no telemetry code at all. After downloading
+a model you can block the app's network access entirely — dictation keeps working. Cloud speech
+engines are off unless you add one yourself (bring your own key); turning one on uploads your
+audio to that provider, and OpenFlow shows a consent dialog before it ever does.
 
 ## Install
 
@@ -104,8 +106,9 @@ The monorepo: `packages/core` (shared TS contract + utils), `apps/desktop` (Reac
 
 ## Privacy
 
-See [PRIVACY.md](PRIVACY.md) for the complete data-flow statement, including exactly which two
-network destinations exist (model downloads; your optional LLM endpoint) and what each receives.
+See [PRIVACY.md](PRIVACY.md) for the complete data-flow statement, including exactly which
+network destinations exist (model downloads; your optional LLM endpoint; and, only if you add
+one, an opt-in cloud speech engine) and what each receives.
 
 ## License
 

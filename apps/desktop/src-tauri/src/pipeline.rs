@@ -14,6 +14,7 @@ use tauri::{AppHandle, Emitter};
 
 use crate::apps;
 use crate::audio::AudioSystem;
+use crate::cloud_stt;
 use crate::error::{AppError, AppResult};
 use crate::history::HistoryStore;
 use crate::hud;
@@ -25,6 +26,7 @@ use crate::profiles::{LlmProfile, ProfileManager};
 use crate::settings::{HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS};
 use crate::shortcuts;
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
+use crate::stt_profiles::SttProfileManager;
 use crate::text;
 
 pub const PIPELINE_STATE_EVENT: &str = "pipeline-state";
@@ -103,6 +105,7 @@ pub struct Pipeline {
     models: Arc<ModelManager>,
     profiles: Arc<ProfileManager>,
     history: Arc<HistoryStore>,
+    stt_profiles: Arc<SttProfileManager>,
     state: Mutex<PipelineState>,
     state_seq: AtomicU64,
     session: Mutex<Option<Session>>,
@@ -125,6 +128,7 @@ impl Pipeline {
         models: Arc<ModelManager>,
         profiles: Arc<ProfileManager>,
         history: Arc<HistoryStore>,
+        stt_profiles: Arc<SttProfileManager>,
     ) -> Arc<Self> {
         Arc::new(Self {
             app,
@@ -136,6 +140,7 @@ impl Pipeline {
             models,
             profiles,
             history,
+            stt_profiles,
             state: Mutex::new(PipelineState {
                 status: Status::Idle,
                 job: None,
@@ -292,7 +297,10 @@ impl Pipeline {
             None => None,
         };
 
-        if !self.models.is_installed(&settings.stt_model_id) {
+        // A cloud engine needs no local model; only gate the on-device default.
+        if !settings.stt_model_id.starts_with("cloud:")
+            && !self.models.is_installed(&settings.stt_model_id)
+        {
             return Err(AppError::Model(
                 "No speech model yet — open Settings to download one.".into(),
             ));
@@ -524,7 +532,7 @@ impl Pipeline {
         };
 
         let stt_model_id = match &mode.stt_model_id {
-            Some(id) if self.models.is_installed(id) => id.clone(),
+            Some(id) if self.stt_model_valid(settings, id) => id.clone(),
             Some(_) => {
                 notice.get_or_insert(format!(
                     "{name}: its speech model isn’t available — used your default model instead."
@@ -554,6 +562,57 @@ impl Pipeline {
         }
     }
 
+    /// Whether a resolved STT model id is usable: a `cloud:<profileId>` id needs
+    /// the profile present AND its consent confirmed (08 §3); a bare id needs the
+    /// whisper model installed.
+    fn stt_model_valid(&self, settings: &Settings, id: &str) -> bool {
+        match id.strip_prefix("cloud:") {
+            Some(pid) => {
+                self.stt_profiles.get(pid).is_some()
+                    && settings.confirmed_stt_profiles.iter().any(|c| c == pid)
+            }
+            None => self.models.is_installed(id),
+        }
+    }
+
+    /// An installed local whisper model to fall back to (08 §4.3) — the global
+    /// if it is local and installed, else any installed model.
+    fn installed_local_model(&self, settings: &Settings) -> Option<String> {
+        if !settings.stt_model_id.starts_with("cloud:")
+            && self.models.is_installed(&settings.stt_model_id)
+        {
+            return Some(settings.stt_model_id.clone());
+        }
+        self.models
+            .list()
+            .into_iter()
+            .find(|m| m.installed)
+            .map(|m| m.id.to_string())
+    }
+
+    /// Today's local transcription: whisper inference inside spawn_blocking.
+    async fn local_transcribe(
+        self: &Arc<Self>,
+        model_id: String,
+        samples: Vec<f32>,
+        language: String,
+        prompt: Option<String>,
+    ) -> AppResult<String> {
+        let model_path = self.models.path_for(&model_id)?;
+        let stt = Arc::clone(&self.stt);
+        tauri::async_runtime::spawn_blocking(move || {
+            stt.transcribe(
+                &model_id,
+                &model_path,
+                &samples,
+                &language,
+                prompt.as_deref(),
+            )
+        })
+        .await
+        .map_err(|e| AppError::Stt(format!("transcription join failed: {e}")))?
+    }
+
     async fn process(self: &Arc<Self>, session: Session) -> AppResult<ProcessOutcome> {
         let settings = self.settings.get();
         let job = session.job;
@@ -579,13 +638,10 @@ impl Pipeline {
             .await
             .map_err(|e| AppError::State(format!("audio join failed: {e}")))??;
 
-        // Transcribe on a blocking thread; whisper inference is CPU/GPU heavy.
-        let stt = Arc::clone(&self.stt);
         let model_id = match &resolved {
             Some(r) => r.stt_model_id.clone(),
             None => settings.stt_model_id.clone(),
         };
-        let model_path = self.models.path_for(&model_id)?;
         let language = match &resolved {
             Some(r) => r.language.clone(),
             None => settings.language.clone(),
@@ -597,17 +653,49 @@ impl Pipeline {
             recorded.samples.len()
         );
         let samples = recorded.samples;
-        let raw = tauri::async_runtime::spawn_blocking(move || {
-            stt.transcribe(
-                &model_id,
-                &model_path,
-                &samples,
-                &language,
-                prompt.as_deref(),
-            )
-        })
-        .await
-        .map_err(|e| AppError::Stt(format!("transcription join failed: {e}")))??;
+
+        let raw = match model_id.strip_prefix("cloud:") {
+            // Cloud STT uploads audio off the Mac. Gate: the profile must exist
+            // AND its consent be confirmed, or nothing is uploaded (08 §3).
+            Some(pid) => {
+                let confirmed = settings.confirmed_stt_profiles.iter().any(|c| c == pid);
+                match (self.stt_profiles.get(pid), confirmed) {
+                    (Some(profile), true) => {
+                        match cloud_stt::transcribe(&profile, &samples, &language, prompt.as_deref())
+                            .await
+                        {
+                            Ok(text) => text,
+                            // Failure policy (08 §4.3): fall back only toward LESS
+                            // data leaving — on-device whisper if installed, never
+                            // escalating. Output is never silently dropped.
+                            Err(err) => match self.installed_local_model(&settings) {
+                                Some(local_id) => {
+                                    log::warn!("cloud STT failed, used on-device instead: {err}");
+                                    self.local_transcribe(local_id, samples, language, prompt)
+                                        .await?
+                                }
+                                None => {
+                                    return Err(AppError::Stt(format!(
+                                        "Cloud transcription failed ({err}). Switch to the on-device model in Settings."
+                                    )))
+                                }
+                            },
+                        }
+                    }
+                    _ => {
+                        return Ok(ProcessOutcome::Notice(
+                            "Cloud transcription isn't set up — choose a speech engine in Settings → Models."
+                                .into(),
+                        ))
+                    }
+                }
+            }
+            // Local whisper.cpp — exactly today's path.
+            None => {
+                self.local_transcribe(model_id, samples, language, prompt)
+                    .await?
+            }
+        };
 
         let cleaned = text::clean_transcript(&raw);
         if cleaned.is_empty() {

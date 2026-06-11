@@ -34,6 +34,7 @@ const base: Settings = {
   appearance: 'system',
   historyEnabled: false,
   appRules: [],
+  confirmedSttProfiles: [],
   tipsEnabled: true,
   tipsSeen: [],
   dictationCount: 0,

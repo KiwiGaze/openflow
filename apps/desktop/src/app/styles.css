@@ -436,6 +436,14 @@ button:focus-visible {
   font-size: var(--text-hint); /* 12px so the green clears AA body (§4.5) */
 }
 
+/* A louder badge than `cloud` — audio is categorically more sensitive (08 §3.1). */
+.badge-audio {
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--text-hint);
+  font-weight: var(--weight-medium);
+}
+
 .badge-muted {
   opacity: 0.7;
 }

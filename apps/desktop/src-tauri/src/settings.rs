@@ -135,6 +135,10 @@ pub struct Settings {
     pub history_enabled: bool,
     /// Per-app rules: dictate in a chosen mode when an app is frontmost (07 §9).
     pub app_rules: Vec<AppRule>,
+    /// STT profile ids whose "audio leaves the Mac" consent the user confirmed
+    /// (08 §3.2). A profile id only reaches the cloud path once it is in here;
+    /// a new endpoint/key (new id) re-confirms.
+    pub confirmed_stt_profiles: Vec<String>,
     pub onboarding_completed: bool,
 }
 
@@ -164,6 +168,7 @@ impl Default for Settings {
             last_tip_shown_at: String::new(),
             history_enabled: false,
             app_rules: Vec::new(),
+            confirmed_stt_profiles: Vec::new(),
             onboarding_completed: false,
         }
     }

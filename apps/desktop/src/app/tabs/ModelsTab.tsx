@@ -15,6 +15,7 @@ import { useLlmProfiles } from '../hooks.js';
 import { ipc } from '../ipc.js';
 import { Callout } from '../components/Callout.js';
 import { Row } from '../components/Row.js';
+import { SttEngines } from '../components/SttEngines.js';
 
 export function ModelsTab({
   api,
@@ -227,6 +228,8 @@ export function ModelsTab({
           })}
         </div>
       </section>
+
+      <SttEngines api={api} />
 
       <section className="card">
         <h2>AI profiles</h2>

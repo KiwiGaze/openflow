@@ -15,6 +15,7 @@ import {
   type PermissionsState,
   type PipelineState,
   type Settings,
+  type SttProfile,
   type TranscriptionResult,
 } from '@openflow/core';
 
@@ -48,6 +49,12 @@ export const ipc = {
   deleteLlmProfile: (id: string): Promise<LlmProfile[]> =>
     invoke(COMMANDS.deleteLlmProfile, { id }),
   revealLlmProfiles: (): Promise<void> => invoke(COMMANDS.revealLlmProfiles),
+  listSttProfiles: (): Promise<SttProfile[]> => invoke(COMMANDS.listSttProfiles),
+  saveSttProfile: (profile: SttProfile): Promise<SttProfile[]> =>
+    invoke(COMMANDS.saveSttProfile, { profile }),
+  deleteSttProfile: (id: string): Promise<SttProfile[]> =>
+    invoke(COMMANDS.deleteSttProfile, { id }),
+  revealSttProfiles: (): Promise<void> => invoke(COMMANDS.revealSttProfiles),
   exportMode: (filename: string, contents: string): Promise<void> =>
     invoke(COMMANDS.exportMode, { filename, contents }),
   exportDictionary: (contents: string): Promise<void> =>

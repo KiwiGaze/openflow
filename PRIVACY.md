@@ -7,15 +7,19 @@ This document states exactly what data exists, where it goes, and how to verify 
 
 - Audio is captured **only while the hotkey is held** (or hands-free mode is latched), kept in
   memory, and discarded immediately after transcription.
-- Audio is **never written to disk** and **never transmitted**. There is no code path that does
-  either.
-- Transcription runs entirely on your Mac via whisper.cpp.
+- Audio is **never written to disk** — there is no code path that does that.
+- **By default** audio is **never transmitted**: transcription runs entirely on your Mac via
+  whisper.cpp. The only way audio leaves the device is if you add a **cloud speech engine**
+  yourself (Settings → Models, bring your own key). Turning one on uploads each recording to that
+  provider for transcription, and OpenFlow shows a consent dialog naming what is sent before it
+  ever does. The on-device engine stays the default; OpenFlow stores nothing.
 
 ## Your text
 
-- Transcripts are processed in memory and inserted into the app you're using. OpenFlow does not
-  keep a history; only the most recent result is held in memory (for "Copy Last Result") until
-  the app quits.
+- Transcripts are processed in memory and inserted into the app you're using. **By default**
+  OpenFlow keeps no history; only the most recent result is held in memory (for "Copy last
+  dictation") until the app quits. You can opt into a local dictation **history** (General → Save
+  history, default off) — text only, stored only on this Mac, capped and clearable anytime.
 - If — and only if — you configure an AI provider, the **text** of a transcript (plus your mode
   prompt, dictionary words, and, for rewrites, the selected text) is sent to that provider:
   - **Ollama / llama.cpp / LM Studio:** stays on your machine (localhost) unless you point the
@@ -28,6 +32,8 @@ This document states exactly what data exists, where it goes, and how to verify 
 
 1. `huggingface.co` — downloading the speech model you pick, when you pick it.
 2. Your configured AI provider's base URL — only when a mode uses AI or you run a rewrite/test.
+3. A cloud speech engine's base URL — only if you added one and selected it; this uploads your
+   **audio** (the one exception to "audio never leaves"), after the consent dialog.
 
 There is no telemetry, no crash reporting, no update pinging, no analytics SDK. You can verify
 with Little Snitch/LuLu, or block the app's network entirely after the model download —

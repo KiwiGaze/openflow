@@ -3,6 +3,7 @@
 
 mod apps;
 mod audio;
+mod cloud_stt;
 mod commands;
 mod error;
 mod history;
@@ -19,6 +20,7 @@ mod settings;
 mod shortcuts;
 mod state;
 mod stt;
+mod stt_profiles;
 mod text;
 mod tray;
 
@@ -61,6 +63,9 @@ fn main() {
             profiles::reconcile(&settings, &profiles);
             let models = Arc::new(models::ModelManager::new(data_dir.join("models")));
             let history = Arc::new(history::HistoryStore::load(&data_dir));
+            let stt_profiles = Arc::new(stt_profiles::SttProfileManager::new(
+                data_dir.join("stt-profiles"),
+            ));
             let stt = Arc::new(stt::SttEngine::new());
             let llm = Arc::new(llm::LlmClient::new());
             let audio = Arc::new(audio::AudioSystem::spawn());
@@ -75,6 +80,7 @@ fn main() {
                 Arc::clone(&models),
                 Arc::clone(&profiles),
                 Arc::clone(&history),
+                Arc::clone(&stt_profiles),
             );
 
             app.manage(AppState {
@@ -86,6 +92,7 @@ fn main() {
                 output,
                 pipeline,
                 history,
+                stt_profiles,
             });
 
             hud::init(&handle)?;
@@ -139,6 +146,10 @@ fn main() {
             commands::save_llm_profile,
             commands::delete_llm_profile,
             commands::reveal_llm_profiles,
+            commands::list_stt_profiles,
+            commands::save_stt_profile,
+            commands::delete_stt_profile,
+            commands::reveal_stt_profiles,
             commands::export_mode,
             commands::export_dictionary,
             commands::list_ollama_models,

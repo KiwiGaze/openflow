@@ -11,6 +11,7 @@ use crate::pipeline::Pipeline;
 use crate::profiles::ProfileManager;
 use crate::settings::SettingsManager;
 use crate::stt::SttEngine;
+use crate::stt_profiles::SttProfileManager;
 
 /// The audio system is owned by the pipeline; everything commands or tray
 /// handlers need lives here.
@@ -23,4 +24,5 @@ pub struct AppState {
     pub output: Arc<OutputSystem>,
     pub pipeline: Arc<Pipeline>,
     pub history: Arc<HistoryStore>,
+    pub stt_profiles: Arc<SttProfileManager>,
 }
