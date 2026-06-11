@@ -291,6 +291,10 @@ button:focus-visible {
   font-size: 12px;
 }
 
+.row-hint-warn {
+  color: var(--warn);
+}
+
 .row-control {
   flex-shrink: 0;
 }

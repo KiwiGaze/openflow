@@ -93,6 +93,7 @@ export function GeneralTab({
           {models.map((model) => {
             const p = progress[model.id];
             const downloading = (model.downloading || (p && !p.done)) ?? false;
+            const failed = (p?.done && p.error) ?? false;
             const active = settings.sttModelId === model.id;
             return (
               <div key={model.id} className={`model-row ${active ? 'model-active' : ''}`}>
@@ -112,6 +113,11 @@ export function GeneralTab({
                     <div className="row-hint">
                       {formatBytes(model.sizeBytes)} — {model.description}
                     </div>
+                    {failed && (
+                      <div className="row-hint row-hint-warn">
+                        Download failed — check your connection.
+                      </div>
+                    )}
                   </div>
                 </label>
                 <div className="model-actions">
@@ -143,7 +149,7 @@ export function GeneralTab({
                         download(model.id);
                       }}
                     >
-                      Download
+                      {failed ? 'Retry' : 'Download'}
                     </button>
                   )}
                 </div>

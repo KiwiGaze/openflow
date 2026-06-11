@@ -132,6 +132,7 @@ export function Onboarding({
             {starterModels.map((model) => {
               const p = progress[model.id];
               const downloading = (model.downloading || (p && !p.done)) ?? false;
+              const failed = (p?.done && p.error) ?? false;
               return (
                 <label key={model.id} className="model-row">
                   <input
@@ -146,6 +147,11 @@ export function Onboarding({
                       <div className="row-hint">
                         {formatBytes(model.sizeBytes)} — {model.description}
                       </div>
+                      {failed && (
+                        <div className="row-hint row-hint-warn">
+                          Download failed — check your connection.
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="model-actions">
@@ -163,7 +169,7 @@ export function Onboarding({
                           download(model.id);
                         }}
                       >
-                        Download
+                        {failed ? 'Retry' : 'Download'}
                       </button>
                     )}
                   </div>
