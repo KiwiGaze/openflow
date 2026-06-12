@@ -34,7 +34,6 @@ export const ipc = {
   startDictation: (): Promise<void> => invoke(COMMANDS.startDictation),
   stopDictation: (): Promise<void> => invoke(COMMANDS.stopDictation),
   cancelDictation: (): Promise<void> => invoke(COMMANDS.cancelDictation),
-  startRefineSelection: (): Promise<void> => invoke(COMMANDS.startRefineSelection),
   startPolishSelection: (): Promise<void> => invoke(COMMANDS.startPolishSelection),
   getLastResult: (): Promise<TranscriptionResult | null> => invoke(COMMANDS.getLastResult),
   getLastDictationApp: (): Promise<FrontmostApp | null> => invoke(COMMANDS.getLastDictationApp),

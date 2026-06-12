@@ -141,7 +141,6 @@ fn main() {
             commands::start_dictation,
             commands::stop_dictation,
             commands::cancel_dictation,
-            commands::start_refine_selection,
             commands::start_polish_selection,
             commands::get_last_result,
             commands::get_last_dictation_app,

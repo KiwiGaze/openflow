@@ -4,9 +4,6 @@ import { barScales, hudGlyph, hudLabel, hudVisible } from './hudState.js';
 describe('hudLabel', () => {
   it('describes each stage', () => {
     expect(hudLabel({ status: 'recording', job: 'dictation', message: null })).toBe('Listening…');
-    expect(hudLabel({ status: 'recording', job: 'refineSelection', message: null })).toBe(
-      'Listening for instruction…',
-    );
     expect(hudLabel({ status: 'recording', job: 'dictation', message: 'Notes' })).toBe(
       'Listening — Notes',
     );
@@ -19,9 +16,6 @@ describe('hudLabel', () => {
 
   it('distinguishes the refining flows', () => {
     expect(hudLabel({ status: 'refining', job: 'dictation', message: null })).toBe('Cleaning up…');
-    expect(hudLabel({ status: 'refining', job: 'refineSelection', message: null })).toBe(
-      'Rewriting…',
-    );
     expect(hudLabel({ status: 'refining', job: 'polishSelection', message: null })).toBe(
       'Polishing selection…',
     );

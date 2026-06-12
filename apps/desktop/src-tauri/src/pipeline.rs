@@ -1,9 +1,10 @@
 //! The dictation pipeline state machine.
 //!
 //! One pipeline instance owns the flow `record → transcribe → (refine) →
-//! insert` for both jobs (dictation and selected-text refinement), emits
-//! progress events to the webviews, and guards against stale work with a
-//! generation counter — cancelling simply bumps the generation.
+//! insert` for dictation plus the no-recording selection jobs (polish,
+//! transforms), emits progress events to the webviews, and guards against
+//! stale work with a generation counter — cancelling simply bumps the
+//! generation.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -65,7 +66,6 @@ pub enum Status {
 #[serde(rename_all = "camelCase")]
 pub enum Job {
     Dictation,
-    RefineSelection,
     /// Refine the selection with the built-in instruction — no recording.
     PolishSelection,
     /// Apply a user-defined transform's instruction to the selection — no
@@ -89,8 +89,7 @@ pub struct PipelineState {
 pub struct TranscriptionResult {
     pub raw: String,
     /// The "before" the change-overlay diffs against: the transcript for
-    /// dictation, the original selection for polish/rewrite. Equals `raw`
-    /// except for rewrite, where `raw` is the spoken instruction.
+    /// dictation, the original selection for polish/transforms.
     pub original: String,
     pub text: String,
     pub mode_id: String,
@@ -102,8 +101,6 @@ struct Session {
     job: Job,
     generation: u64,
     started: Instant,
-    /// Captured before recording starts (refine job only).
-    selection: Option<String>,
     /// Mode id from a per-mode hotkey, used for this job only without changing
     /// the persistent active mode (one-shot, 07 §4). None = use the active mode.
     mode_override: Option<String>,
@@ -286,23 +283,6 @@ impl Pipeline {
         Some("Tip: tap the hotkey instead of holding to go hands-free.".into())
     }
 
-    /// The HUD tip to ride a successful rewrite (tip.polish — teach the polish
-    /// hotkey), or None. Marks it seen so it shows once.
-    fn refine_hud_tip(&self) -> Option<String> {
-        if self.tip_shown_session.load(Ordering::SeqCst) {
-            return None;
-        }
-        let s = self.settings.get();
-        if !s.tips_enabled || s.tips_seen.iter().any(|t| t == "tip.polish") {
-            return None;
-        }
-        if s.polish_hotkey.is_empty() || s.active_llm_profile_id.is_empty() {
-            return None;
-        }
-        self.mark_tip_shown("tip.polish", s);
-        Some("Tip: tap your polish hotkey to fix grammar without recording.".into())
-    }
-
     fn mark_tip_shown(&self, id: &str, mut settings: Settings) {
         self.tip_shown_session.store(true, Ordering::SeqCst);
         settings.tips_seen.push(id.to_string());
@@ -365,14 +345,11 @@ impl Pipeline {
     }
 
     pub fn on_hotkey_released(self: &Arc<Self>, job: Job) {
-        let behavior = match job {
-            Job::Dictation => self.settings.get().dictation_hotkey_behavior,
-            // Refinement is always push-to-talk style.
-            Job::RefineSelection => HotkeyBehavior::Hold,
-            // Polish and transforms are taps; there is no recording to stop.
-            Job::PolishSelection | Job::Transform => return,
-        };
-        if behavior == HotkeyBehavior::Toggle {
+        // Polish and transforms are taps; only dictation records.
+        if job != Job::Dictation {
+            return;
+        }
+        if self.settings.get().dictation_hotkey_behavior == HotkeyBehavior::Toggle {
             return;
         }
         let held_for = {
@@ -391,6 +368,8 @@ impl Pipeline {
 
     // ---- Lifecycle ------------------------------------------------------
 
+    /// Starts a recording job. Only dictation records; polish and transforms
+    /// capture the selection without one and never come through here.
     pub fn start(self: &Arc<Self>, job: Job, mode_override: Option<String>) -> AppResult<()> {
         {
             let state = self.state();
@@ -408,7 +387,7 @@ impl Pipeline {
         // hotkey. Explicit overrides win; a detection failure just means no rule.
         let mode_override = match mode_override {
             Some(id) => Some(id),
-            None if job == Job::Dictation => match apps::frontmost_app() {
+            None => match apps::frontmost_app() {
                 Some((bundle_id, name)) => {
                     *self.last_app.lock().expect("pipeline state poisoned") =
                         Some((bundle_id.clone(), name));
@@ -425,24 +404,19 @@ impl Pipeline {
                     None
                 }
             },
-            None => None,
         };
 
         // Preflight the model this job will actually use: a dictation mode can
         // override the speech model (07 §3), so checking the global default
         // would wrongly block a valid per-mode override. A cloud engine needs
         // no local model.
-        let effective_stt = if job == Job::Dictation {
-            let mode = mode_override
-                .as_ref()
-                .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
-                .unwrap_or_else(|| settings.active_mode());
-            match &mode.stt_model_id {
-                Some(id) if self.stt_model_valid(&settings, id) => id.clone(),
-                _ => settings.stt_model_id.clone(),
-            }
-        } else {
-            settings.stt_model_id.clone()
+        let mode = mode_override
+            .as_ref()
+            .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
+            .unwrap_or_else(|| settings.active_mode());
+        let effective_stt = match &mode.stt_model_id {
+            Some(id) if self.stt_model_valid(&settings, id) => id.clone(),
+            _ => settings.stt_model_id.clone(),
         };
         if !effective_stt.starts_with(CLOUD_STT_PREFIX) && !self.models.is_installed(&effective_stt)
         {
@@ -451,41 +425,10 @@ impl Pipeline {
             ));
         }
 
-        let selection = if job == Job::RefineSelection {
-            if self
-                .profiles
-                .active(&settings.active_llm_profile_id)
-                .is_none()
-            {
-                return Err(AppError::Llm(
-                    "Rewrite needs an AI profile — add one in Settings.".into(),
-                ));
-            }
-            match self.output.capture_selection()? {
-                Some(text) => Some(text),
-                None => {
-                    return Err(AppError::State(
-                        "Select some text first, then hold the rewrite hotkey.".into(),
-                    ))
-                }
-            }
-        } else {
-            None
-        };
-
         // Name the mode in the listening label so the user sees which mode will
         // write before speaking (07 §5) — the override mode for a mode hotkey,
-        // else the active mode. Rewrite is an action, not a mode.
-        let recording_label = if job == Job::Dictation {
-            let mode_name = mode_override
-                .as_ref()
-                .and_then(|id| settings.modes.iter().find(|m| &m.id == id))
-                .map(|m| m.name.clone())
-                .unwrap_or_else(|| settings.active_mode().name);
-            Some(truncate_mode_name(&mode_name))
-        } else {
-            None
-        };
+        // else the active mode.
+        let recording_label = Some(truncate_mode_name(&mode.name));
 
         self.audio.start()?;
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
@@ -493,7 +436,6 @@ impl Pipeline {
             job,
             generation,
             started: Instant::now(),
-            selection,
             mode_override,
         });
         self.set_state(Status::Recording, Some(job), recording_label);
@@ -812,19 +754,14 @@ impl Pipeline {
         let job = session.job;
         let started = session.started;
 
-        // Resolve mode overrides once, up front (dictation only). A per-mode
-        // hotkey resolves its own mode for this job only; otherwise the active
-        // mode. Rewrite uses the global speech model + language.
-        let resolved = if job == Job::Dictation {
-            let mode = session
-                .mode_override
-                .as_ref()
-                .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
-                .unwrap_or_else(|| settings.active_mode());
-            Some(self.resolve_dictation(&settings, &mode))
-        } else {
-            None
-        };
+        // Resolve mode overrides once, up front. A per-mode hotkey resolves its
+        // own mode for this job only; otherwise the active mode.
+        let mode = session
+            .mode_override
+            .as_ref()
+            .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
+            .unwrap_or_else(|| settings.active_mode());
+        let resolved = self.resolve_dictation(&settings, &mode);
 
         // Stop capture and get 16 kHz samples (resampled on the audio thread).
         let audio = Arc::clone(&self.audio);
@@ -832,14 +769,8 @@ impl Pipeline {
             .await
             .map_err(|e| AppError::State(format!("audio join failed: {e}")))??;
 
-        let model_id = match &resolved {
-            Some(r) => r.stt_model_id.clone(),
-            None => settings.stt_model_id.clone(),
-        };
-        let language = match &resolved {
-            Some(r) => r.language.clone(),
-            None => settings.language.clone(),
-        };
+        let model_id = resolved.stt_model_id.clone();
+        let language = resolved.language.clone();
         let prompt = initial_prompt_from_dictionary(&settings.dictionary);
         log::info!(
             "recorded {:.1}s of audio ({} samples at 16 kHz)",
@@ -895,35 +826,16 @@ impl Pipeline {
 
         let cleaned = text::clean_transcript(&raw);
         if cleaned.is_empty() {
-            // The accuracy tip is about dictation; an empty Rewrite instruction
-            // is a different situation, so only dictation feeds the streak.
-            let message = if job == Job::Dictation {
-                let streak = self.empty_streak.fetch_add(1, Ordering::SeqCst) + 1;
-                self.empty_dictation_notice(streak)
-            } else {
-                "Didn't catch that — try again.".into()
-            };
-            return Ok(ProcessOutcome::Notice(message));
+            let streak = self.empty_streak.fetch_add(1, Ordering::SeqCst) + 1;
+            return Ok(ProcessOutcome::Notice(self.empty_dictation_notice(streak)));
         }
-        if job == Job::Dictation {
-            self.empty_streak.store(0, Ordering::SeqCst);
-        }
+        self.empty_streak.store(0, Ordering::SeqCst);
         let with_dictionary = text::apply_dictionary(&cleaned, &settings.dictionary);
 
         match job {
             Job::Dictation => {
-                let resolved = resolved.expect("dictation always resolves a mode");
                 self.finish_dictation(&settings, resolved, with_dictionary, started, record_ms)
                     .await
-            }
-            Job::RefineSelection => {
-                self.finish_refine(
-                    &settings,
-                    session.selection.unwrap_or_default(),
-                    with_dictionary,
-                    started,
-                )
-                .await
             }
             // Sessions are only created for recording jobs; polish and
             // transforms run through `refine_selection()` without one.
@@ -976,7 +888,7 @@ impl Pipeline {
 
         // Snippets expand on the final text only: dictation-only, verbatim,
         // and after any LLM pass so the expansion is never reworded. Selection
-        // jobs (rewrite/polish) edit existing text and deliberately skip this.
+        // jobs (polish, transforms) edit existing text and deliberately skip this.
         let final_text = text::apply_snippets(&final_text, &settings.snippets);
 
         let words = word_count(&final_text);
@@ -1029,43 +941,6 @@ impl Pipeline {
         }
     }
 
-    async fn finish_refine(
-        self: &Arc<Self>,
-        settings: &Settings,
-        selection: String,
-        instruction: String,
-        started: Instant,
-    ) -> AppResult<ProcessOutcome> {
-        self.set_state(Status::Refining, Some(Job::RefineSelection), None);
-        // Re-resolved at use time: the profile may have changed mid-recording.
-        let Some(profile) = self.profiles.active(&settings.active_llm_profile_id) else {
-            return Err(AppError::Llm(
-                "Rewrite needs an AI profile — add one in Settings.".into(),
-            ));
-        };
-        let system = modes::selection_system_prompt();
-        let user = modes::selection_user_prompt(&selection, &instruction);
-        // Unlike dictation there is no fallback: replacing the user's
-        // selection with something other than what they asked for is worse
-        // than doing nothing.
-        let rewritten = self.llm.chat(&profile, &system, &user).await?;
-        let outcome = self.insert(
-            settings,
-            &instruction,
-            &selection,
-            rewritten,
-            "refine",
-            true,
-            started,
-        )?;
-        Ok(match outcome {
-            ProcessOutcome::Inserted(preview, _) => {
-                ProcessOutcome::Inserted(preview, self.refine_hud_tip())
-            }
-            other => other,
-        })
-    }
-
     async fn finish_selection_refine(
         self: &Arc<Self>,
         settings: &Settings,
@@ -1079,8 +954,8 @@ impl Pipeline {
         // An empty instruction selects the built-in fix-grammar default
         // (Polish); a transform passes its own instruction.
         let user = modes::selection_user_prompt(&selection, instruction);
-        // Like rewrite: no fallback — wrong text over the user's selection is
-        // worse than nothing.
+        // No fallback — wrong text over the user's selection is worse than
+        // nothing.
         let result = self.llm.chat(profile, &system, &user).await?;
         // `original` is the text the diff is measured against — the selection.
         self.insert(

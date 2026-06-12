@@ -141,7 +141,6 @@ pub struct Settings {
     pub version: u32,
     pub dictation_hotkey: String,
     pub dictation_hotkey_behavior: HotkeyBehavior,
-    pub refine_hotkey: String,
     pub polish_hotkey: String,
     /// Reveals the word-level diff of the last result. "" disables it.
     pub change_overlay_hotkey: String,
@@ -193,7 +192,6 @@ impl Default for Settings {
             version: SETTINGS_VERSION,
             dictation_hotkey: "Alt+Space".into(),
             dictation_hotkey_behavior: HotkeyBehavior::Hold,
-            refine_hotkey: "Alt+Shift+Space".into(),
             polish_hotkey: "Alt+Shift+P".into(),
             change_overlay_hotkey: "Alt+O".into(),
             refine_after_dictation: true,

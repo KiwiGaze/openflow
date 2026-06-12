@@ -18,7 +18,7 @@ export type PipelineStatus =
   | 'error';
 
 /** What kind of job the pipeline is currently running. */
-export type PipelineJob = 'dictation' | 'refineSelection' | 'polishSelection' | 'transform';
+export type PipelineJob = 'dictation' | 'polishSelection' | 'transform';
 
 export interface PipelineState {
   status: PipelineStatus;
@@ -194,7 +194,6 @@ export interface Settings {
   version: number;
   dictationHotkey: string;
   dictationHotkeyBehavior: HotkeyBehavior;
-  refineHotkey: string;
   polishHotkey: string;
   /** Reveals the word-level diff of the last result. Empty disables it. */
   changeOverlayHotkey: string;
@@ -263,8 +262,7 @@ export interface TranscriptionResult {
   raw: string;
   /**
    * The text the change is measured against for the "see changes" diff:
-   * the transcript for dictation, the original selection for polish/rewrite.
-   * Differs from `raw` only for rewrite, where `raw` is the spoken instruction.
+   * the transcript for dictation, the original selection for polish/transforms.
    */
   original: string;
   /** Final text that was inserted. */
@@ -347,7 +345,6 @@ export const COMMANDS = {
   startDictation: 'start_dictation',
   stopDictation: 'stop_dictation',
   cancelDictation: 'cancel_dictation',
-  startRefineSelection: 'start_refine_selection',
   startPolishSelection: 'start_polish_selection',
   getLastResult: 'get_last_result',
   getLastDictationApp: 'get_last_dictation_app',

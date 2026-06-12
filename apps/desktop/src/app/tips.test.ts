@@ -19,7 +19,6 @@ const base: Settings = {
   version: 3,
   dictationHotkey: 'Alt+Space',
   dictationHotkeyBehavior: 'hold',
-  refineHotkey: 'Alt+Shift+Space',
   polishHotkey: 'Alt+Shift+P',
   changeOverlayHotkey: 'Alt+O',
   refineAfterDictation: true,

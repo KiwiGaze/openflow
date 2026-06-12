@@ -80,8 +80,6 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
           </dd>
           <dt>Cancel</dt>
           <dd>Esc while recording</dd>
-          <dt>Rewrite selection</dt>
-          <dd>Hold {formatAcceleratorMac(settings.refineHotkey)}, then speak the change</dd>
           <dt>Polish selection</dt>
           <dd>Tap {formatAcceleratorMac(settings.polishHotkey)}</dd>
           <dt>Copy last result</dt>

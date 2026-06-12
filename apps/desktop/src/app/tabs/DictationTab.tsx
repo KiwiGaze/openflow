@@ -57,18 +57,8 @@ export function DictationTab({
           />
         </Row>
         <Row
-          title="Rewrite selection"
-          hint="Select text, hold, and say the change. Needs an AI profile."
-        >
-          <HotkeyRecorder
-            value={settings.refineHotkey}
-            label="Rewrite selection"
-            onChange={(accelerator) => void update({ refineHotkey: accelerator })}
-          />
-        </Row>
-        <Row
           title="See changes"
-          hint="Reveal a word-level diff of the last cleanup, polish, or rewrite. Empty disables it."
+          hint="Reveal a word-level diff of the last cleanup or polish. Empty disables it."
         >
           <HotkeyRecorder
             value={settings.changeOverlayHotkey}

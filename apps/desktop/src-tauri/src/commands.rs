@@ -70,7 +70,6 @@ pub fn save_settings(
             .collect()
     };
     let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
-        || previous.refine_hotkey != saved.refine_hotkey
         || previous.polish_hotkey != saved.polish_hotkey
         || previous.change_overlay_hotkey != saved.change_overlay_hotkey
         || mode_hotkeys(&previous) != mode_hotkeys(&saved)
@@ -81,7 +80,6 @@ pub fn save_settings(
             // to the last working set as one atomic unit.
             let mut reverted = saved.clone();
             reverted.dictation_hotkey = previous.dictation_hotkey.clone();
-            reverted.refine_hotkey = previous.refine_hotkey.clone();
             reverted.polish_hotkey = previous.polish_hotkey.clone();
             reverted.change_overlay_hotkey = previous.change_overlay_hotkey.clone();
             for mode in &mut reverted.modes {
@@ -205,25 +203,14 @@ pub fn cancel_dictation(state: State<'_, AppState>) {
     state.pipeline.cancel();
 }
 
-/// Captures the current selection and starts a voice-rewrite recording.
-#[tauri::command]
-pub async fn start_refine_selection(state: State<'_, AppState>) -> AppResult<()> {
-    // Sync commands run on the main thread, but starting a refine job blocks
-    // on the output worker (selection capture), which round-trips keystrokes
-    // through the main thread — running it inline would deadlock.
-    let pipeline = state.pipeline.clone();
-    tauri::async_runtime::spawn_blocking(move || pipeline.start(Job::RefineSelection, None))
-        .await
-        .map_err(|e| AppError::State(format!("refine task failed: {e}")))?
-}
-
 /// Rewrites the current selection with the built-in fix-grammar instruction —
 /// no recording involved.
 #[tauri::command]
 pub async fn start_polish_selection(state: State<'_, AppState>) -> AppResult<()> {
-    // Same offload as start_refine_selection: polish blocks on selection
-    // capture, which round-trips keystrokes through the main thread.
-    // Errors surface as transient HUD states inside polish().
+    // Sync commands run on the main thread, but polish blocks on selection
+    // capture, which round-trips keystrokes through the main thread — running
+    // it inline would deadlock. Errors surface as transient HUD states inside
+    // polish().
     let pipeline = state.pipeline.clone();
     tauri::async_runtime::spawn_blocking(move || pipeline.polish())
         .await
