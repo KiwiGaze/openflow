@@ -6,6 +6,7 @@ mod audio;
 mod changes;
 mod cloud_stt;
 mod commands;
+mod db;
 mod error;
 mod history;
 mod hud;
@@ -65,7 +66,8 @@ fn main() {
             // dangling active-profile pointer.
             profiles::reconcile(&settings, &profiles);
             let models = Arc::new(models::ModelManager::new(data_dir.join("models")));
-            let history = Arc::new(history::HistoryStore::load(&data_dir));
+            let db = Arc::new(db::Db::open(&data_dir)?);
+            let history = Arc::new(history::HistoryStore::new(Arc::clone(&db)));
             let stt_profiles = Arc::new(stt_profiles::SttProfileManager::new(
                 data_dir.join("stt-profiles"),
             ));
@@ -94,6 +96,7 @@ fn main() {
                 llm,
                 output,
                 pipeline,
+                db,
                 history,
                 stt_profiles,
             });
@@ -147,6 +150,7 @@ fn main() {
             commands::get_last_dictation_app,
             commands::get_history,
             commands::clear_history,
+            commands::delete_history_entry,
             commands::reprocess_history,
             commands::get_insights,
             commands::list_dictionary_suggestions,

@@ -268,6 +268,13 @@ pub fn clear_history(state: State<'_, AppState>) -> AppResult<()> {
     Ok(())
 }
 
+/// Deletes one persisted history entry by id. A missing id is a no-op.
+#[tauri::command]
+pub fn delete_history_entry(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    state.history.delete(&id)?;
+    Ok(())
+}
+
 /// Re-runs a stored transcript through a chosen mode, reusing the dictation
 /// resolution (the mode's prompt + active profile, or rules cleanup with no
 /// profile). Returns the new text for the user to copy — never auto-inserts.

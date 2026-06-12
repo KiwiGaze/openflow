@@ -1,147 +1,118 @@
 //! Opt-in local dictation history. Off by default (`settings.history_enabled`);
-//! a privacy posture the user turns on explicitly. One JSON file under
-//! `<app-data>`, capped and atomically written, storing **text only — never
-//! audio**. Serialized camelCase; the TS mirror is `packages/core/src/types.ts`.
+//! a privacy posture the user turns on explicitly. Persisted in the shared
+//! SQLite store (`db.rs`), storing **text only — never audio**. Newest first,
+//! hard-capped. Serialized camelCase; the TS mirror is `packages/core/src/types.ts`.
 
-use std::fs;
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::RwLock;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-/// Bounds the file: oldest entries drop past this. History is a convenience,
-/// not an archive.
-const MAX_ENTRIES: usize = 200;
+use crate::db::{Db, HistoryRow};
+use crate::error::AppResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryEntry {
     pub id: String,
-    pub raw: String,
-    pub text: String,
-    pub mode_id: String,
-    #[serde(alias = "refined")]
-    pub polished: bool,
     /// Unix epoch milliseconds; the webview formats the date locally.
-    pub at: u64,
+    pub at: i64,
+    pub text: String,
+    pub raw_text: String,
+    pub mode_id: String,
+    /// Frontmost app's display name at dictation time; null for legacy imports.
+    pub app_name: Option<String>,
+    /// Recording duration in milliseconds; null for legacy imports.
+    pub duration_ms: Option<i64>,
+    pub word_count: i64,
+    /// Whether an LLM pass ran (vs rules-based cleanup only).
+    pub used_ai: bool,
 }
 
+impl From<HistoryRow> for HistoryEntry {
+    fn from(row: HistoryRow) -> Self {
+        Self {
+            id: row.id,
+            at: row.at,
+            text: row.text,
+            raw_text: row.raw_text,
+            mode_id: row.mode_id,
+            app_name: row.app_name,
+            duration_ms: row.duration_ms,
+            word_count: row.word_count,
+            used_ai: row.used_ai,
+        }
+    }
+}
+
+/// Owns history logic over the shared SQLite store. The `seq` counter only
+/// disambiguates two appends landing in the same millisecond when minting ids.
 pub struct HistoryStore {
-    path: PathBuf,
-    entries: RwLock<Vec<HistoryEntry>>,
+    db: Arc<Db>,
     seq: AtomicU64,
 }
 
 impl HistoryStore {
-    pub fn load(dir: &Path) -> Self {
-        let path = dir.join("history.json");
-        let entries: Vec<HistoryEntry> = match fs::read_to_string(&path) {
-            Ok(raw) => match serde_json::from_str(&raw) {
-                Ok(entries) => entries,
-                Err(err) => {
-                    // Don't clobber a corrupt-but-present log: the next append()
-                    // would overwrite it. Preserve it so transcripts aren't lost.
-                    log::warn!("history.json unreadable ({err}); preserving as .corrupt");
-                    if let Err(rename_err) = fs::rename(&path, path.with_extension("json.corrupt"))
-                    {
-                        // Rename failed → the corrupt file is still in place and
-                        // the next append() will overwrite it. Make that loss
-                        // visible instead of silent.
-                        log::warn!("could not preserve corrupt history.json: {rename_err}");
-                    }
-                    Vec::new()
-                }
-            },
-            Err(_) => Vec::new(),
-        };
+    pub fn new(db: Arc<Db>) -> Self {
         Self {
-            path,
-            entries: RwLock::new(entries),
+            db,
             seq: AtomicU64::new(0),
         }
     }
 
     pub fn list(&self) -> Vec<HistoryEntry> {
-        self.entries.read().expect("history lock poisoned").clone()
+        match self.db.history_list() {
+            Ok(rows) => rows.into_iter().map(HistoryEntry::from).collect(),
+            Err(err) => {
+                log::warn!("could not read history: {err}");
+                Vec::new()
+            }
+        }
     }
 
     /// Append a dictation (newest first), capped. Best-effort persist — a
     /// history write failure must never affect the dictation that just landed.
-    pub fn append(&self, raw: String, text: String, mode_id: String, polished: bool) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn append(
+        &self,
+        raw: String,
+        text: String,
+        mode_id: String,
+        app_name: Option<String>,
+        duration_ms: Option<i64>,
+        word_count: i64,
+        used_ai: bool,
+    ) {
         let at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
+            .map(|d| d.as_millis() as i64)
             .unwrap_or(0);
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
-        let entry = HistoryEntry {
-            id: format!("{at}-{seq}"),
-            raw,
-            text,
-            mode_id,
-            polished,
+        let id = format!("{at}-{seq}");
+        if let Err(err) = self.db.history_append(
+            &id,
             at,
-        };
-        {
-            let mut guard = self.entries.write().expect("history lock poisoned");
-            guard.insert(0, entry);
-            guard.truncate(MAX_ENTRIES);
-        }
-        if let Err(err) = self.persist() {
+            &text,
+            &raw,
+            &mode_id,
+            app_name.as_deref(),
+            duration_ms,
+            word_count,
+            used_ai,
+        ) {
             log::warn!("could not persist history: {err}");
         }
     }
 
-    /// Clears the log and removes the file. Deletes first and only clears the
-    /// in-memory copy on success: a "cleared" history still sitting on disk is a
-    /// privacy lie, so the failure must surface to the caller.
-    pub fn clear(&self) -> std::io::Result<()> {
-        match fs::remove_file(&self.path) {
-            Ok(()) => {}
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => return Err(err),
-        }
-        self.entries.write().expect("history lock poisoned").clear();
-        Ok(())
+    /// Removes every history row. A "cleared" history that still has rows is a
+    /// privacy lie, so a failure must surface to the caller.
+    pub fn clear(&self) -> AppResult<()> {
+        self.db.history_clear()
     }
 
-    fn persist(&self) -> std::io::Result<()> {
-        let entries = self.list();
-        // Propagate instead of writing a fallback: an "[]" on serialize failure
-        // would atomically replace the file and silently erase all history.
-        let json = serde_json::to_string_pretty(&entries).map_err(std::io::Error::other)?;
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let tmp = self.path.with_extension("json.tmp");
-        fs::write(&tmp, json)?;
-        fs::rename(&tmp, &self.path)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn temp_dir(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("velata-history-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        dir
-    }
-
-    #[test]
-    fn legacy_refined_key_still_reads() {
-        let dir = temp_dir("alias");
-        fs::write(
-            dir.join("history.json"),
-            r#"[{ "id": "1-0", "raw": "r", "text": "t", "modeId": "standard", "refined": true, "at": 1 }]"#,
-        )
-        .unwrap();
-        let entries = HistoryStore::load(&dir).list();
-        assert_eq!(entries.len(), 1);
-        assert!(entries[0].polished);
+    /// Removes one history row by id.
+    pub fn delete(&self, id: &str) -> AppResult<()> {
+        self.db.history_delete(id)
     }
 }

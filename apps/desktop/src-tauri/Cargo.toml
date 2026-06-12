@@ -20,6 +20,8 @@ tauri-plugin-log = "2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# `bundled` compiles SQLite from source — no system libsqlite3, no network at runtime.
+rusqlite = { version = "0.37", features = ["bundled"] }
 thiserror = "2"
 regex = "1"
 cpal = "0.18"

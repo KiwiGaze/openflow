@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use crate::db::Db;
 use crate::history::HistoryStore;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
@@ -23,6 +24,11 @@ pub struct AppState {
     pub llm: Arc<LlmClient>,
     pub output: Arc<OutputSystem>,
     pub pipeline: Arc<Pipeline>,
+    /// Shared SQLite store. History reaches it via its own `Arc<Db>`; this
+    /// handle is the entry point for the insights and notes commands added in
+    /// later tasks.
+    #[allow(dead_code)]
+    pub db: Arc<Db>,
     pub history: Arc<HistoryStore>,
     pub stt_profiles: Arc<SttProfileManager>,
 }

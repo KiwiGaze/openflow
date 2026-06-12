@@ -382,29 +382,25 @@ impl Pipeline {
 
         let settings = self.settings.get();
 
+        // Capture the frontmost app for every job — history and the "add a
+        // rule" flow need the app at dictation time, and a mode-hotkey start
+        // must not inherit the previous dictation's app. A detection failure
+        // clears it so stale data can't leak forward.
+        let frontmost = apps::frontmost_app();
+        *self.last_app.lock().expect("pipeline state poisoned") = frontmost.clone();
+
         // Per-app rules (07 §9): for a plain dictation (no explicit mode hotkey),
         // a frontmost-app rule supplies a one-shot mode override, exactly like a
         // hotkey. Explicit overrides win; a detection failure just means no rule.
-        let mode_override = match mode_override {
-            Some(id) => Some(id),
-            None => match apps::frontmost_app() {
-                Some((bundle_id, name)) => {
-                    *self.last_app.lock().expect("pipeline state poisoned") =
-                        Some((bundle_id.clone(), name));
-                    settings
-                        .app_rules
-                        .iter()
-                        .find(|r| r.bundle_id == bundle_id)
-                        .map(|r| r.mode_id.clone())
-                }
-                None => {
-                    // Detection failed: clear the stale app so the "add a rule"
-                    // flow can't target whatever was frontmost last time.
-                    *self.last_app.lock().expect("pipeline state poisoned") = None;
-                    None
-                }
-            },
-        };
+        let mode_override = mode_override.or_else(|| {
+            frontmost.and_then(|(bundle_id, _)| {
+                settings
+                    .app_rules
+                    .iter()
+                    .find(|r| r.bundle_id == bundle_id)
+                    .map(|r| r.mode_id.clone())
+            })
+        });
 
         // Preflight the model this job will actually use: a dictation mode can
         // override the speech model (07 §3), so checking the global default
@@ -919,8 +915,22 @@ impl Pipeline {
         // on. Uses the in-scope values rather than re-reading `last_result` —
         // `insert` stores the same text verbatim, so these are identical.
         if let Some(text) = history_text {
-            self.history
-                .append(transcript.clone(), text, mode.id.clone(), polished);
+            let history = Arc::clone(&self.history);
+            let raw = transcript.clone();
+            let mode_id = mode.id.clone();
+            let app_name = self.last_app().map(|(_, name)| name);
+            // DB write off the async executor (convention: file/DB I/O blocks).
+            tauri::async_runtime::spawn_blocking(move || {
+                history.append(
+                    raw,
+                    text,
+                    mode_id,
+                    app_name,
+                    Some(record_ms as i64),
+                    words as i64,
+                    polished,
+                );
+            });
         }
         // A clipboard fallback (paste failed / no Accessibility) is the
         // highest-priority message — the user must know to press ⌘V to get

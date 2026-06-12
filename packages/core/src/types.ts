@@ -276,12 +276,18 @@ export interface TranscriptionResult {
 /** One entry in the opt-in local dictation history (text only, never audio). */
 export interface HistoryEntry {
   id: string;
-  raw: string;
-  text: string;
-  modeId: string;
-  polished: boolean;
   /** Unix epoch milliseconds. */
   at: number;
+  text: string;
+  rawText: string;
+  modeId: string;
+  /** Frontmost app's display name at dictation time; null for legacy imports. */
+  appName: string | null;
+  /** Recording duration in milliseconds; null for legacy imports. */
+  durationMs: number | null;
+  wordCount: number;
+  /** Whether an LLM pass ran (vs rules-based cleanup only). */
+  usedAi: boolean;
 }
 
 export interface ModeCount {
@@ -350,6 +356,7 @@ export const COMMANDS = {
   getLastDictationApp: 'get_last_dictation_app',
   getHistory: 'get_history',
   clearHistory: 'clear_history',
+  deleteHistoryEntry: 'delete_history_entry',
   reprocessHistory: 'reprocess_history',
   getInsights: 'get_insights',
   listDictionarySuggestions: 'list_dictionary_suggestions',

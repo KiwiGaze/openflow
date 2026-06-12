@@ -24,7 +24,7 @@ export function History({ api }: { api: SettingsApi }): JSX.Element {
 
   const q = query.trim().toLowerCase();
   const filtered = q
-    ? entries.filter((e) => `${e.text} ${e.raw}`.toLowerCase().includes(q))
+    ? entries.filter((e) => `${e.text} ${e.rawText}`.toLowerCase().includes(q))
     : entries;
 
   const clear = (): void => {

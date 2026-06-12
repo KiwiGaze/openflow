@@ -39,6 +39,7 @@ export const ipc = {
   getLastDictationApp: (): Promise<FrontmostApp | null> => invoke(COMMANDS.getLastDictationApp),
   getHistory: (): Promise<HistoryEntry[]> => invoke(COMMANDS.getHistory),
   clearHistory: (): Promise<void> => invoke(COMMANDS.clearHistory),
+  deleteHistoryEntry: (id: string): Promise<void> => invoke(COMMANDS.deleteHistoryEntry, { id }),
   reprocessHistory: (text: string, modeId: string): Promise<string> =>
     invoke(COMMANDS.reprocessHistory, { text, modeId }),
   getInsights: (): Promise<Insights> => invoke(COMMANDS.getInsights),
