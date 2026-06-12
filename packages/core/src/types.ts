@@ -35,7 +35,7 @@ export type HotkeyBehavior = 'hold' | 'toggle';
 /** `paste` simulates Cmd+V into the active app; `clipboard` only copies. */
 export type InsertMethod = 'paste' | 'clipboard';
 
-/** Window theme. `system` follows macOS; `light`/`dark` force it for OpenFlow. */
+/** Window theme. `system` follows macOS; `light`/`dark` force it for Velata. */
 export type Appearance = 'system' | 'light' | 'dark';
 
 export type LlmProviderKind = 'ollama' | 'openaiCompatible';
@@ -130,7 +130,7 @@ export interface Mode {
 export interface DictionaryEntry {
   /** What the transcriber tends to produce, e.g. "open flow". */
   from: string;
-  /** The replacement, e.g. "OpenFlow". When equal to `from`, the entry is a
+  /** The replacement, e.g. "Velata". When equal to `from`, the entry is a
    * pure vocabulary hint (preserve this spelling) rather than a replacement. */
   to: string;
 }
@@ -148,7 +148,7 @@ export interface FrontmostApp {
 }
 
 /**
- * A term OpenFlow noticed you dictate — a distinctive product/proper name —
+ * A term Velata noticed you dictate — a distinctive product/proper name —
  * offered as a one-click dictionary addition. Computed from in-memory,
  * session-only counts; never persisted or transmitted.
  */

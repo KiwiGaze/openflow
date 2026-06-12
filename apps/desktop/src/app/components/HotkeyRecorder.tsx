@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type JSX } from 'react';
-import { acceleratorFromKeyboardEvent, formatAcceleratorMac } from '@openflow/core';
+import { acceleratorFromKeyboardEvent, formatAcceleratorMac } from '@velata/core';
 
 interface Props {
   value: string;

@@ -8,7 +8,7 @@ import {
   isLocalEndpoint,
   isValidBaseUrl,
   type SttProfile,
-} from '@openflow/core';
+} from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
 import { useSttProfiles } from '../hooks.js';
 import { ipc } from '../ipc.js';
@@ -100,14 +100,14 @@ export function SttEngines({ api }: { api: SettingsApi }): JSX.Element {
     <section className="card">
       <h2>Cloud &amp; remote speech engines</h2>
       <p className="row-hint">
-        By default OpenFlow transcribes on this Mac. Add a cloud or local-server engine to
-        transcribe elsewhere — cloud engines upload your audio, and OpenFlow asks first.
+        By default Velata transcribes on this Mac. Add a cloud or local-server engine to transcribe
+        elsewhere — cloud engines upload your audio, and Velata asks first.
       </p>
       {consentFor && (
         <Callout variant="warn">
-          <strong>Send your audio to a cloud service?</strong> OpenFlow normally transcribes on your
+          <strong>Send your audio to a cloud service?</strong> Velata normally transcribes on your
           Mac. With <strong>{consentFor.name}</strong>, each time you dictate the full recording is
-          uploaded to {hostOf(consentFor.baseUrl)} using your key. OpenFlow stores nothing; that
+          uploaded to {hostOf(consentFor.baseUrl)} using your key. Velata stores nothing; that
           service&rsquo;s policy governs the audio. The on-device engine stays the default.{' '}
           <button
             className="btn btn-sm"

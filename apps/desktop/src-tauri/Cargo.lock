@@ -3040,37 +3040,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "openflow"
-version = "0.1.0"
-dependencies = [
- "arboard",
- "block2",
- "core-foundation 0.10.1",
- "cpal",
- "enigo",
- "futures-util",
- "log",
- "objc2",
- "objc2-app-kit",
- "objc2-av-foundation",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-log",
- "tauri-plugin-opener",
- "tauri-plugin-single-instance",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "whisper-rs",
-]
-
-[[package]]
 name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5374,6 +5343,37 @@ name = "value-bag"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ba6f5989077681266825251a52748b8c1d8a4ad098cc37e440103d0ea717fc0"
+
+[[package]]
+name = "velata"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "block2",
+ "core-foundation 0.10.1",
+ "cpal",
+ "enigo",
+ "futures-util",
+ "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-av-foundation",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-log",
+ "tauri-plugin-opener",
+ "tauri-plugin-single-instance",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "whisper-rs",
+]
 
 [[package]]
 name = "version-compare"

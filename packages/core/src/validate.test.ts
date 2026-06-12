@@ -45,7 +45,7 @@ describe('isLocalEndpoint', () => {
 });
 
 describe('validateDictionaryEntry', () => {
-  const existing = [{ from: 'open flow', to: 'OpenFlow' }];
+  const existing = [{ from: 'open flow', to: 'Velata' }];
 
   it('accepts a valid entry', () => {
     expect(validateDictionaryEntry({ from: 'tory', to: 'Tauri' }, existing)).toBeNull();

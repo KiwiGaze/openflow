@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { type Appearance, formatAcceleratorMac } from '@openflow/core';
+import { type Appearance, formatAcceleratorMac } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
@@ -11,14 +11,14 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
     <div className="tab-body">
       <section className="card">
         <h2>General</h2>
-        <Row title="Launch at login" hint="Start OpenFlow in the menu bar when you sign in.">
+        <Row title="Launch at login" hint="Start Velata in the menu bar when you sign in.">
           <Toggle
             checked={settings.launchAtLogin}
             onChange={(checked) => void update({ launchAtLogin: checked })}
             label="Launch at login"
           />
         </Row>
-        <Row title="Appearance" hint="Match macOS, or force light or dark for OpenFlow's windows.">
+        <Row title="Appearance" hint="Match macOS, or force light or dark for Velata's windows.">
           <select
             value={settings.appearance}
             onChange={(e) => void update({ appearance: e.target.value as Appearance })}
@@ -61,7 +61,7 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
             label="Save history"
           />
         </Row>
-        <Row title="Show in Dock" hint="Keep a Dock icon. Off keeps OpenFlow in the menu bar only.">
+        <Row title="Show in Dock" hint="Keep a Dock icon. Off keeps Velata in the menu bar only.">
           <Toggle
             checked={settings.showInDock}
             onChange={(checked) => void update({ showInDock: checked })}

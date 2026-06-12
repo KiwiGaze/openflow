@@ -21,7 +21,7 @@ RC codegen crates. The discipline is this document; the drift check is
 
 The webviews never call `invoke()` or `listen()` directly — only through the
 `ipc` / `events` wrappers in `ipc.ts`, which take their names from
-`@openflow/core`. That keeps the entire contract reviewable in three files.
+`@velata/core`. That keeps the entire contract reviewable in three files.
 
 ## Naming rules
 

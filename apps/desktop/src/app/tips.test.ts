@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Mode, Settings } from '@openflow/core';
+import type { Mode, Settings } from '@velata/core';
 import { eligibleTip } from './tips.js';
 
 const standardMode: Mode = {

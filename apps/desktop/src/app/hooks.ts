@@ -10,7 +10,7 @@ import type {
   Settings,
   SttProfile,
   TranscriptionResult,
-} from '@openflow/core';
+} from '@velata/core';
 import { events, ipc, subscribe } from './ipc.js';
 
 export interface SettingsApi {

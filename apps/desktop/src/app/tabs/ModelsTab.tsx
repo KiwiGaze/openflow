@@ -6,7 +6,7 @@ import {
   LLM_PROFILE_VERSION,
   type LlmProfile,
   OLLAMA_PRESET,
-} from '@openflow/core';
+} from '@velata/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { useLlmProfiles } from '../hooks.js';
 import { ipc } from '../ipc.js';

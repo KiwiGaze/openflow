@@ -391,10 +391,10 @@ mod tests {
 
     #[test]
     fn dictionary_replaces_whole_words_case_insensitively() {
-        let entries = vec![entry("open flow", "OpenFlow"), entry("tory", "Tauri")];
+        let entries = vec![entry("open flow", "Velata"), entry("tory", "Tauri")];
         assert_eq!(
             apply_dictionary("Open Flow uses tory under the hood", &entries),
-            "OpenFlow uses Tauri under the hood"
+            "Velata uses Tauri under the hood"
         );
         // "history" contains "tory" but must not match.
         assert_eq!(apply_dictionary("history class", &entries), "history class");
@@ -402,10 +402,10 @@ mod tests {
 
     #[test]
     fn dictionary_prefers_longest_match() {
-        let entries = vec![entry("flow", "Flow?"), entry("open flow", "OpenFlow")];
+        let entries = vec![entry("flow", "Flow?"), entry("open flow", "Velata")];
         assert_eq!(
             apply_dictionary("try open flow now", &entries),
-            "try OpenFlow now"
+            "try Velata now"
         );
     }
 

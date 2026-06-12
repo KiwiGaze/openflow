@@ -1,5 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
-import type { FrontmostApp } from '@openflow/core';
+import type { FrontmostApp } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
 import { ipc } from '../ipc.js';
 

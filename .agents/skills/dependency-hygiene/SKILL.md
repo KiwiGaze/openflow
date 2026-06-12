@@ -1,6 +1,6 @@
 ---
 name: dependency-hygiene
-description: Add, update, audit, or remove dependencies in OpenFlow — npm packages, Cargo crates, cargo features, or GitHub Actions. Use this for every dependency change, including devDependencies and version bumps, because the repo is deliberately dependency-light and has supply-chain guards that silently shape what installs.
+description: Add, update, audit, or remove dependencies in Velata — npm packages, Cargo crates, cargo features, or GitHub Actions. Use this for every dependency change, including devDependencies and version bumps, because the repo is deliberately dependency-light and has supply-chain guards that silently shape what installs.
 ---
 
 # Dependency hygiene

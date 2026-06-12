@@ -31,3 +31,9 @@ ggml-*.bin
 *.local
 .env
 .env.*
+
+# Agent-generated planning docs (never committed)
+docs/superpowers/
+
+# Python tooling cache (icon renderer)
+__pycache__/

@@ -67,7 +67,7 @@ survive if whisper is biased toward them and the cleanup never "fixes" them. Two
 Deep editor integration — reading the open file, tagging files in a chat, knowing the project's
 symbols by scraping the IDE — is **out of scope**. It would require editor-specific automation
 and accessibility/screen access that cut against the privacy posture, for value that the
-on-device formatting already captures. OpenFlow formats what you _say_; it does not look at what
+on-device formatting already captures. Velata formats what you _say_; it does not look at what
 is on your screen.
 
 ## How it fits

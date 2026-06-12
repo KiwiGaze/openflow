@@ -1,6 +1,6 @@
 ---
 name: local-first-privacy
-description: Verify any OpenFlow change against the privacy invariants — audio never persisted, no telemetry, cloud strictly opt-in + BYO-key + consent-gated, network code confined to three modules. Use this for every change that touches audio, networking, persistence, logging, history, profiles, consent, or adds any dependency; privacy is the product and violations are unmergeable.
+description: Verify any Velata change against the privacy invariants — audio never persisted, no telemetry, cloud strictly opt-in + BYO-key + consent-gated, network code confined to three modules. Use this for every change that touches audio, networking, persistence, logging, history, profiles, consent, or adds any dependency; privacy is the product and violations are unmergeable.
 ---
 
 # Local-first privacy

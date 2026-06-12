@@ -2,7 +2,7 @@
 
 Compiled 2026-06-11 from official documentation and engineering writeups, then
 filtered against this repo's reality (2 packages, 1 app, macOS-only, privacy
-as the product). Each section ends with what OpenFlow adopted and what it
+as the product). Each section ends with what Velata adopted and what it
 deliberately skipped — "skip" here is a decision, not an omission.
 
 Companion docs that turn these notes into rules:
@@ -15,7 +15,7 @@ Companion docs that turn these notes into rules:
 
 - Reference internal packages with `workspace:*` so resolution can never fall
   back to the registry ([pnpm workspaces](https://pnpm.io/workspaces)).
-  Already the case (`@openflow/core: workspace:*`).
+  Already the case (`@velata/core: workspace:*`).
 - Use the same base script names (`build`, `test`, `typecheck`) in every
   package so `pnpm -r <name>` works without per-package knowledge
   ([pnpm scripts](https://pnpm.io/scripts)). Already the case.
@@ -44,7 +44,7 @@ without a present problem).
 
 ## 2. Shared TypeScript package shape
 
-`@openflow/core` is a **built** internal package: `tsc` emits `dist/`, and
+`@velata/core` is a **built** internal package: `tsc` emits `dist/`, and
 `apps/desktop` consumes the compiled output. The known cost is the
 build-before-typecheck trap — from a cold clone, `pnpm typecheck` and
 type-aware lint fail until `pnpm -r build` has produced `dist/`.
@@ -72,7 +72,7 @@ npm without switching `exports` back to `dist/` via `publishConfig`.
 - Commands for request/response, events for backend-initiated push, channels
   for high-throughput streams
   ([Tauri IPC](https://v2.tauri.app/concept/inter-process-communication/)).
-  OpenFlow follows this; the audio-level feed is the one candidate where a
+  Velata follows this; the audio-level feed is the one candidate where a
   channel would beat repeated events — not worth churn at one emit per frame.
 - All commands registered in a single `generate_handler!` — multiple
   `invoke_handler` calls silently discard earlier ones
@@ -106,7 +106,7 @@ doesn't subscribe to — converting is churn with no observable win today; use
   render state and dispatch `invoke()`
   ([Tauri process model](https://v2.tauri.app/concept/process-model/)).
 - One typed wrapper module around `invoke`/`listen` rather than scattered
-  string literals — OpenFlow's `ipc.ts` already is this pattern.
+  string literals — Velata's `ipc.ts` already is this pattern.
 - Every `listen()` subscription returns its unlisten from `useEffect` cleanup,
   or Strict-Mode double-mounting duplicates handlers.
 - Multiple windows = multiple Vite HTML entries (`index.html`, `hud.html`,
@@ -120,7 +120,7 @@ doesn't subscribe to — converting is churn with no observable win today; use
 audit confirmed no backend logic is currently duplicated in React.
 
 **Skipped:** Tauri's isolation pattern (sandboxed iframe between frontend and
-IPC) — it defends against third-party scripts in the webview, and OpenFlow
+IPC) — it defends against third-party scripts in the webview, and Velata
 loads none.
 
 ## 5. Local-first privacy engineering
@@ -134,7 +134,7 @@ loads none.
   crates outside audited modules, webview-originated network I/O, telemetry
   SDKs in manifests.
 - Consent gates: appear at first activation, name the provider, say what data
-  leaves, require explicit confirmation. OpenFlow's STT consent gate already
+  leaves, require explicit confirmation. Velata's STT consent gate already
   does this, including revoking consent when the endpoint changes.
 
 **Adopted:** `scripts/check-privacy.mjs` (the three tripwires above), run in
@@ -190,7 +190,7 @@ tags are cut from `main`, which only advances through CI-green PRs.
 - Errors: `thiserror` for the typed app error, message text written for the
   HUD (sentence case, no module paths, actionable); add context only at
   module-boundary crossings so messages don't nest the same words twice.
-  OpenFlow's `AppError` + `user_message()` already implement this shape.
+  Velata's `AppError` + `user_message()` already implement this shape.
 - React: extract a hook when logic is shared by two components or when
   naming the effect clarifies it; never `use`-prefix a non-hook
   ([react.dev custom hooks](https://react.dev/learn/reusing-logic-with-custom-hooks)).
@@ -216,7 +216,7 @@ documented for when the file grows again.
   frontmatter) instead of always-loaded context
   ([agent skills docs](https://code.claude.com/docs/en/skills)).
 - `AGENTS.md` is the cross-tool standard ([agents.md](https://agents.md/));
-  OpenFlow already symlinks it to CLAUDE.md.
+  Velata already symlinks it to CLAUDE.md.
 - Don't restate linter-enforced style rules in agent docs; the linter is the
   enforcement.
 

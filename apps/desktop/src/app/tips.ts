@@ -1,4 +1,4 @@
-import type { Settings } from '@openflow/core';
+import type { Settings } from '@velata/core';
 import type { TabId } from './App.js';
 
 export interface Tip {
@@ -28,7 +28,7 @@ const TIPS: Tip[] = [
   {
     id: 'tip.ai',
     page: 'dictation',
-    copy: 'Want sharper cleanup? Add a local Ollama model or your own API key and OpenFlow will polish transcripts with AI.',
+    copy: 'Want sharper cleanup? Add a local Ollama model or your own API key and Velata will polish transcripts with AI.',
     actionLabel: 'Set up AI',
     actionTab: 'models',
     predicate: (s) =>

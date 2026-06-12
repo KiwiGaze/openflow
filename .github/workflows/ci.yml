@@ -21,7 +21,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Build first: @openflow/desktop imports @openflow/core from its dist,
+      # Build first: @velata/desktop imports @velata/core from its dist,
       # so type-aware lint, typecheck, and tests all need it present.
       - run: pnpm -r build
       - run: pnpm check:ipc
@@ -48,7 +48,7 @@ jobs:
         working-directory: .
         run: |
           pnpm install --frozen-lockfile
-          pnpm --filter @openflow/desktop build
+          pnpm --filter @velata/desktop build
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy

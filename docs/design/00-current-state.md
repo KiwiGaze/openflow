@@ -4,7 +4,7 @@ Status: reference document. Written 2026-06-11 against `main` (cd63494) plus the
 Refine work (`docs/REFINE.md`, partially implemented). Every other document in `docs/design/`
 treats this file as the factual baseline. If this file and the code disagree, the code wins.
 
-## 1. What OpenFlow is
+## 1. What Velata is
 
 A local-first macOS menu-bar dictation app (Tauri 2 + Rust + whisper.cpp + React).
 

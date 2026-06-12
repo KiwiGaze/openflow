@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { type HotkeyBehavior, LANGUAGES } from '@openflow/core';
+import { type HotkeyBehavior, LANGUAGES } from '@velata/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { PolishShortcuts } from '../components/PolishShortcuts.js';

@@ -10,7 +10,7 @@ evidence), 02 (audit findings the structure must fix).
 ### D1. Modes are the one switchable bundle
 
 The brief asks for "profiles" (Developer, Student, Writer…) that bundle LLM, STT,
-instructions, output, and shortcuts — switchable in one click. OpenFlow already has a
+instructions, output, and shortcuts — switchable in one click. Velata already has a
 switchable bundle: the **Mode**. Adding a second switchable concept ("profile") on top of
 modes would force every user to learn a 2-axis matrix (which mode × which profile is active?)
 and double every "why did it write that?" debugging path. Superwhisper — the best-regarded
@@ -60,14 +60,14 @@ Superwhisper all use concrete nouns. The five dimensions map onto six concrete p
 ## 2. Sitemap
 
 ```
-OpenFlow
+Velata
 ├── Menu-bar tray  (quick-switch surface — no configuration)
 │   ├── Mode               ○ Standard  ● Email  ○ Notes  ○ Literal  ○ <custom…>
 │   ├── Refine with AI     ✓ (mirrors Dictation → Refine with AI; in-flight item)
 │   ├── ────────────
 │   ├── Copy Last Result
 │   ├── Settings…                       (opens window, last-used page)
-│   └── Quit OpenFlow
+│   └── Quit Velata
 │
 ├── HUD pill  (feedback only; never configurable from itself)
 │   states: listening / listening-for-instruction / transcribing / refining(job-aware)

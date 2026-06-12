@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="apps/desktop/app-icon.png" width="96" alt="OpenFlow icon" />
+  <img src="apps/desktop/app-icon.png" width="96" alt="Velata icon" />
 </p>
 
-<h1 align="center">OpenFlow</h1>
+<h1 align="center">Velata</h1>
 
 <p align="center">
   <strong>Local-first AI voice input for macOS.</strong><br/>
@@ -22,20 +22,20 @@
 
 ## What it does
 
-- **Dictate anywhere.** Hold `⌥ Space`, talk, release. OpenFlow transcribes your speech
+- **Dictate anywhere.** Hold `⌥ Space`, talk, release. Velata transcribes your speech
   _on-device_ with whisper.cpp (Metal-accelerated), removes the "um"s, fixes punctuation, and
   pastes the result at your cursor. A quick tap latches hands-free mode.
 - **Polish selected text with one keystroke.** Select text in any app, tap `⌥⇧ P`, and the
   selection is replaced with a grammar-, spelling-, and clarity-fixed version. No voice needed.
 - **Modes** shape the output — Standard, Email, Notes, Literal, or your own custom prompts.
-- **Personal dictionary** teaches it your names, products, and jargon ("open flow" → "OpenFlow").
+- **Personal dictionary** teaches it your names, products, and jargon ("vel atta" → "Velata").
 - **Optional AI polish.** Plug in [Ollama](https://ollama.com) for fully-local LLM cleanup, or
   bring your own key for any OpenAI-compatible API (OpenAI, Groq, OpenRouter, LM Studio,
   llama.cpp). Or use neither — rules-based cleanup works offline with zero setup.
 
-## Why OpenFlow
+## Why Velata
 
-|                  | Cloud dictation apps | OpenFlow                                         |
+|                  | Cloud dictation apps | Velata                                           |
 | ---------------- | -------------------- | ------------------------------------------------ |
 | Where audio goes | Their servers        | **On your Mac by default** (cloud STT is opt-in) |
 | Price            | $8–15/month          | **Free, MIT-licensed**                           |
@@ -46,15 +46,15 @@ Privacy here is architectural, not contractual: by default transcription is in-p
 whisper.cpp, audio lives only in memory, and there is no telemetry code at all. After downloading
 a model you can block the app's network access entirely — dictation keeps working. Cloud speech
 engines are off unless you add one yourself (bring your own key); turning one on uploads your
-audio to that provider, and OpenFlow shows a consent dialog before it ever does.
+audio to that provider, and Velata shows a consent dialog before it ever does.
 
 ## Install
 
 **Build from source** (no signed releases yet — see the [roadmap](ROADMAP.md)):
 
 ```sh
-git clone https://github.com/KiwiGaze/openflow.git
-cd openflow
+git clone https://github.com/KiwiGaze/velata.git
+cd velata
 pnpm install
 pnpm tauri build        # produces apps/desktop/src-tauri/target/release/bundle/dmg/
 ```
@@ -64,7 +64,7 @@ Prerequisites: Xcode Command Line Tools, Rust (stable), Node 22+, pnpm 10+, CMak
 
 ## First run
 
-1. Launch OpenFlow — it lives in the **menu bar** (no Dock icon).
+1. Launch Velata — it lives in the **menu bar** (no Dock icon).
 2. The onboarding asks for **Microphone** access (to hear you) and **Accessibility** access
    (to paste with ⌘V — skippable; results go to the clipboard instead).
 3. Pick a speech model. They download once from Hugging Face, then run offline:
@@ -108,5 +108,5 @@ one, an opt-in cloud speech engine) and what each receives.
 
 ## License
 
-[MIT](LICENSE) © OpenFlow contributors. whisper.cpp is MIT-licensed by Georgi Gerganov and
+[MIT](LICENSE) © Velata contributors. whisper.cpp is MIT-licensed by Georgi Gerganov and
 contributors; Whisper models are released by OpenAI under MIT.

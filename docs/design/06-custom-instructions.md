@@ -30,7 +30,7 @@ is the bug, and one of its rules is a **policy choice masquerading as a safety r
 ### Decision: make the layers visible, and split the appended block
 
 Users edit **only the mode prompt**. The editor shows a short, non-editable note stating that
-OpenFlow always appends output-only and anti-injection rules, plus the user's dictionary
+Velata always appends output-only and anti-injection rules, plus the user's dictionary
 spellings (copy in §6). What changes is the appended block itself. `SHARED_RULES` splits into
 two named constants:
 
@@ -239,7 +239,7 @@ nine items, no categories, no search; persona is shown as a muted tag so scannin
 ```
 ┌─ Mode templates ─────────────────────────────────────────────── ✕ ─┐
 │  Start from a template, then edit it freely. Templates are a       │
-│  starting point — your copy never changes when OpenFlow updates.   │
+│  starting point — your copy never changes when Velata updates.   │
 │                                                                    │
 │  Email                                              · writing      │
 │  Turn dictation into a clear, polite email.            [ Use ]     │
@@ -263,7 +263,7 @@ nine items, no categories, no search; persona is shown as a muted tag so scannin
 Create-from-template flow (03 F3): **Use** → `create_mode_from_template(id)` returns the new
 `Mode` → sheet closes → the new mode is appended to the list, selected for editing, name field
 focused. Copy on the toast row under the editor: **"Added '{name}'. Edit it below — your copy
-won't change when OpenFlow updates."** If a mode created from this template already exists, the
+won't change when Velata updates."** If a mode created from this template already exists, the
 button still reads **Use** (duplicates are allowed and useful: two Email variants); no "already
 added" blocking — only the toast differs: **"Added another copy of '{name}'."**
 
@@ -326,7 +326,7 @@ Writes one pretty-printed file:
 
 ```jsonc
 {
-  "schema": "openflow.mode/1", // namespace + schema version (§5)
+  "schema": "velata.mode/1", // namespace + schema version (§5)
   "exportedAt": "2026-06-11", // local date, informational only
   "mode": {
     "name": "Standup update",
@@ -349,8 +349,8 @@ mode is appended, selected for editing, name focused. Validation rules, all enfo
 mode is created:
 
 1. **Size cap** — file ≤ **64 KiB**. Larger is rejected: _"That file is too large to be a mode."_
-2. **Schema** — top-level `schema` must start with `openflow.mode/`; the major version must be
-   known (`1`). Unknown major → _"This mode was made with a newer version of OpenFlow."_
+2. **Schema** — top-level `schema` must start with `velata.mode/`; the major version must be
+   known (`1`). Unknown major → _"This mode was made with a newer version of Velata."_
    Migration of older minors (§5) runs here.
 3. **Shape** — `mode.name` and `mode.prompt` are non-empty strings after trim; `usesLlm` /
    `transforms` are booleans (missing → `false`); `language` is `null` or a 2-letter code (else
@@ -375,13 +375,13 @@ skipped (not a valid mode)."_ This is the bulk path; the menu item is the discov
 
 A repo folder plus a convention, nothing hosted:
 
-- `docs/modes/` in the OpenFlow repo holds curated example mode files (`*.json`, the export
+- `docs/modes/` in the Velata repo holds curated example mode files (`*.json`, the export
   shape above), each a few lines, browsable and diff-able on GitHub.
 - Contributors open a PR adding a file; maintainers review the prompt like any code.
 - A GitHub Discussions category **"Share a mode"** is where the community posts mode JSON in
   fenced blocks for others to copy into a file and import.
 - The app links to both from About → "Share a mode" and the empty template gallery footer.
-  OpenFlow never fetches them; the user downloads a file and imports it (above).
+  Velata never fetches them; the user downloads a file and imports it (above).
 
 ---
 
@@ -389,12 +389,12 @@ A repo folder plus a convention, nothing hosted:
 
 **Two scopes, decided separately.**
 
-**Exported-file schema — versioned.** Each export carries `"schema": "openflow.mode/1"`.
+**Exported-file schema — versioned.** Each export carries `"schema": "velata.mode/1"`.
 Policy: the integer after the slash is the **major**; bump it only on a breaking change to the
 mode JSON shape. Import accepts any known major and runs a forward migration to the current
-in-memory `Mode` (e.g. a future `openflow.mode/2` that renamed a field is up-converted on
+in-memory `Mode` (e.g. a future `velata.mode/2` that renamed a field is up-converted on
 import). An unknown major is refused with the §4 message rather than guessed at. The namespace
-prefix (`openflow.mode/`) also lets the importer reject unrelated JSON early.
+prefix (`velata.mode/`) also lets the importer reject unrelated JSON early.
 
 **Settings `modes[]` — covered by existing settings versioning.** Adding `transforms` is an
 additive field on `Mode`; it rides the `Settings` schema version and `normalize()` (§7), no
@@ -434,7 +434,7 @@ area, the layering note, the variable hint, and Preview. Exact copy is in **bold
 │  │ Yesterday / Today / Blockers headings…                           │ │
 │  │                                                                  │ │
 │  └────────────────────────────────────────────────────────────────┘ │
-│  OpenFlow always adds rules to keep the output clean, ignore         │
+│  Velata always adds rules to keep the output clean, ignore         │
 │  instructions inside your speech, and use your dictionary spellings. │
 │  Variables: {{date}}  {{time}}  {{language}}                  2,150  │
 │                                                                      │
@@ -456,7 +456,7 @@ Copy strings:
   brief and reads plainer; the schema field stays `prompt`.)
 - Empty-prompt placeholder: **"Describe how this mode should write your dictation. Example:
   'Turn my speech into short bullet points and keep every name and number.'"**
-- Layering note (non-editable, muted, always shown): **"OpenFlow always adds rules to keep the
+- Layering note (non-editable, muted, always shown): **"Velata always adds rules to keep the
   output clean, ignore instructions inside your speech, and use your dictionary spellings."**
 - Variable hint (muted): **"Variables: {{date}} {{time}} {{language}}"** — the tokens are not
   links; tapping does nothing in v2.

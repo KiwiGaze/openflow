@@ -22,7 +22,7 @@ Five new steps, renamed and re-sequenced from today's five:
 2 Microphone   the one required permission
 3 Accessibility paste vs clipboard-only — both framed as working outcomes
 4 Try it       a REAL dictation into an in-window field; raw → cleaned diff
-5 You're set   where OpenFlow lives + the three things to learn next
+5 You're set   where Velata lives + the three things to learn next
 ```
 
 The change in shape: the speech-model **picker** (today's gated step 4) becomes a single
@@ -31,14 +31,14 @@ Continue button. Nothing serializes behind the download anymore.
 
 ## 2. Journey map
 
-| #   | Stage               | User state                    | System state                                     | Screen        | Exit criteria                                     | Active-time budget |
-| --- | ------------------- | ----------------------------- | ------------------------------------------------ | ------------- | ------------------------------------------------- | ------------------ |
-| 1   | Launch & value      | curious, unsure it is safe    | first run, `onboardingCompleted:false`, no model | Welcome       | reads value, taps "Download base.en"              | 10 s               |
-| 2   | Microphone          | willing                       | mic `undetermined`; download running             | Microphone    | mic `granted` (or chooses to continue denied)     | 8 s                |
-| 3   | Accessibility       | weighing convenience vs trust | AX `false`; download running                     | Accessibility | grants AX, or accepts clipboard-only              | 8 s                |
-| 4   | Try it              | proving it works              | model installs mid-step; pipeline idle           | Try it        | one dictation lands in the field, diff shown      | 20 s               |
-| 5   | You're set          | convinced                     | configured, working                              | You're set    | reads the three tips, taps "Start using OpenFlow" | 10 s               |
-| —   | Habitual use, day 1 | reaching for ⌥Space by reflex | window closed, tray live                         | —             | dictates in a real app without the window         | n/a                |
+| #   | Stage               | User state                    | System state                                     | Screen        | Exit criteria                                   | Active-time budget |
+| --- | ------------------- | ----------------------------- | ------------------------------------------------ | ------------- | ----------------------------------------------- | ------------------ |
+| 1   | Launch & value      | curious, unsure it is safe    | first run, `onboardingCompleted:false`, no model | Welcome       | reads value, taps "Download base.en"            | 10 s               |
+| 2   | Microphone          | willing                       | mic `undetermined`; download running             | Microphone    | mic `granted` (or chooses to continue denied)   | 8 s                |
+| 3   | Accessibility       | weighing convenience vs trust | AX `false`; download running                     | Accessibility | grants AX, or accepts clipboard-only            | 8 s                |
+| 4   | Try it              | proving it works              | model installs mid-step; pipeline idle           | Try it        | one dictation lands in the field, diff shown    | 20 s               |
+| 5   | You're set          | convinced                     | configured, working                              | You're set    | reads the three tips, taps "Start using Velata" | 10 s               |
+| —   | Habitual use, day 1 | reaching for ⌥Space by reflex | window closed, tray live                         | —             | dictates in a real app without the window       | n/a                |
 
 Active time excludes download wait: steps 2–3 are where the 148 MB `base.en` finishes on most
 connections, so step 4 rarely waits.
@@ -94,7 +94,7 @@ Face is one of the two sanctioned calls; the button names the host and the size.
 ┌──────────────────────────────────────────────────────────────┐
 │  ● Welcome   ○ Microphone   ○ Accessibility   ○ Try it   ○ Done │
 │                                                                │
-│   Welcome to OpenFlow                                          │
+│   Welcome to Velata                                          │
 │                                                                │
 │   Hold ⌥Space, speak, release — clean text lands in whatever  │
 │   app you're using.                                            │
@@ -103,7 +103,7 @@ Face is one of the two sanctioned calls; the button names the host and the size.
 │   • No account, no telemetry, no cloud by default.             │
 │   • Optional AI polish via Ollama or your own API key.         │
 │                                                                │
-│   To transcribe, OpenFlow needs a speech model (148 MB, one    │
+│   To transcribe, Velata needs a speech model (148 MB, one    │
 │   time). It downloads from Hugging Face, then runs offline.    │
 │                                                                │
 │        ┌────────────────────────────┐                         │
@@ -114,11 +114,11 @@ Face is one of the two sanctioned calls; the button names the host and the size.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- **Headline:** "Welcome to OpenFlow"
+- **Headline:** "Welcome to Velata"
 - **Body:** "Hold ⌥Space, speak, release — clean text lands in whatever app you're using."
   (the literal hotkey comes from `formatAcceleratorMac(settings.dictationHotkey)`).
 - **Privacy bullets:** as drawn above (kept close to today's, tightened).
-- **Consent line:** "To transcribe, OpenFlow needs a speech model (148 MB, one time). It
+- **Consent line:** "To transcribe, Velata needs a speech model (148 MB, one time). It
   downloads from Hugging Face, then runs offline."
 - **Primary button:** "Download Base (English)".
   - States: idle → on click calls `download('base.en')`, button becomes a quiet progress chip
@@ -143,9 +143,9 @@ Face is one of the two sanctioned calls; the button names the host and the size.
 ┌──────────────────────────────────────────────────────────────┐
 │  ○ Welcome   ● Microphone   ○ Accessibility   ○ Try it   ○ Done │
 │                                                                │
-│   Let OpenFlow hear you                                        │
+│   Let Velata hear you                                        │
 │                                                                │
-│   OpenFlow records only while you hold the hotkey. Audio is    │
+│   Velata records only while you hold the hotkey. Audio is    │
 │   never written to disk.                                       │
 │                                                                │
 │   Microphone:  [ undetermined ]                               │
@@ -160,8 +160,8 @@ Face is one of the two sanctioned calls; the button names the host and the size.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- **Headline:** "Let OpenFlow hear you"
-- **Body:** "OpenFlow records only while you hold the hotkey. Audio is never written to disk."
+- **Headline:** "Let Velata hear you"
+- **Body:** "Velata records only while you hold the hotkey. Audio is never written to disk."
 - **Status badge:** reflects `permissions.microphone` (`granted` / `denied` / `undetermined` /
   `unknown`), polled every 1.5 s by `usePermissions`.
 - **Dependency-detection behavior:**
@@ -170,7 +170,7 @@ Face is one of the two sanctioned calls; the button names the host and the size.
   - `granted` → badge turns green "granted ✓", button hidden, hint "You're set for microphone."
   - `denied` → button becomes "Open System Settings" → `openMicrophoneSettings()`; copy: "macOS
     is blocking the microphone. Open System Settings → Privacy & Security → Microphone, switch
-    OpenFlow on, then come back — this updates automatically." (the poll flips the badge when
+    Velata on, then come back — this updates automatically." (the poll flips the badge when
     they return; no relaunch needed).
 - **Dev-mode hint** (kept): "Running from a dev build? The permission attaches to your terminal
   app." Shown small.
@@ -189,8 +189,8 @@ Face is one of the two sanctioned calls; the button names the host and the size.
 │                                                                │
 │   Paste straight into your apps (optional)                     │
 │                                                                │
-│   With Accessibility on, OpenFlow types your text into the     │
-│   active app for you. Without it, OpenFlow copies the text to  │
+│   With Accessibility on, Velata types your text into the     │
+│   active app for you. Without it, Velata copies the text to  │
 │   your clipboard and you press ⌘V — that works too.            │
 │                                                                │
 │   Accessibility:  [ not granted ]                             │
@@ -199,7 +199,7 @@ Face is one of the two sanctioned calls; the button names the host and the size.
 │   │  Grant access      │  │  Open System Settings  │          │
 │   └────────────────────┘  └────────────────────────┘          │
 │                                                                │
-│   Skip → OpenFlow uses the clipboard. You can turn this on     │
+│   Skip → Velata uses the clipboard. You can turn this on     │
 │   later in System Settings.                                    │
 │                                                                │
 │  Skip setup                              [ Back ]  [ Continue ]│
@@ -208,16 +208,16 @@ Face is one of the two sanctioned calls; the button names the host and the size.
 
 - **Headline:** "Paste straight into your apps (optional)" — the word "optional" sets the frame:
   clipboard-only is a working outcome, not a failure.
-- **Body:** "With Accessibility on, OpenFlow types your text into the active app for you. Without
-  it, OpenFlow copies the text to your clipboard and you press ⌘V — that works too."
+- **Body:** "With Accessibility on, Velata types your text into the active app for you. Without
+  it, Velata copies the text to your clipboard and you press ⌘V — that works too."
 - **Status badge:** `permissions.accessibility` → "granted ✓" / "not granted".
 - **Dependency-detection behavior:**
   - not granted → "Grant access" calls `promptAccessibilityPermission()` (shows the macOS dialog
     that deep-links to System Settings) and "Open System Settings" calls
     `openAccessibilitySettings()`. The AX trust check is live-polled, so flipping the toggle
     updates the badge without relaunch.
-  - granted → badge green, buttons hidden, hint "OpenFlow will paste for you."
-- **Honest skip line:** "Skip → OpenFlow uses the clipboard. You can turn this on later in System
+  - granted → badge green, buttons hidden, hint "Velata will paste for you."
+- **Honest skip line:** "Skip → Velata uses the clipboard. You can turn this on later in System
   Settings." No scary language.
 - **Advance:** Continue always enabled, regardless of AX state. Step 4 adapts to whichever
   outcome is live.
@@ -287,11 +287,11 @@ app is findable), and teaches three things — one line each — then gets out o
 ┌──────────────────────────────────────────────────────────────┐
 │  ○ Welcome  ○ Microphone  ○ Accessibility  ○ Try it  ● Done    │
 │                                                                │
-│   That's dictation.                          ↑ OpenFlow lives  │
+│   That's dictation.                          ↑ Velata lives  │
 │                                                in your menu bar │
-│   You said            →   OpenFlow wrote                       │
+│   You said            →   Velata wrote                       │
 │   ┌──────────────────┐    ┌──────────────────────────────┐    │
-│   │ hey open flow    │    │ Hey, OpenFlow. This is my     │    │
+│   │ hey open flow    │    │ Hey, Velata. This is my     │    │
 │   │ this is my first │    │ first note.                   │    │
 │   │ note             │    │                               │    │
 │   └──────────────────┘    └──────────────────────────────┘    │
@@ -302,18 +302,18 @@ app is findable), and teaches three things — one line each — then gets out o
 │   • Select text, hold ⌥⇧Space, and speak an edit to rewrite it.│
 │   • Switch the writing style anytime from the menu-bar Mode list.│
 │                                                                │
-│  Skip setup                       [ Start using OpenFlow ]     │
+│  Skip setup                       [ Start using Velata ]     │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 - **Headline:** "That's dictation."
-- **Diff panel:** two columns, "You said" (= `lastResult.raw`) → "OpenFlow wrote" (=
+- **Diff panel:** two columns, "You said" (= `lastResult.raw`) → "Velata wrote" (=
   `lastResult.text`). Captions: "raw transcript" and, when `lastResult.refined` is false (the
   zero-config default — Standard mode with no AI profile uses rules cleanup), "cleaned with
   Standard mode"; if `refined` is true, "polished with AI". If the user skipped step 4 and there
   is no `lastResult`, this panel is replaced by a single line: "Hold ⌥Space in any app to
   dictate." (no fake example).
-- **Menu-bar pointer:** an arrow/caption at the top-right — "↑ OpenFlow lives in your menu bar"
+- **Menu-bar pointer:** an arrow/caption at the top-right — "↑ Velata lives in your menu bar"
   — because there is no Dock icon (00 §2) and this is the one place to say so.
 - **The three tips (exact copy, one line each):**
   - "Tap ⌥Space (don't hold) to keep recording hands-free." — tap-to-latch (00 §1).
@@ -324,7 +324,7 @@ app is findable), and teaches three things — one line each — then gets out o
   per-mode hotkeys, accuracy upgrades) is **not** taught here. It belongs to
   `05-discoverability` (empty-state nudges, the Last-result "Add correction" quick win, contextual
   hints) and to the Settings pages in 03. This screen deliberately stops at three.
-- **Primary button:** "Start using OpenFlow" → `update({ onboardingCompleted: true })`, window
+- **Primary button:** "Start using Velata" → `update({ onboardingCompleted: true })`, window
   drops to the normal Settings shell (or closes, per current behavior).
 
 ### 4.6 Skip — honest final state
@@ -369,7 +369,7 @@ computed from live state (`permissions`, `models`, `progress`):
 
 **`onboardingCompleted` semantics.** It is the _only_ completion signal and it is **not**
 telemetry — it is local state gating which view `App.tsx` renders. It flips to `true` exactly
-once, on "Start using OpenFlow" or "Skip anyway". It is never written on intermediate steps, so a
+once, on "Start using Velata" or "Skip anyway". It is never written on intermediate steps, so a
 crash or quit always resumes onboarding. F12 sets it back to `false` to re-run. No timestamp, no
 counter, no "completed N steps" record — there is nothing to measure (§7).
 

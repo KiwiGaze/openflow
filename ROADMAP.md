@@ -1,4 +1,4 @@
-# OpenFlow Roadmap
+# Velata Roadmap
 
 The MVP ships hold-to-talk local dictation, modes, a personal dictionary, selected-text
 polish, and optional AI cleanup. Everything below is ordered by expected impact; nothing is
@@ -50,4 +50,4 @@ scheduled until someone owns it.
 ## Explicit non-goals
 
 Team accounts, cloud sync, telemetry of any kind, a hosted backend, mobile apps, marketplace.
-If a feature requires OpenFlow to run servers, it does not belong in this repository.
+If a feature requires Velata to run servers, it does not belong in this repository.

@@ -1,6 +1,6 @@
 # Review checklist
 
-What a reviewer (human or agent) checks on an OpenFlow PR, ordered by blast
+What a reviewer (human or agent) checks on an Velata PR, ordered by blast
 radius. `.coderabbit.yaml` encodes the same rules for automated review.
 
 ## Blockers — reject without further discussion
@@ -50,7 +50,7 @@ CI doesn't run is changing the quality gate — flag it.
 - Strict types hold: no `any`, no `as` casts that paper over a design gap
   (a cast to a union from user/DOM input wants a type guard or a typed
   source instead).
-- Shared values come from `@openflow/core`, not re-declared locally
+- Shared values come from `@velata/core`, not re-declared locally
   (presets, versions, wire prefixes, validation).
 - Hooks: effects clean up their listeners; no per-render `invoke` storms
   (bootstrap once + subscribe); dependency arrays honest.

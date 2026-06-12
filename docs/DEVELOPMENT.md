@@ -1,4 +1,4 @@
-# Developing OpenFlow
+# Developing Velata
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ pnpm dev                     # tauri dev: starts Vite, builds Rust, launches the
 
 - Frontend hot-reloads. Rust changes recompile on save and restart the app.
 - The first Rust build compiles whisper.cpp (~2–4 min); afterwards it's incremental.
-- Logs: terminal + `~/Library/Logs/app.openflow.desktop/`.
+- Logs: terminal + `~/Library/Logs/app.velata.desktop/`.
 
 ### Checks (run all before a PR)
 
@@ -51,7 +51,7 @@ CI (`.github/workflows/ci.yml`) runs exactly these.
 
 ```sh
 curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin
-OPENFLOW_TEST_MODEL=$PWD/ggml-tiny.en.bin cargo test -- --ignored
+VELATA_TEST_MODEL=$PWD/ggml-tiny.en.bin cargo test -- --ignored
 ```
 
 ## macOS permissions in development
@@ -62,9 +62,9 @@ TCC grants attach to the **process that asks**. Under `pnpm dev` that is your te
 - **Microphone** — the prompt appears on first recording; grant it to your terminal. If you
   denied it once: System Settings → Privacy & Security → Microphone → enable your terminal.
 - **Accessibility** — needed for the ⌘V paste and the ⌘C selection capture. Add your terminal
-  under System Settings → Privacy & Security → Accessibility. Without it, OpenFlow still works
+  under System Settings → Privacy & Security → Accessibility. Without it, Velata still works
   but copies results to the clipboard instead of pasting.
-- After `pnpm tauri build`, the bundled `OpenFlow.app` asks for its own grants on first run.
+- After `pnpm tauri build`, the bundled `Velata.app` asks for its own grants on first run.
 - Hotkeys need no extra permission (Carbon `RegisterEventHotKey`).
 
 ## Manual test checklist
@@ -109,7 +109,7 @@ Automated tests cover the logic; these flows need a human:
 packages/core/            TS contract (mirrors Rust serde structs) + pure utils + tests
 apps/desktop/src/         React: main settings app (index.html) + HUD (hud.html)
 apps/desktop/src-tauri/   Rust core — see docs/ARCHITECTURE.md §2 for the module map
-scripts/                  check-ipc.mjs + check-privacy.mjs (CI guards), generate-icon.mjs, release.sh
+scripts/                  check-ipc.mjs + check-privacy.mjs (CI guards), release.sh; icon source: docs/design/velata-icon/render.py
 ```
 
 Keep the IPC contract in sync: any change to a serde struct in

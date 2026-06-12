@@ -1,4 +1,4 @@
-# Contributing to OpenFlow
+# Contributing to Velata
 
 Thanks for helping build a private, free alternative to cloud dictation. All kinds of
 contributions are welcome: bug reports, docs, code, and real-world dictation feedback
@@ -55,7 +55,7 @@ contributions are welcome: bug reports, docs, code, and real-world dictation fee
 
 Use the bug template. Always include: macOS version, chip (M1/M2/…), the app you were dictating
 into, which speech model, and whether an AI provider was configured. Logs live at
-`~/Library/Logs/app.openflow.desktop/`.
+`~/Library/Logs/app.velata.desktop/`.
 
 ## Security
 

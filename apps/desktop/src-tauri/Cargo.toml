@@ -1,9 +1,9 @@
 [package]
-name = "openflow"
+name = "velata"
 version = "0.1.0"
 description = "Local-first AI voice input for macOS"
 license = "MIT"
-repository = "https://github.com/KiwiGaze/openflow"
+repository = "https://github.com/KiwiGaze/velata"
 edition = "2021"
 rust-version = "1.82"
 

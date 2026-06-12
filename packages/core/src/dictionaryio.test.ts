@@ -4,17 +4,17 @@ import { dictionaryToCsv, parseDictionaryCsv } from './dictionaryio.js';
 describe('dictionaryToCsv', () => {
   it('writes a header and quotes fields with commas or quotes', () => {
     const csv = dictionaryToCsv([
-      { from: 'open flow', to: 'OpenFlow' },
+      { from: 'open flow', to: 'Velata' },
       { from: 'a, b', to: 'c"d' },
     ]);
-    expect(csv).toBe('from,to\nopen flow,OpenFlow\n"a, b","c""d"\n');
+    expect(csv).toBe('from,to\nopen flow,Velata\n"a, b","c""d"\n');
   });
 });
 
 describe('parseDictionaryCsv', () => {
   it('round-trips through dictionaryToCsv', () => {
     const entries = [
-      { from: 'open flow', to: 'OpenFlow' },
+      { from: 'open flow', to: 'Velata' },
       { from: 'tory', to: 'Tauri' },
     ];
     const result = parseDictionaryCsv(dictionaryToCsv(entries), []);
@@ -23,9 +23,9 @@ describe('parseDictionaryCsv', () => {
   });
 
   it('skips the header, blank lines, and invalid or duplicate rows', () => {
-    const text = 'from,to\nopen flow,OpenFlow\n\nbad,\nopen flow,OpenFlow\n';
+    const text = 'from,to\nopen flow,Velata\n\nbad,\nopen flow,Velata\n';
     const result = parseDictionaryCsv(text, []);
-    expect(result.entries).toEqual([{ from: 'open flow', to: 'OpenFlow' }]);
+    expect(result.entries).toEqual([{ from: 'open flow', to: 'Velata' }]);
     expect(result.skipped).toBe(2); // "bad," (empty `to`) and the duplicate
   });
 

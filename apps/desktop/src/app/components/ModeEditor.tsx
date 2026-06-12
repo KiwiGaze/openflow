@@ -6,7 +6,7 @@ import {
   type Mode,
   type ModelInfo,
   type Settings,
-} from '@openflow/core';
+} from '@velata/core';
 import { ipc } from '../ipc.js';
 import { HotkeyRecorder } from './HotkeyRecorder.js';
 import { Row } from './Row.js';
@@ -117,7 +117,7 @@ export function ModeEditor({
             }}
           />
           <p className="row-hint">
-            OpenFlow always adds rules to keep the output clean, ignore instructions inside your
+            Velata always adds rules to keep the output clean, ignore instructions inside your
             speech, and use your dictionary spellings.
           </p>
         </div>

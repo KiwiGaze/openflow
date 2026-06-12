@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react';
-import { validateSnippet } from '@openflow/core';
+import { validateSnippet } from '@velata/core';
 import { Toggle } from '../components/Toggle.js';
 import type { SettingsApi } from '../hooks.js';
 

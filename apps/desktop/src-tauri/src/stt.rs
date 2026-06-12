@@ -162,7 +162,7 @@ mod tests {
         let entries = vec![
             DictionaryEntry {
                 from: "open flow".into(),
-                to: "OpenFlow".into(),
+                to: "Velata".into(),
             },
             DictionaryEntry {
                 from: "k 8 s".into(),
@@ -171,16 +171,16 @@ mod tests {
         ];
         assert_eq!(
             initial_prompt_from_dictionary(&entries).unwrap(),
-            "Glossary: OpenFlow, k8s."
+            "Glossary: Velata, k8s."
         );
     }
 
     /// Real-model integration test; runs only when a model file is provided:
-    /// `OPENFLOW_TEST_MODEL=~/path/ggml-tiny.en.bin cargo test -- --ignored`
+    /// `VELATA_TEST_MODEL=~/path/ggml-tiny.en.bin cargo test -- --ignored`
     #[test]
     #[ignore = "requires a downloaded whisper model"]
     fn transcribes_synthetic_audio_with_real_model() {
-        let model = std::env::var("OPENFLOW_TEST_MODEL").expect("OPENFLOW_TEST_MODEL not set");
+        let model = std::env::var("VELATA_TEST_MODEL").expect("VELATA_TEST_MODEL not set");
         let engine = SttEngine::new();
         // 2 s of a 220 Hz tone — expect empty or near-empty output, but the
         // full load→infer path must not error.

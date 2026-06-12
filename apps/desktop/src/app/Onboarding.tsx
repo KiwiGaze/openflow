@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react';
-import { formatAcceleratorMac, formatBytes, formatProgress } from '@openflow/core';
+import { formatAcceleratorMac, formatBytes, formatProgress } from '@velata/core';
 import type { ModelsApi, SettingsApi } from './hooks.js';
 import { usePermissions, usePipeline } from './hooks.js';
 import { ipc } from './ipc.js';
@@ -60,7 +60,7 @@ export function Onboarding({
             <li>{modelLine}</li>
             <li>
               {axGranted
-                ? '✓ Accessibility: on — OpenFlow pastes for you'
+                ? '✓ Accessibility: on — Velata pastes for you'
                 : '• Accessibility: off — text will go to your clipboard (⌘V)'}
             </li>
           </ul>
@@ -100,7 +100,7 @@ export function Onboarding({
 
       {step === 0 && (
         <div className="onboarding-pane">
-          <h1>Welcome to OpenFlow</h1>
+          <h1>Welcome to Velata</h1>
           <p>
             Hold <strong>{hotkey}</strong>, speak, release — clean text lands in whatever app you’re
             using.
@@ -111,8 +111,8 @@ export function Onboarding({
             <li>Optional AI polish via Ollama (local) or your own API key.</li>
           </ul>
           <p>
-            To transcribe, OpenFlow needs a speech model (148 MB, one time). It downloads from
-            Hugging Face, then runs offline.
+            To transcribe, Velata needs a speech model (148 MB, one time). It downloads from Hugging
+            Face, then runs offline.
           </p>
           <div className="row-actions">
             <DownloadConsent baseModel={baseModel} progress={progress} download={download} />
@@ -179,8 +179,8 @@ export function Onboarding({
 
       {step === 1 && (
         <div className="onboarding-pane">
-          <h1>Let OpenFlow hear you</h1>
-          <p>OpenFlow records only while you hold the hotkey. Audio is never written to disk.</p>
+          <h1>Let Velata hear you</h1>
+          <p>Velata records only while you hold the hotkey. Audio is never written to disk.</p>
           <div className="perm-status">
             Microphone:{' '}
             <span className={micGranted ? 'badge badge-ok' : 'badge'}>
@@ -199,7 +199,7 @@ export function Onboarding({
             <>
               <p className="row-hint">
                 macOS is blocking the microphone. Open System Settings → Privacy &amp; Security →
-                Microphone, switch OpenFlow on, then come back — this updates automatically.
+                Microphone, switch Velata on, then come back — this updates automatically.
               </p>
               <button className="btn" onClick={() => void ipc.openMicrophoneSettings()}>
                 Open System Settings
@@ -216,8 +216,8 @@ export function Onboarding({
         <div className="onboarding-pane">
           <h1>Paste straight into your apps (optional)</h1>
           <p>
-            With Accessibility on, OpenFlow types your text into the active app for you. Without it,
-            OpenFlow copies the text to your clipboard and you press ⌘V — that works too.
+            With Accessibility on, Velata types your text into the active app for you. Without it,
+            Velata copies the text to your clipboard and you press ⌘V — that works too.
           </p>
           <div className="perm-status">
             Accessibility:{' '}
@@ -239,7 +239,7 @@ export function Onboarding({
             </div>
           )}
           <p className="row-hint">
-            Skip → OpenFlow uses the clipboard. You can turn this on later in System Settings.
+            Skip → Velata uses the clipboard. You can turn this on later in System Settings.
           </p>
         </div>
       )}
@@ -291,7 +291,7 @@ export function Onboarding({
         <div className="onboarding-pane">
           <div className="youre-set-head">
             <h1>That’s dictation.</h1>
-            <span className="row-hint">↑ OpenFlow lives in your menu bar</span>
+            <span className="row-hint">↑ Velata lives in your menu bar</span>
           </div>
           {lastResult ? (
             <div className="diff-panel">
@@ -357,7 +357,7 @@ export function Onboarding({
             </button>
           ) : (
             <button className="btn btn-primary" onClick={finish}>
-              Start using OpenFlow
+              Start using Velata
             </button>
           )}
         </div>

@@ -1,4 +1,4 @@
-//! Tauri IPC commands. Names map 1:1 to `COMMANDS` in `@openflow/core`.
+//! Tauri IPC commands. Names map 1:1 to `COMMANDS` in `@velata/core`.
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -245,7 +245,7 @@ pub struct FrontmostApp {
     pub name: String,
 }
 
-/// The app OpenFlow last dictated into — lets the App rules UI offer a one-click
+/// The app Velata last dictated into — lets the App rules UI offer a one-click
 /// rule for it without the user hunting for a bundle id. None until first use.
 #[tauri::command]
 pub fn get_last_dictation_app(state: State<'_, AppState>) -> Option<FrontmostApp> {

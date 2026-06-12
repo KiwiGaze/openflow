@@ -1,20 +1,20 @@
 {
-  "name": "@openflow/desktop",
+  "name": "@velata/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "OpenFlow desktop app (Tauri + React).",
+  "description": "Velata desktop app (Tauri + React).",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev:vite": "pnpm --filter @openflow/core build && vite",
-    "build:vite": "pnpm --filter @openflow/core build && vite build",
+    "dev:vite": "pnpm --filter @velata/core build && vite",
+    "build:vite": "pnpm --filter @velata/core build && vite build",
     "build": "pnpm run build:vite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "tauri": "tauri"
   },
   "dependencies": {
-    "@openflow/core": "workspace:*",
+    "@velata/core": "workspace:*",
     "@tauri-apps/api": "^2.9.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

@@ -1,4 +1,4 @@
-import type { DownloadProgress, ModelInfo } from '@openflow/core';
+import type { DownloadProgress, ModelInfo } from '@velata/core';
 
 /** One copy of the failure hint so the wording cannot drift between screens. */
 export const DOWNLOAD_FAILED_HINT = 'Download failed — check your connection.';
