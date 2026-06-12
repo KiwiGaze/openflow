@@ -323,10 +323,64 @@ pub fn set_changes_interactive(app: AppHandle, interactive: bool) {
     }
 }
 
-/// Returns session-only usage aggregates (in-memory, reset on quit).
+/// Returns the Insights snapshot: always the session aggregates (in-memory,
+/// reset on quit), enriched with all-time totals, streaks, and an all-time
+/// per-app breakdown when their opt-in flags are on (`app_stats_enabled`,
+/// `history_enabled`). The DB reads are best-effort — a failure degrades to the
+/// session view rather than failing the whole command.
 #[tauri::command]
 pub fn get_insights(state: State<'_, AppState>) -> crate::stats::Insights {
-    state.pipeline.insights()
+    use crate::stats::{AllTimeStats, AppWords, PerAppScope, PER_APP_LIMIT};
+
+    let mut insights = state.pipeline.insights();
+    let settings = state.settings.get();
+
+    // All-time per-app from history when the user keeps it; otherwise the
+    // snapshot's session tally stands.
+    if settings.history_enabled {
+        if let Ok(rows) = state.db.history_per_app(PER_APP_LIMIT as i64) {
+            insights.per_app = rows
+                .into_iter()
+                .map(|(name, words)| AppWords { name, words })
+                .collect();
+            insights.per_app_scope = PerAppScope::AllTime;
+        }
+    }
+
+    if settings.app_stats_enabled {
+        if let Ok(Some(totals)) = state.db.insights_totals() {
+            let ai_percent = if totals.dictations > 0 {
+                (totals.ai_dictations as f64 / totals.dictations as f64 * 100.0).round() as u32
+            } else {
+                0
+            };
+            insights.all_time = Some(AllTimeStats {
+                words: totals.words,
+                dictations: totals.dictations,
+                ai_percent,
+                fixes: totals.fixes,
+                words_per_minute: crate::stats::pace_wpm(totals.words, totals.duration_ms),
+            });
+        }
+        if let Ok(days) = state.db.insights_days() {
+            insights.streak = Some(crate::stats::streaks(&days, &local_day()));
+        }
+    }
+
+    insights
+}
+
+/// Deletes every persisted `insights_daily` row (the "reset all-time stats"
+/// action). Session counters are untouched — they live in RAM.
+#[tauri::command]
+pub fn clear_insights(state: State<'_, AppState>) -> AppResult<()> {
+    state.db.insights_clear()
+}
+
+/// The user's LOCAL calendar day as `YYYY-MM-DD` — the streak calculator's
+/// "today". Local (not UTC) so the streak matches the user's clock.
+fn local_day() -> String {
+    chrono::Local::now().format("%Y-%m-%d").to_string()
 }
 
 /// Returns session-only candidate terms for the dictionary, most-seen first.

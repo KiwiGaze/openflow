@@ -25,9 +25,8 @@ pub struct AppState {
     pub output: Arc<OutputSystem>,
     pub pipeline: Arc<Pipeline>,
     /// Shared SQLite store. History reaches it via its own `Arc<Db>`; this
-    /// handle is the entry point for the insights and notes commands added in
-    /// later tasks.
-    #[allow(dead_code)]
+    /// handle backs the insights commands (all-time totals, streaks, per-app)
+    /// and the notes commands added in later tasks.
     pub db: Arc<Db>,
     pub history: Arc<HistoryStore>,
     pub stt_profiles: Arc<SttProfileManager>,

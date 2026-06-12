@@ -182,20 +182,30 @@ export function useSttProfiles(): SttProfilesApi {
   };
 }
 
-/** Session usage aggregates; refetched after each completed dictation. */
-export function useInsights(): Insights | null {
+export interface InsightsApi {
+  insights: Insights | null;
+  /** Re-fetch on demand — e.g. after resetting all-time stats. */
+  refresh: () => void;
+}
+
+/**
+ * Usage aggregates; refetched after each completed dictation. Insights re-fetch
+ * on `transcription-result` (stats are recorded before that event), so the
+ * richer all-time fields stay current without listening to `history-changed`.
+ */
+export function useInsights(): InsightsApi {
   const [insights, setInsights] = useState<Insights | null>(null);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     void ipc.getInsights().then(setInsights);
-    return subscribe(
-      events.onResult(() => {
-        void ipc.getInsights().then(setInsights);
-      }),
-    );
   }, []);
 
-  return insights;
+  useEffect(() => {
+    refresh();
+    return subscribe(events.onResult(refresh));
+  }, [refresh]);
+
+  return { insights, refresh };
 }
 
 export interface DictionarySuggestionsApi {

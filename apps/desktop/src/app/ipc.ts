@@ -43,6 +43,7 @@ export const ipc = {
   reprocessHistory: (text: string, modeId: string): Promise<string> =>
     invoke(COMMANDS.reprocessHistory, { text, modeId }),
   getInsights: (): Promise<Insights> => invoke(COMMANDS.getInsights),
+  clearInsights: (): Promise<void> => invoke(COMMANDS.clearInsights),
   listDictionarySuggestions: (): Promise<DictionarySuggestion[]> =>
     invoke(COMMANDS.listDictionarySuggestions),
   dismissDictionarySuggestion: (term: string): Promise<void> =>
@@ -108,6 +109,11 @@ export const events = {
   onChangesToggle: (cb: (result: TranscriptionResult) => void): Promise<UnlistenFn> =>
     listen<TranscriptionResult>(EVENTS.changesToggle, (e) => {
       cb(e.payload);
+    }),
+  /** History committed to the DB; refresh from durable rows (no payload). */
+  onHistoryChanged: (cb: () => void): Promise<UnlistenFn> =>
+    listen(EVENTS.historyChanged, () => {
+      cb();
     }),
 };
 

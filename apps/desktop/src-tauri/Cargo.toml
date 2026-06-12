@@ -20,6 +20,9 @@ tauri-plugin-log = "2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# `clock` pulls the OS local timezone so insights bucket by the user's local
+# calendar day; no other features (no default `oldtime`/`std`-only locale data).
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # `bundled` compiles SQLite from source — no system libsqlite3, no network at runtime.
 rusqlite = { version = "0.37", features = ["bundled"] }
 thiserror = "2"

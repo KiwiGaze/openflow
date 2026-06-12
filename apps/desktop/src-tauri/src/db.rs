@@ -156,6 +156,116 @@ impl Db {
         conn.execute("DELETE FROM history", [])?;
         Ok(())
     }
+
+    /// All-time words per app from the history table, highest first. Rows with
+    /// no recorded app (legacy imports) are excluded so the breakdown only ever
+    /// shows real app names. Caller passes the row cap.
+    pub fn history_per_app(&self, limit: i64) -> AppResult<Vec<(String, u64)>> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        let mut stmt = conn.prepare(
+            "SELECT app_name, SUM(word_count) FROM history \
+             WHERE app_name IS NOT NULL \
+             GROUP BY app_name ORDER BY 2 DESC LIMIT ?1",
+        )?;
+        let rows = stmt
+            .query_map([limit], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?.max(0) as u64,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Accumulates one dictation into the local-day `insights_daily` row. Only
+    /// ever called when `app_stats_enabled` (the opt-in persistence gate lives
+    /// in the pipeline); a single UPSERT so two dictations on the same day sum.
+    pub fn insights_upsert_daily(
+        &self,
+        day: &str,
+        words: i64,
+        used_ai: bool,
+        fixes: i64,
+        duration_ms: i64,
+    ) -> AppResult<()> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        conn.execute(
+            "INSERT INTO insights_daily \
+             (day, words, dictations, ai_dictations, fixes, duration_ms) \
+             VALUES (?1, ?2, 1, ?3, ?4, ?5) \
+             ON CONFLICT(day) DO UPDATE SET \
+                words = words + excluded.words, \
+                dictations = dictations + 1, \
+                ai_dictations = ai_dictations + excluded.ai_dictations, \
+                fixes = fixes + excluded.fixes, \
+                duration_ms = duration_ms + excluded.duration_ms",
+            rusqlite::params![day, words, used_ai as i64, fixes, duration_ms],
+        )?;
+        Ok(())
+    }
+
+    /// All-time totals summed over `insights_daily`. `None` when no day rows
+    /// exist yet, so the caller renders "no all-time data" rather than zeros.
+    pub fn insights_totals(&self) -> AppResult<Option<InsightsTotals>> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        // COUNT distinguishes "no rows" (None) from "rows that sum to zero"; the
+        // SUMs are NULL with no rows, so coalesce them to 0 for the populated case.
+        conn.query_row(
+            "SELECT COUNT(*), \
+                    COALESCE(SUM(words), 0), \
+                    COALESCE(SUM(dictations), 0), \
+                    COALESCE(SUM(ai_dictations), 0), \
+                    COALESCE(SUM(fixes), 0), \
+                    COALESCE(SUM(duration_ms), 0) \
+             FROM insights_daily",
+            [],
+            |row| {
+                let days: i64 = row.get(0)?;
+                if days == 0 {
+                    return Ok(None);
+                }
+                Ok(Some(InsightsTotals {
+                    words: row.get::<_, i64>(1)?.max(0) as u64,
+                    dictations: row.get::<_, i64>(2)?.max(0) as u64,
+                    ai_dictations: row.get::<_, i64>(3)?.max(0) as u64,
+                    fixes: row.get::<_, i64>(4)?.max(0) as u64,
+                    duration_ms: row.get::<_, i64>(5)?.max(0) as u64,
+                }))
+            },
+        )
+        .map_err(Into::into)
+    }
+
+    /// Every day that has an `insights_daily` row, as sorted `YYYY-MM-DD`
+    /// strings — the streak calculator's input.
+    pub fn insights_days(&self) -> AppResult<Vec<String>> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        let mut stmt = conn.prepare("SELECT day FROM insights_daily ORDER BY day ASC")?;
+        let days = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(days)
+    }
+
+    /// Removes every `insights_daily` row (the "reset all-time stats" action).
+    pub fn insights_clear(&self) -> AppResult<()> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        conn.execute("DELETE FROM insights_daily", [])?;
+        Ok(())
+    }
+}
+
+/// All-time usage totals summed over `insights_daily`. Counts and durations
+/// only — never words or audio. The IPC-facing shape is assembled in
+/// `commands.rs`; this stays storage-shaped.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InsightsTotals {
+    pub words: u64,
+    pub dictations: u64,
+    pub ai_dictations: u64,
+    pub fixes: u64,
+    pub duration_ms: u64,
 }
 
 /// One history row as stored. The IPC-facing `HistoryEntry` (history.rs) is a
@@ -470,6 +580,74 @@ mod tests {
         assert_eq!(
             rows.last().expect("last").id,
             format!("id-{}", total - HISTORY_CAP)
+        );
+    }
+
+    #[test]
+    fn insights_upsert_accumulates_per_day() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        // Two dictations on the same day sum into one row.
+        db.insights_upsert_daily("2026-06-13", 10, true, 2, 60_000)
+            .expect("upsert 1");
+        db.insights_upsert_daily("2026-06-13", 5, false, 1, 30_000)
+            .expect("upsert 2");
+        // A different day is a separate row.
+        db.insights_upsert_daily("2026-06-12", 7, true, 0, 20_000)
+            .expect("upsert other day");
+
+        let days = db.insights_days().expect("days");
+        assert_eq!(days, vec!["2026-06-12", "2026-06-13"]);
+
+        let totals = db.insights_totals().expect("totals").expect("some totals");
+        assert_eq!(totals.words, 22);
+        assert_eq!(totals.dictations, 3);
+        assert_eq!(totals.ai_dictations, 2);
+        assert_eq!(totals.fixes, 3);
+        assert_eq!(totals.duration_ms, 110_000);
+    }
+
+    #[test]
+    fn insights_totals_empty_is_none_then_cleared() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        // No rows yet → None, so the UI shows "no all-time data" not zeros.
+        assert!(db.insights_totals().expect("totals").is_none());
+        assert!(db.insights_days().expect("days").is_empty());
+
+        db.insights_upsert_daily("2026-06-13", 3, false, 0, 0)
+            .expect("upsert");
+        assert!(db.insights_totals().expect("totals").is_some());
+
+        db.insights_clear().expect("clear");
+        assert!(db.insights_totals().expect("totals").is_none());
+        assert!(db.insights_days().expect("days").is_empty());
+    }
+
+    #[test]
+    fn history_per_app_aggregates_and_excludes_null_app() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        db.history_append("1", 1, "t", "r", "standard", Some("Mail"), None, 3, false)
+            .expect("append 1");
+        db.history_append("2", 2, "t", "r", "standard", Some("Mail"), None, 2, false)
+            .expect("append 2");
+        db.history_append("3", 3, "t", "r", "standard", Some("Notes"), None, 4, false)
+            .expect("append 3");
+        // No app recorded → must be excluded from the breakdown.
+        db.history_append("4", 4, "t", "r", "standard", None, None, 99, false)
+            .expect("append 4");
+
+        let per_app = db.history_per_app(10).expect("per app");
+        // Highest words first: Mail (3+2=5) then Notes (4); the null-app row is gone.
+        assert_eq!(
+            per_app,
+            vec![("Mail".to_string(), 5), ("Notes".to_string(), 4)]
+        );
+        // The limit bounds the result.
+        assert_eq!(
+            db.history_per_app(1).expect("per app limit"),
+            vec![("Mail".to_string(), 5)]
         );
     }
 

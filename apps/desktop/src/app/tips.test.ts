@@ -16,7 +16,7 @@ const standardMode: Mode = {
 };
 
 const base: Settings = {
-  version: 4,
+  version: 5,
   dictationHotkey: 'Alt+Space',
   dictationHotkeyBehavior: 'hold',
   polishHotkey: 'Alt+Shift+P',
@@ -33,6 +33,7 @@ const base: Settings = {
   launchAtLogin: false,
   appearance: 'system',
   historyEnabled: false,
+  appStatsEnabled: false,
   appRules: [],
   confirmedSttProfiles: [],
   snippets: [],

@@ -68,7 +68,9 @@ function HistorySection({ modeName, api }: { modeName: ModeName; api: SettingsAp
 
   useEffect(() => {
     refresh();
-    return subscribe(events.onResult(refresh));
+    // history-changed fires after the DB append commits, so this reads durable
+    // rows instead of racing the write (which onResult would).
+    return subscribe(events.onHistoryChanged(refresh));
   }, [refresh]);
 
   const groups = groupHistoryByDay(entries, new Date());
@@ -243,7 +245,7 @@ function HistoryOffCard({ api }: { api: SettingsApi }): JSX.Element {
 }
 
 function UsageCard(): JSX.Element {
-  const insights = useInsights();
+  const { insights } = useInsights();
 
   return (
     <section className="card">

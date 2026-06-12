@@ -16,6 +16,7 @@ use tauri::{AppHandle, Emitter};
 use crate::apps;
 use crate::audio::AudioSystem;
 use crate::cloud_stt;
+use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::history::HistoryStore;
 use crate::hud;
@@ -37,6 +38,10 @@ use crate::text;
 pub const PIPELINE_STATE_EVENT: &str = "pipeline-state";
 pub const AUDIO_LEVEL_EVENT: &str = "audio-level";
 pub const RESULT_EVENT: &str = "transcription-result";
+/// Fired (no payload) once a history append has actually committed to the DB,
+/// so views refresh from durable rows rather than racing the write. Mirrored as
+/// `EVENTS.historyChanged` in `@velata/core`.
+pub const HISTORY_CHANGED_EVENT: &str = "history-changed";
 
 /// Releases faster than this are treated as a tap, which switches the
 /// hold-to-talk gesture into hands-free mode instead of stopping.
@@ -116,6 +121,9 @@ pub struct Pipeline {
     models: Arc<ModelManager>,
     profiles: Arc<ProfileManager>,
     history: Arc<HistoryStore>,
+    /// Direct store handle for the opt-in `insights_daily` upsert at the
+    /// dictation success point; history goes through `history` above.
+    db: Arc<Db>,
     stt_profiles: Arc<SttProfileManager>,
     state: Mutex<PipelineState>,
     state_seq: AtomicU64,
@@ -149,6 +157,7 @@ impl Pipeline {
         models: Arc<ModelManager>,
         profiles: Arc<ProfileManager>,
         history: Arc<HistoryStore>,
+        db: Arc<Db>,
         stt_profiles: Arc<SttProfileManager>,
     ) -> Arc<Self> {
         Arc::new(Self {
@@ -161,6 +170,7 @@ impl Pipeline {
             models,
             profiles,
             history,
+            db,
             stt_profiles,
             state: Mutex::new(PipelineState {
                 status: Status::Idle,
@@ -826,12 +836,19 @@ impl Pipeline {
             return Ok(ProcessOutcome::Notice(self.empty_dictation_notice(streak)));
         }
         self.empty_streak.store(0, Ordering::SeqCst);
-        let with_dictionary = text::apply_dictionary(&cleaned, &settings.dictionary);
+        let (with_dictionary, dict_fixes) = text::apply_dictionary(&cleaned, &settings.dictionary);
 
         match job {
             Job::Dictation => {
-                self.finish_dictation(&settings, resolved, with_dictionary, started, record_ms)
-                    .await
+                self.finish_dictation(
+                    &settings,
+                    resolved,
+                    with_dictionary,
+                    dict_fixes,
+                    started,
+                    record_ms,
+                )
+                .await
             }
             // Sessions are only created for recording jobs; polish and
             // transforms run through `polish_selection()` without one.
@@ -841,11 +858,13 @@ impl Pipeline {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn finish_dictation(
         self: &Arc<Self>,
         settings: &Settings,
         resolved: ResolvedDictation,
         transcript: String,
+        dict_fixes: usize,
         started: Instant,
         record_ms: u64,
     ) -> AppResult<ProcessOutcome> {
@@ -888,6 +907,9 @@ impl Pipeline {
         let final_text = text::apply_snippets(&final_text, &settings.snippets);
 
         let words = word_count(&final_text);
+        // Frontmost-app display name at dictation time, for the session per-app
+        // tally and the opt-in history row (never any dictated content).
+        let app_name = self.last_app().map(|(_, name)| name);
         // Clone only when the opt-in history will consume it below — `insert`
         // takes the text by move.
         let history_text = settings.history_enabled.then(|| final_text.clone());
@@ -902,8 +924,14 @@ impl Pipeline {
         )?;
         // Record the session aggregate only once the text actually reached the
         // user (insert returns Ok even on the clipboard fallback).
-        self.stats
-            .record_dictation(words, record_ms, &mode.id, polished);
+        self.stats.record_dictation(
+            words,
+            record_ms,
+            &mode.id,
+            polished,
+            app_name.as_deref(),
+            dict_fixes as u64,
+        );
         // Count this successful dictation — the only tip-system counter (05); a
         // count, never a log. Emit so an open settings webview re-evaluates tips.
         let mut counted = self.settings.get();
@@ -911,16 +939,33 @@ impl Pipeline {
         if let Ok(saved) = self.settings.set(counted) {
             let _ = self.app.emit(SETTINGS_CHANGED_EVENT, &saved);
         }
-        // Opt-in history: log the text (never audio) when the user turned it
-        // on. Uses the in-scope values rather than re-reading `last_result` —
-        // `insert` stores the same text verbatim, so these are identical.
-        if let Some(text) = history_text {
-            let history = Arc::clone(&self.history);
-            let raw = transcript.clone();
-            let mode_id = mode.id.clone();
-            let app_name = self.last_app().map(|(_, name)| name);
-            // DB write off the async executor (convention: file/DB I/O blocks).
-            tauri::async_runtime::spawn_blocking(move || {
+        // Opt-in persistence at the success point, off the async executor
+        // (convention: file/DB I/O blocks). Two independent opt-ins:
+        //   • history (text, never audio) when `history_enabled`;
+        //   • `insights_daily` counts/dates (never words or audio) for the
+        //     LOCAL calendar day when `app_stats_enabled` — no row is ever
+        //     written while the flag is off.
+        // `history-changed` fires only after the history write commits, so views
+        // refresh from durable rows instead of racing the write.
+        let app = self.app.clone();
+        let history = Arc::clone(&self.history);
+        let db = Arc::clone(&self.db);
+        let raw = transcript.clone();
+        let mode_id = mode.id.clone();
+        let insights_day = settings.app_stats_enabled.then(local_day);
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Some(day) = insights_day {
+                if let Err(err) = db.insights_upsert_daily(
+                    &day,
+                    words as i64,
+                    polished,
+                    dict_fixes as i64,
+                    record_ms as i64,
+                ) {
+                    log::warn!("could not persist insights: {err}");
+                }
+            }
+            if let Some(text) = history_text {
                 history.append(
                     raw,
                     text,
@@ -930,8 +975,9 @@ impl Pipeline {
                     words as i64,
                     polished,
                 );
-            });
-        }
+                let _ = app.emit(HISTORY_CHANGED_EVENT, ());
+            }
+        });
         // A clipboard fallback (paste failed / no Accessibility) is the
         // highest-priority message — the user must know to press ⌘V to get
         // their text. AI/override notes only matter once the text auto-pasted;
@@ -1029,6 +1075,12 @@ struct ResolvedDictation {
     profile: Option<LlmProfile>,
     /// First dangling-override notice, if any; informational, never fatal.
     notice: Option<String>,
+}
+
+/// The user's LOCAL calendar day as `YYYY-MM-DD` — the `insights_daily` bucket
+/// key. Local (not UTC) so a dictation reads as "today" by the user's clock.
+fn local_day() -> String {
+    chrono::Local::now().format("%Y-%m-%d").to_string()
 }
 
 /// Mode names render up to 16 chars in the HUD and dangling notices (07 §5);

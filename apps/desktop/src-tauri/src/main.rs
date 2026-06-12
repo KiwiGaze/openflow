@@ -85,6 +85,7 @@ fn main() {
                 Arc::clone(&models),
                 Arc::clone(&profiles),
                 Arc::clone(&history),
+                Arc::clone(&db),
                 Arc::clone(&stt_profiles),
             );
 
@@ -153,6 +154,7 @@ fn main() {
             commands::delete_history_entry,
             commands::reprocess_history,
             commands::get_insights,
+            commands::clear_insights,
             commands::list_dictionary_suggestions,
             commands::dismiss_dictionary_suggestion,
             commands::copy_text,

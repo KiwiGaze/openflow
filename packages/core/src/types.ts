@@ -219,6 +219,11 @@ export interface Settings {
   appearance: Appearance;
   /** Opt-in: keep a local, searchable log of past dictations (default off). */
   historyEnabled: boolean;
+  /**
+   * Opt-in: persist all-time usage counts and dates (never words or audio) for
+   * the Insights view's lifetime totals and streaks (default off).
+   */
+  appStatsEnabled: boolean;
   /** Per-app rules: dictate in a chosen mode when an app is frontmost. */
   appRules: AppRule[];
   /** STT profile ids whose 'audio leaves the Mac' consent the user confirmed. */
@@ -295,10 +300,39 @@ export interface ModeCount {
   count: number;
 }
 
+/** One app's word total for the "where it goes" breakdown (an app name, never
+ * any dictated content). Mirrors `AppWords` in `stats.rs`. */
+export interface AppWords {
+  name: string;
+  words: number;
+}
+
+/** Source of the per-app breakdown: all-time (history) or this session. */
+export type PerAppScope = 'allTime' | 'session';
+
+/** Opt-in all-time usage summary from `insights_daily`. Mirrors `AllTimeStats`. */
+export interface AllTimeStats {
+  words: number;
+  dictations: number;
+  /** Percent of all-time dictations that used the LLM. */
+  aiPercent: number;
+  fixes: number;
+  /** All-time speaking pace (words ÷ minutes spoken); 0 with no duration. */
+  wordsPerMinute: number;
+}
+
+/** Consecutive-day dictation streaks, in days. Mirrors `Streak` in `stats.rs`. */
+export interface Streak {
+  current: number;
+  longest: number;
+}
+
 /**
- * Session-only usage aggregates for the Insights view. Counts and sums only —
- * never transcripts or audio — held in memory and reset on quit. Mirrors the
- * Rust `Insights` in `stats.rs`.
+ * Usage aggregates for the Insights view. The session fields (counts and sums,
+ * never transcripts or audio) are held in memory and reset on quit. The
+ * opt-in, persisted fields — `allTime` and `streak` (when `appStatsEnabled`),
+ * and the all-time `perApp` (when `historyEnabled`) — store counts and dates
+ * only, never words. Mirrors the Rust `Insights` in `stats.rs`.
  */
 export interface Insights {
   totalWords: number;
@@ -309,6 +343,15 @@ export interface Insights {
   polishedPercent: number;
   /** Most-used modes, highest first (up to 3). */
   topModes: ModeCount[];
+  /** Dictionary replacements applied this session. */
+  dictionaryFixes: number;
+  /** Per-app word totals, highest first (up to 6). */
+  perApp: AppWords[];
+  perAppScope: PerAppScope;
+  /** All-time totals, or null unless `appStatsEnabled`. */
+  allTime: AllTimeStats | null;
+  /** Dictation streaks, or null unless `appStatsEnabled`. */
+  streak: Streak | null;
 }
 
 export type MicrophonePermission = 'granted' | 'denied' | 'undetermined' | 'unknown';
@@ -337,6 +380,8 @@ export const EVENTS = {
   settingsChanged: 'settings-changed',
   result: 'transcription-result',
   changesToggle: 'changes-toggle',
+  /** Fired once a history append has committed; views refresh from durable rows. */
+  historyChanged: 'history-changed',
 } as const;
 
 /** Tauri command names callable via `invoke`. */
@@ -359,6 +404,7 @@ export const COMMANDS = {
   deleteHistoryEntry: 'delete_history_entry',
   reprocessHistory: 'reprocess_history',
   getInsights: 'get_insights',
+  clearInsights: 'clear_insights',
   listDictionarySuggestions: 'list_dictionary_suggestions',
   dismissDictionarySuggestion: 'dismiss_dictionary_suggestion',
   copyText: 'copy_text',

@@ -84,7 +84,8 @@ pub fn apply_rules_cleanup(text: &str) -> String {
 }
 
 /// Single-pass, whole-word, case-insensitive replacement of many phrases at
-/// once. Shared by the dictionary and snippet expanders. Two properties matter:
+/// once. Shared by the dictionary and snippet expanders. Returns the rewritten
+/// text and the number of replacements applied. Two properties matter:
 ///
 /// 1. **Longest wins.** Phrases compete longest-first, so "open flow" beats a
 ///    bare "flow" at the same span.
@@ -94,10 +95,10 @@ pub fn apply_rules_cleanup(text: &str) -> String {
 ///    that a "my cal" snippet just produced).
 ///
 /// `pairs` is `(from, to)`; each `from` must be trimmed and non-empty.
-fn replace_phrases(text: &str, pairs: &[(&str, &str)]) -> String {
+fn replace_phrases(text: &str, pairs: &[(&str, &str)]) -> (String, usize) {
     let mut ordered: Vec<&(&str, &str)> = pairs.iter().filter(|(f, _)| !f.is_empty()).collect();
     if ordered.is_empty() {
-        return text.to_string();
+        return (text.to_string(), 0);
     }
     // Longest first: with leftmost matching plus word boundaries, the longer of
     // two competing phrases is the one that matches its span.
@@ -126,29 +127,35 @@ fn replace_phrases(text: &str, pairs: &[(&str, &str)]) -> String {
         .case_insensitive(true)
         .build()
     else {
-        return text.to_string();
+        return (text.to_string(), 0);
     };
 
     let lookup: HashMap<String, &str> = ordered
         .iter()
         .map(|(from, to)| (from.to_lowercase(), *to))
         .collect();
-    re.replace_all(text, |caps: &regex::Captures| {
-        let matched = caps.get(0).map_or("", |m| m.as_str());
-        // Verbatim: return the replacement as an owned string so `$`-bearing
-        // expansions (e.g. "$$$") are never treated as capture references.
-        lookup
-            .get(&matched.to_lowercase())
-            .copied()
-            .unwrap_or(matched)
-            .to_string()
-    })
-    .into_owned()
+    let mut count = 0usize;
+    let replaced = re
+        .replace_all(text, |caps: &regex::Captures| {
+            let matched = caps.get(0).map_or("", |m| m.as_str());
+            count += 1;
+            // Verbatim: return the replacement as an owned string so `$`-bearing
+            // expansions (e.g. "$$$") are never treated as capture references.
+            lookup
+                .get(&matched.to_lowercase())
+                .copied()
+                .unwrap_or(matched)
+                .to_string()
+        })
+        .into_owned();
+    (replaced, count)
 }
 
 /// Applies personal-dictionary replacements with whole-word, case-insensitive
-/// matching. Longer phrases win over shorter ones.
-pub fn apply_dictionary(text: &str, entries: &[DictionaryEntry]) -> String {
+/// matching. Longer phrases win over shorter ones. Returns the rewritten text
+/// and how many replacements were applied (the Insights "dictionary fixes"
+/// counter), counting occurrences replaced, not entries that matched.
+pub fn apply_dictionary(text: &str, entries: &[DictionaryEntry]) -> (String, usize) {
     let pairs: Vec<(&str, &str)> = entries
         .iter()
         .map(|e| (e.from.trim(), e.to.as_str()))
@@ -190,7 +197,8 @@ pub fn apply_snippets(text: &str, snippets: &[Snippet]) -> String {
         .filter(|s| !s.whole_utterance)
         .map(|s| (s.trigger.trim(), s.expansion.as_str()))
         .collect();
-    replace_phrases(text, &pairs)
+    // Snippet expansion does not feed the dictionary-fixes counter.
+    replace_phrases(text, &pairs).0
 }
 
 /// Casing styles for Code-mode identifier conversion.
@@ -389,34 +397,50 @@ mod tests {
         );
     }
 
+    /// Test helper: the rewritten text only, dropping the replacement count.
+    fn dict(text: &str, entries: &[DictionaryEntry]) -> String {
+        apply_dictionary(text, entries).0
+    }
+
     #[test]
     fn dictionary_replaces_whole_words_case_insensitively() {
         let entries = vec![entry("open flow", "Velata"), entry("tory", "Tauri")];
         assert_eq!(
-            apply_dictionary("Open Flow uses tory under the hood", &entries),
+            dict("Open Flow uses tory under the hood", &entries),
             "Velata uses Tauri under the hood"
         );
         // "history" contains "tory" but must not match.
-        assert_eq!(apply_dictionary("history class", &entries), "history class");
+        assert_eq!(dict("history class", &entries), "history class");
     }
 
     #[test]
     fn dictionary_prefers_longest_match() {
         let entries = vec![entry("flow", "Flow?"), entry("open flow", "Velata")];
-        assert_eq!(
-            apply_dictionary("try open flow now", &entries),
-            "try Velata now"
-        );
+        assert_eq!(dict("try open flow now", &entries), "try Velata now");
     }
 
     #[test]
     fn dictionary_replacement_is_literal_not_regex() {
         let entries = vec![entry("cash", "$$$"), entry("c++", "C++")];
-        assert_eq!(apply_dictionary("send cash", &entries), "send $$$");
+        assert_eq!(dict("send cash", &entries), "send $$$");
+        assert_eq!(dict("i like c++ a lot", &entries), "i like C++ a lot");
+    }
+
+    #[test]
+    fn dictionary_counts_replacement_occurrences() {
+        let entries = vec![entry("tory", "Tauri"), entry("open flow", "Velata")];
+        // Two occurrences of "tory" plus one "open flow" → three replacements,
+        // counting occurrences applied rather than the two entries that matched.
+        let (text, count) = apply_dictionary("tory and tory in open flow", &entries);
+        assert_eq!(text, "Tauri and Tauri in Velata");
+        assert_eq!(count, 3);
+        // No matches → zero, text unchanged.
         assert_eq!(
-            apply_dictionary("i like c++ a lot", &entries),
-            "i like C++ a lot"
+            apply_dictionary("nothing here", &entries),
+            ("nothing here".into(), 0)
         );
+        // Empty dictionary → zero.
+        assert_eq!(apply_dictionary("anything", &[]), ("anything".into(), 0));
     }
 
     #[test]

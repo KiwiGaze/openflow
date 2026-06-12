@@ -942,6 +942,43 @@ button:focus-visible,
   border-top: 1px solid var(--border);
 }
 
+/* Five stats fit a three-up grid better than the default two-up. */
+.insights-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.insight-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.insight-app-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.insight-app-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insight-bar-track {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--chip);
+  overflow: hidden;
+}
+
+.insight-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+}
+
 /* ---- Home ---- */
 
 .home-greeting {

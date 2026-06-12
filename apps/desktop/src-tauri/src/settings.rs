@@ -13,7 +13,7 @@ use crate::error::{AppError, AppResult};
 use crate::models::DEFAULT_STT_MODEL_ID;
 use crate::modes;
 
-pub const SETTINGS_VERSION: u32 = 4;
+pub const SETTINGS_VERSION: u32 = 5;
 pub const MAX_RECORDING_SECS: u64 = 300;
 
 /// Emitted (with the full `Settings` payload) after every backend-initiated
@@ -176,6 +176,10 @@ pub struct Settings {
     /// Opt-in (default off): keep a local, searchable log of past dictations.
     /// Off preserves the no-transcript-persistence privacy default.
     pub history_enabled: bool,
+    /// Opt-in (default off): persist all-time usage counts and dates (never
+    /// words or audio) to `insights_daily` for the Insights view's lifetime
+    /// totals and streaks. Off keeps insights session-only, in-RAM.
+    pub app_stats_enabled: bool,
     /// Per-app rules: dictate in a chosen mode when an app is frontmost (07 §9).
     pub app_rules: Vec<AppRule>,
     /// STT profile ids whose "audio leaves the Mac" consent the user confirmed
@@ -214,6 +218,7 @@ impl Default for Settings {
             dictation_count: 0,
             last_tip_shown_at: String::new(),
             history_enabled: false,
+            app_stats_enabled: false,
             app_rules: Vec::new(),
             confirmed_stt_profiles: Vec::new(),
             show_in_dock: false,
@@ -446,6 +451,7 @@ mod tests {
         assert!(json.contains("\"tipsEnabled\":true"));
         assert!(json.contains("\"dictationCount\":0"));
         assert!(json.contains("\"historyEnabled\":false"));
+        assert!(json.contains("\"appStatsEnabled\":false"));
         assert!(json.contains("\"snippets\":[]"));
         assert!(json.contains("\"showInDock\":false"));
         // The v1 LLM block is deserialize-only; it must never be written.
