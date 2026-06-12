@@ -243,6 +243,11 @@ export interface Settings {
   sttModelId: string;
   /** ISO 639-1 code or `auto`. */
   language: string;
+  /**
+   * Input device to record from, matched by exact name; null = system default.
+   * A saved name no longer present falls back to the default.
+   */
+  inputDeviceName: string | null;
   insertMethod: InsertMethod;
   restoreClipboard: boolean;
   launchAtLogin: boolean;
@@ -250,6 +255,8 @@ export interface Settings {
   appearance: Appearance;
   /** Opt-in: keep a local, searchable log of past dictations (default off). */
   historyEnabled: boolean;
+  /** Days a history entry is kept before purge; 0 = keep forever. */
+  historyRetentionDays: number;
   /**
    * Opt-in: persist all-time usage counts and dates (never words or audio) for
    * the Insights view's lifetime totals and streaks (default off).
@@ -505,6 +512,7 @@ export const COMMANDS = {
   exportMode: 'export_mode',
   exportDictionary: 'export_dictionary',
   listOllamaModels: 'list_ollama_models',
+  listInputDevices: 'list_input_devices',
   checkPermissions: 'check_permissions',
   requestMicrophonePermission: 'request_microphone_permission',
   promptAccessibilityPermission: 'prompt_accessibility_permission',

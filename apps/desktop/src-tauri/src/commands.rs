@@ -617,6 +617,14 @@ pub async fn list_ollama_models(
     state.llm.list_ollama_models(&base_url).await
 }
 
+/// Lists input device names for the microphone picker (local hardware
+/// enumeration — never network). Enumeration failures degrade to whatever names
+/// were collected, so the picker can always offer at least the system default.
+#[tauri::command]
+pub fn list_input_devices() -> Vec<String> {
+    crate::audio::list_input_device_names()
+}
+
 /// Returns microphone and Accessibility permission state.
 #[tauri::command]
 pub fn check_permissions() -> PermissionsState {

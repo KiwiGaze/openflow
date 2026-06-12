@@ -446,7 +446,7 @@ impl Pipeline {
         // else the active mode.
         let recording_label = Some(truncate_mode_name(&mode.name));
 
-        self.audio.start()?;
+        self.audio.start(settings.input_device_name.as_deref())?;
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         *self.session.lock().expect("pipeline state poisoned") = Some(Session {
             job,
@@ -988,6 +988,7 @@ impl Pipeline {
         let raw = transcript.clone();
         let mode_id = mode.id.clone();
         let insights_day = settings.app_stats_enabled.then(local_day);
+        let retention_days = settings.history_retention_days;
         tauri::async_runtime::spawn_blocking(move || {
             if let Some(day) = insights_day {
                 if let Err(err) = db.insights_upsert_daily(
@@ -1009,6 +1010,7 @@ impl Pipeline {
                     Some(record_ms as i64),
                     words as i64,
                     polished,
+                    retention_days,
                 );
                 let _ = app.emit(HISTORY_CHANGED_EVENT, ());
             }

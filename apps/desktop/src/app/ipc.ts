@@ -79,6 +79,7 @@ export const ipc = {
     invoke(COMMANDS.exportDictionary, { contents }),
   listOllamaModels: (baseUrl: string): Promise<string[]> =>
     invoke(COMMANDS.listOllamaModels, { baseUrl }),
+  listInputDevices: (): Promise<string[]> => invoke(COMMANDS.listInputDevices),
   checkPermissions: (): Promise<PermissionsState> => invoke(COMMANDS.checkPermissions),
   requestMicrophonePermission: (): Promise<void> => invoke(COMMANDS.requestMicrophonePermission),
   promptAccessibilityPermission: (): Promise<boolean> =>

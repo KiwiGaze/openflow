@@ -70,6 +70,24 @@ fn main() {
             let models = Arc::new(models::ModelManager::new(data_dir.join("models")));
             let db = Arc::new(db::Db::open(&data_dir)?);
             let history = Arc::new(history::HistoryStore::new(Arc::clone(&db)));
+            // Enforce history retention once at startup so an entry that aged out
+            // while the app was closed is gone before any view can read it. 0 =
+            // keep forever (no purge); the per-append purge handles the rest.
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
+            if let Some(cutoff) =
+                history::retention_cutoff_ms(now_ms, settings.get().history_retention_days)
+            {
+                match db.history_purge_older_than(cutoff) {
+                    Ok(removed) if removed > 0 => {
+                        log::info!("purged {removed} history entries past the retention window")
+                    }
+                    Ok(_) => {}
+                    Err(err) => log::warn!("startup history retention purge failed: {err}"),
+                }
+            }
             let stt_profiles = Arc::new(stt_profiles::SttProfileManager::new(
                 data_dir.join("stt-profiles"),
             ));
@@ -174,6 +192,7 @@ fn main() {
             commands::export_mode,
             commands::export_dictionary,
             commands::list_ollama_models,
+            commands::list_input_devices,
             commands::check_permissions,
             commands::request_microphone_permission,
             commands::prompt_accessibility_permission,

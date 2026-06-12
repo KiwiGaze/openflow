@@ -24,6 +24,8 @@ pub struct RecordedAudio {
 
 enum AudioCmd {
     Start {
+        /// Saved input device name to match by, or None for the system default.
+        device_name: Option<String>,
         respond: SyncSender<AppResult<()>>,
     },
     Stop {
@@ -53,10 +55,15 @@ impl AudioSystem {
         Self { tx, level }
     }
 
-    pub fn start(&self) -> AppResult<()> {
+    /// Starts capture. `device_name` is the saved input device to match by exact
+    /// name; None (or a name no longer present) records from the system default.
+    pub fn start(&self, device_name: Option<&str>) -> AppResult<()> {
         let (respond, wait) = mpsc::sync_channel(1);
         self.tx
-            .send(AudioCmd::Start { respond })
+            .send(AudioCmd::Start {
+                device_name: device_name.map(str::to_owned),
+                respond,
+            })
             .map_err(|_| AppError::Audio("audio thread is gone".into()))?;
         wait.recv()
             .map_err(|_| AppError::Audio("audio thread did not respond".into()))?
@@ -94,11 +101,14 @@ fn worker(rx: mpsc::Receiver<AudioCmd>, level: Arc<AtomicU32>) {
 
     while let Ok(cmd) = rx.recv() {
         match cmd {
-            AudioCmd::Start { respond } => {
+            AudioCmd::Start {
+                device_name,
+                respond,
+            } => {
                 let result = if active.is_some() {
                     Err(AppError::State("already recording".into()))
                 } else {
-                    match open_stream(Arc::clone(&level)) {
+                    match open_stream(Arc::clone(&level), device_name.as_deref()) {
                         Ok(recording) => {
                             active = Some(recording);
                             Ok(())
@@ -135,11 +145,9 @@ fn worker(rx: mpsc::Receiver<AudioCmd>, level: Arc<AtomicU32>) {
     }
 }
 
-fn open_stream(level: Arc<AtomicU32>) -> AppResult<ActiveRecording> {
+fn open_stream(level: Arc<AtomicU32>, device_name: Option<&str>) -> AppResult<ActiveRecording> {
     let host = cpal::default_host();
-    let device = host
-        .default_input_device()
-        .ok_or_else(|| AppError::Audio("no microphone found".into()))?;
+    let device = select_input_device(&host, device_name)?;
     let config = device
         .default_input_config()
         .map_err(|e| AppError::Audio(format!("no usable microphone config: {e}")))?;
@@ -177,4 +185,103 @@ fn open_stream(level: Arc<AtomicU32>) -> AppResult<ActiveRecording> {
         sample_rate,
         started: std::time::Instant::now(),
     })
+}
+
+/// Resolves the input device to record from. When `saved` names a device the
+/// host still exposes, that device is used; otherwise (no preference, or the
+/// saved mic was unplugged) capture falls back to the system default — a saved
+/// name must never make dictation fail.
+fn select_input_device(host: &cpal::Host, saved: Option<&str>) -> AppResult<cpal::Device> {
+    let names = list_input_device_names();
+    match select_input_device_name(saved, &names) {
+        Some(name) => {
+            // cpal 0.18 exposes the device name via `Display`, so compare the
+            // formatted name against the saved choice.
+            let found = host
+                .input_devices()
+                .ok()
+                .and_then(|mut devices| devices.find(|d| d.to_string() == name));
+            match found {
+                Some(device) => Ok(device),
+                None => {
+                    log::warn!("input device '{name}' vanished mid-lookup; using system default");
+                    default_input_device(host)
+                }
+            }
+        }
+        None => {
+            if let Some(saved) = saved {
+                log::warn!("saved input device '{saved}' is not available; using system default");
+            }
+            default_input_device(host)
+        }
+    }
+}
+
+fn default_input_device(host: &cpal::Host) -> AppResult<cpal::Device> {
+    host.default_input_device()
+        .ok_or_else(|| AppError::Audio("no microphone found".into()))
+}
+
+/// Input device names the host can enumerate, a fresh host query each call (for
+/// the mic picker and device resolution). An enumeration failure is logged and
+/// yields an empty list (the caller then uses the system default). cpal 0.18
+/// exposes the name via `Display`. Local hardware only — never network.
+pub fn list_input_device_names() -> Vec<String> {
+    let host = cpal::default_host();
+    let devices = match host.input_devices() {
+        Ok(devices) => devices,
+        Err(err) => {
+            log::warn!("could not enumerate input devices: {err}");
+            return Vec::new();
+        }
+    };
+    devices.map(|d| d.to_string()).collect()
+}
+
+/// Decides which input device name to record from: the saved name when it is
+/// present in `available`, else `None` to signal "use the system default".
+/// Pure (no cpal) so the fallback rule is unit-tested in isolation.
+fn select_input_device_name(saved: Option<&str>, available: &[String]) -> Option<String> {
+    let saved = saved?;
+    if available.iter().any(|name| name == saved) {
+        Some(saved.to_owned())
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn select_device_name_uses_saved_when_present() {
+        let available = vec![
+            "MacBook Pro Microphone".to_string(),
+            "External USB Mic".to_string(),
+        ];
+        assert_eq!(
+            select_input_device_name(Some("External USB Mic"), &available),
+            Some("External USB Mic".to_string())
+        );
+    }
+
+    #[test]
+    fn select_device_name_falls_back_when_saved_absent() {
+        let available = vec!["MacBook Pro Microphone".to_string()];
+        // A saved mic that was unplugged is not in the list → default (None).
+        assert_eq!(
+            select_input_device_name(Some("External USB Mic"), &available),
+            None
+        );
+        // No list at all → default.
+        assert_eq!(select_input_device_name(Some("Anything"), &[]), None);
+    }
+
+    #[test]
+    fn select_device_name_none_means_default() {
+        let available = vec!["MacBook Pro Microphone".to_string()];
+        assert_eq!(select_input_device_name(None, &available), None);
+    }
 }

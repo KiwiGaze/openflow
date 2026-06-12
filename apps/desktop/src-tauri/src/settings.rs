@@ -206,6 +206,10 @@ pub struct Settings {
     pub polish_rules: PolishRules,
     pub stt_model_id: String,
     pub language: String,
+    /// Input device to record from, matched by exact name; None = system
+    /// default. A saved name that is no longer present falls back to the
+    /// default so dictation never fails because a mic was unplugged.
+    pub input_device_name: Option<String>,
     /// v1 migration only — see `profiles::reconcile`.
     #[serde(skip_serializing)]
     pub llm: Option<LegacyLlmConfig>,
@@ -226,6 +230,9 @@ pub struct Settings {
     /// Opt-in (default off): keep a local, searchable log of past dictations.
     /// Off preserves the no-transcript-persistence privacy default.
     pub history_enabled: bool,
+    /// Days a history entry is kept before it is purged; 0 = keep forever.
+    /// Enforced on every append and once at startup, on top of the row cap.
+    pub history_retention_days: u32,
     /// Opt-in (default off): persist all-time usage counts and dates (never
     /// words or audio) to `insights_daily` for the Insights view's lifetime
     /// totals and streaks. Off keeps insights session-only, in-RAM.
@@ -266,6 +273,7 @@ impl Default for Settings {
             polish_rules: PolishRules::default(),
             stt_model_id: DEFAULT_STT_MODEL_ID.into(),
             language: "auto".into(),
+            input_device_name: None,
             llm: None,
             insert_method: InsertMethod::Paste,
             restore_clipboard: true,
@@ -276,6 +284,7 @@ impl Default for Settings {
             dictation_count: 0,
             last_tip_shown_at: String::new(),
             history_enabled: false,
+            history_retention_days: 0,
             app_stats_enabled: false,
             app_rules: Vec::new(),
             auto_cleanup_level: CleanupLevel::Ai,
@@ -522,6 +531,8 @@ mod tests {
         assert!(json.contains("\"tipsEnabled\":true"));
         assert!(json.contains("\"dictationCount\":0"));
         assert!(json.contains("\"historyEnabled\":false"));
+        assert!(json.contains("\"historyRetentionDays\":0"));
+        assert!(json.contains("\"inputDeviceName\":null"));
         assert!(json.contains("\"appStatsEnabled\":false"));
         assert!(json.contains("\"snippets\":[]"));
         assert!(json.contains("\"showInDock\":false"));
@@ -564,6 +575,36 @@ mod tests {
         let s = SettingsManager::load(&dir).get();
         assert_eq!(s.auto_cleanup_level, CleanupLevel::Rules);
         assert_eq!(s.app_rules[0].cleanup_level, Some(CleanupLevel::Off));
+    }
+
+    #[test]
+    fn retention_and_input_device_default_for_old_files() {
+        // A file predating this task has neither field; both must default
+        // (retention 0 = keep forever, device None = system default) rather
+        // than fail the load.
+        let dir = temp_dir("retention-device-defaults");
+        fs::write(
+            dir.join("settings.json"),
+            r#"{ "version": 5, "historyEnabled": true }"#,
+        )
+        .unwrap();
+        let s = SettingsManager::load(&dir).get();
+        assert_eq!(s.history_retention_days, 0);
+        assert_eq!(s.input_device_name, None);
+
+        // An explicit pair round-trips through load and reaches both fields.
+        let dir = temp_dir("retention-device-explicit");
+        fs::write(
+            dir.join("settings.json"),
+            r#"{ "version": 5, "historyRetentionDays": 30, "inputDeviceName": "MacBook Pro Microphone" }"#,
+        )
+        .unwrap();
+        let s = SettingsManager::load(&dir).get();
+        assert_eq!(s.history_retention_days, 30);
+        assert_eq!(
+            s.input_device_name.as_deref(),
+            Some("MacBook Pro Microphone")
+        );
     }
 
     #[test]

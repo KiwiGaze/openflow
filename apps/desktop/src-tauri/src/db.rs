@@ -170,6 +170,15 @@ impl Db {
         Ok(())
     }
 
+    /// Deletes history rows recorded before `cutoff_ms` (the retention window's
+    /// lower bound). The caller computes the cutoff; 0-retention never calls
+    /// this. Returns the number of rows removed.
+    pub fn history_purge_older_than(&self, cutoff_ms: i64) -> AppResult<usize> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        let removed = conn.execute("DELETE FROM history WHERE at < ?1", [cutoff_ms])?;
+        Ok(removed)
+    }
+
     /// All-time words per app from the history table, highest first. Rows with
     /// no recorded app (legacy imports) are excluded so the breakdown only ever
     /// shows real app names. Caller passes the row cap.
@@ -801,6 +810,29 @@ mod tests {
             rows.last().expect("last").id,
             format!("id-{}", total - HISTORY_CAP)
         );
+    }
+
+    #[test]
+    fn history_purge_older_than_drops_old_keeps_recent() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        // Three rows at ascending timestamps 100/200/300.
+        for (id, at) in [("old", 100), ("mid", 200), ("new", 300)] {
+            db.history_append(id, at, "t", "r", "standard", None, None, 1, false)
+                .expect("append");
+        }
+        // Cutoff 250: only rows with at < 250 (old, mid) go; "new" stays.
+        let removed = db.history_purge_older_than(250).expect("purge");
+        assert_eq!(removed, 2);
+        let rows = db.history_list().expect("list");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, "new");
+
+        // A cutoff before everything removes nothing (proves the boundary is
+        // strict less-than: a row exactly at the cutoff is kept).
+        let removed = db.history_purge_older_than(300).expect("purge boundary");
+        assert_eq!(removed, 0);
+        assert_eq!(db.history_list().expect("list").len(), 1);
     }
 
     #[test]

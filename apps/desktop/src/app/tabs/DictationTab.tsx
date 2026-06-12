@@ -1,6 +1,7 @@
-import type { JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { type HotkeyBehavior, LANGUAGES } from '@velata/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
+import { ipc } from '../ipc.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
@@ -16,6 +17,18 @@ export function DictationTab({
   const { models } = modelsApi;
   const activeModel = models.find((m) => m.id === settings.sttModelId);
   const englishOnly = (activeModel && !activeModel.multilingual) ?? false;
+
+  // Enumerate input devices once when the tab mounts (local hardware; no
+  // polling). An empty list disables the picker with "System default" only.
+  const [inputDevices, setInputDevices] = useState<string[]>([]);
+  useEffect(() => {
+    void ipc
+      .listInputDevices()
+      .then(setInputDevices)
+      .catch((err: unknown) => {
+        console.error('Failed to list input devices:', err);
+      });
+  }, []);
 
   return (
     <div className="tab-body">
@@ -60,6 +73,30 @@ export function DictationTab({
 
       <section className="card">
         <h2>Speech</h2>
+        <Row
+          title="Microphone"
+          hint="The input device to record from. System default follows your Mac's choice."
+        >
+          <select
+            value={settings.inputDeviceName ?? ''}
+            disabled={inputDevices.length === 0}
+            onChange={(e) => void update({ inputDeviceName: e.target.value || null })}
+          >
+            <option value="">System default</option>
+            {/* Keep a saved-but-absent device (e.g. unplugged) visible so the
+                picker reflects the stored choice; recording falls back server-side. */}
+            {inputDevices.length > 0 &&
+              settings.inputDeviceName &&
+              !inputDevices.includes(settings.inputDeviceName) && (
+                <option value={settings.inputDeviceName}>{settings.inputDeviceName}</option>
+              )}
+            {inputDevices.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </Row>
         <Row
           title="Spoken language"
           hint={

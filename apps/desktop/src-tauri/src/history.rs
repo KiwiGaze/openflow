@@ -73,6 +73,8 @@ impl HistoryStore {
 
     /// Append a dictation (newest first), capped. Best-effort persist — a
     /// history write failure must never affect the dictation that just landed.
+    /// `retention_days > 0` also purges entries older than that window on top of
+    /// the row cap; 0 keeps forever.
     #[allow(clippy::too_many_arguments)]
     pub fn append(
         &self,
@@ -83,6 +85,7 @@ impl HistoryStore {
         duration_ms: Option<i64>,
         word_count: i64,
         used_ai: bool,
+        retention_days: u32,
     ) {
         let at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -103,6 +106,11 @@ impl HistoryStore {
         ) {
             log::warn!("could not persist history: {err}");
         }
+        if let Some(cutoff) = retention_cutoff_ms(at, retention_days) {
+            if let Err(err) = self.db.history_purge_older_than(cutoff) {
+                log::warn!("could not purge old history: {err}");
+            }
+        }
     }
 
     /// Removes every history row. A "cleared" history that still has rows is a
@@ -114,5 +122,34 @@ impl HistoryStore {
     /// Removes one history row by id.
     pub fn delete(&self, id: &str) -> AppResult<()> {
         self.db.history_delete(id)
+    }
+}
+
+/// Lower bound for the retention window: the earliest timestamp a history entry
+/// may keep, given `now_ms` and a retention of `days`. `None` when `days == 0`
+/// (keep forever — the caller skips the purge entirely).
+pub fn retention_cutoff_ms(now_ms: i64, days: u32) -> Option<i64> {
+    if days == 0 {
+        return None;
+    }
+    const DAY_MS: i64 = 86_400_000;
+    Some(now_ms - i64::from(days) * DAY_MS)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retention_cutoff_zero_is_keep_forever() {
+        assert_eq!(retention_cutoff_ms(1_000_000_000, 0), None);
+    }
+
+    #[test]
+    fn retention_cutoff_subtracts_whole_days() {
+        // 7 days back from a fixed now.
+        let now = 1_000_000_000_000;
+        assert_eq!(retention_cutoff_ms(now, 7), Some(now - 7 * 86_400_000),);
+        assert_eq!(retention_cutoff_ms(now, 1), Some(now - 86_400_000));
     }
 }

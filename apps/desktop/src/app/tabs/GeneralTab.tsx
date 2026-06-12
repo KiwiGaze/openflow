@@ -1,8 +1,151 @@
-import type { JSX } from 'react';
+import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { type Appearance, formatAcceleratorMac } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
+import { ipc } from '../ipc.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
+
+/** A flat row whose title carries an "On this Mac" locality badge. */
+function LocalRow({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <div className="row">
+      <div className="row-text">
+        <div className="row-title">
+          {title}
+          <span className="badge badge-local">On this Mac</span>
+        </div>
+        <div className="row-hint">{hint}</div>
+      </div>
+      <div className="row-control">{children}</div>
+    </div>
+  );
+}
+
+/** History, stats, and notes: three local opt-ins, each with its own controls. */
+function DataPrivacyCard({ api }: { api: SettingsApi }): JSX.Element {
+  const { settings, update } = api;
+  const [noteCount, setNoteCount] = useState<number | null>(null);
+  const [clearError, setClearError] = useState<string | null>(null);
+
+  // Only read notes when the Scratchpad is on — the command refuses while off,
+  // and counting is the only reason to touch it here.
+  useEffect(() => {
+    if (!settings.scratchpadEnabled) {
+      setNoteCount(null);
+      return;
+    }
+    void ipc
+      .listNotes(null)
+      .then((notes) => {
+        setNoteCount(notes.length);
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to count notes:', err);
+      });
+  }, [settings.scratchpadEnabled]);
+
+  const clearHistory = (): void => {
+    setClearError(null);
+    void ipc.clearHistory().catch((err: unknown) => {
+      // The Rust side reports success only once the rows are gone, so a
+      // rejection means transcripts may still be on disk — say so.
+      setClearError(`Couldn't clear history — it may still be on disk. ${String(err)}`);
+    });
+  };
+
+  const resetStats = (): void => {
+    void ipc.clearInsights().catch((err: unknown) => {
+      console.error('Failed to reset stats:', err);
+    });
+  };
+
+  return (
+    <section className="card">
+      <h2>Data &amp; privacy</h2>
+      <p className="row-hint">
+        By default Velata stores nothing. History, stats, and notes are separate opt-ins, kept only
+        on this Mac.
+      </p>
+
+      <LocalRow
+        title="Save history"
+        hint="Keep a local, searchable log of past dictations (text only, never audio)."
+      >
+        <Toggle
+          checked={settings.historyEnabled}
+          onChange={(checked) => void update({ historyEnabled: checked })}
+          label="Save history"
+        />
+      </LocalRow>
+      {settings.historyEnabled && (
+        <div className="row-actions">
+          <select
+            value={settings.historyRetentionDays}
+            onChange={(e) => void update({ historyRetentionDays: Number(e.target.value) })}
+          >
+            <option value={0}>Keep forever</option>
+            <option value={30}>30 days</option>
+            <option value={7}>7 days</option>
+            <option value={1}>1 day</option>
+          </select>
+          <button className="btn btn-quiet btn-danger" onClick={clearHistory}>
+            Clear history
+          </button>
+        </div>
+      )}
+      {clearError && <p className="row-hint row-hint-warn">{clearError}</p>}
+
+      <LocalRow
+        title="Keep all-time stats"
+        hint="Persist lifetime usage counts and dates — never your words or audio."
+      >
+        <Toggle
+          checked={settings.appStatsEnabled}
+          onChange={(checked) => void update({ appStatsEnabled: checked })}
+          label="Keep all-time stats"
+        />
+      </LocalRow>
+      {settings.appStatsEnabled && (
+        <div className="row-actions">
+          <button className="btn btn-quiet btn-danger" onClick={resetStats}>
+            Reset stats
+          </button>
+        </div>
+      )}
+
+      <LocalRow
+        title="Scratchpad"
+        hint="A local notes surface. Off, no note is written and every note command refuses."
+      >
+        <Toggle
+          checked={settings.scratchpadEnabled}
+          onChange={(checked) => void update({ scratchpadEnabled: checked })}
+          label="Scratchpad"
+        />
+      </LocalRow>
+      {settings.scratchpadEnabled && (
+        <div className="row-actions">
+          {noteCount !== null && (
+            <span className="row-hint">
+              {noteCount} {noteCount === 1 ? 'note' : 'notes'} on this Mac
+            </span>
+          )}
+          <button className="btn btn-quiet" onClick={() => void ipc.openScratchpadWindow(null)}>
+            Open Scratchpad
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, update } = api;
@@ -51,16 +194,6 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
             Reset tips
           </button>
         </div>
-        <Row
-          title="Save history"
-          hint="Keep a local, searchable log of past dictations on this Mac (text only, never audio). Off by default. Clear it anytime under Output."
-        >
-          <Toggle
-            checked={settings.historyEnabled}
-            onChange={(checked) => void update({ historyEnabled: checked })}
-            label="Save history"
-          />
-        </Row>
         <Row title="Show in Dock" hint="Keep a Dock icon. Off keeps Velata in the menu bar only.">
           <Toggle
             checked={settings.showInDock}
@@ -69,6 +202,8 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
           />
         </Row>
       </section>
+
+      <DataPrivacyCard api={api} />
 
       <section className="card">
         <h2>Keyboard shortcuts</h2>
