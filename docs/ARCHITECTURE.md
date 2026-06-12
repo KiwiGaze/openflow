@@ -3,8 +3,10 @@
 ## 1. System overview
 
 Velata is a Tauri 2 app: a Rust core owns every capability that touches the OS or heavy
-compute; two small React webviews (settings window, HUD overlay) are pure UI driven over Tauri
-IPC. There is no other process — whisper.cpp is linked in.
+compute; the React webviews (settings window, HUD overlay, the on-demand Scratchpad) are pure
+UI driven over Tauri IPC. There is no other process — whisper.cpp is linked in. The settings
+window is a two-section sidebar: Features (Home, Insights, Dictionary, Snippets, Style,
+Transforms, Scratchpad) and Settings (Dictation, Modes, Models, Output, General, About).
 
 ```
                          ┌────────────────────────────────────────────────┐
@@ -26,6 +28,7 @@ IPC. There is no other process — whisper.cpp is linked in.
                          │ models.rs · history.rs · permissions.rs        │
                          │ tray.rs · hud.rs · changes.rs · apps.rs        │
                          │ stats.rs · suggestions.rs · modes.rs · state.rs│
+                         │ db.rs · notes.rs · scratchpad.rs               │
                          │ commands.rs (IPC surface) · error.rs           │
                          └───────△─────────────────────────△──────────────┘
                                  │ events (pipeline-state,  │ invoke (get/save settings,
@@ -54,8 +57,10 @@ Per job:
    buffers are skipped outright. The dictionary is passed as an `initial_prompt` glossary.
 4. **Clean** — `text.rs` strips whisper artifacts (`[BLANK_AUDIO]`, `(laughs)`, …), then either
    applies rules-based cleanup (fillers, spoken "new line/new paragraph" commands, sentence
-   capitalization) or hands off to the LLM, depending on mode and provider availability.
-   Dictionary replacements always run.
+   capitalization) or hands off to the LLM, depending on mode and provider availability. The
+   cleanup level (off / rules / AI) is resolved once at recording start from the frontmost
+   app's rule, falling back to the global `autoCleanupLevel`, and carried on the `Session` —
+   so a mid-job app switch can't change the routing. Dictionary replacements always run.
 5. **Insert** — `output.rs` writes the clipboard, simulates ⌘V, and restores the previous
    clipboard. Without the Accessibility permission it degrades to clipboard-only and the HUD
    says so.
@@ -63,6 +68,16 @@ Per job:
 Selected-text polish (the polish hotkey or a transform) skips recording entirely: the
 selection is captured (clipboard save → probe marker → ⌘C → read → restore), the prompt +
 selection go to the LLM, and the result replaces the selection via paste.
+
+### The Scratchpad window
+
+The opt-in Scratchpad (`scratchpad.rs`, label `scratchpad`) is a plain decorated, resizable
+window — unlike the always-present click-through HUD and changes overlay, it is created on
+demand and destroyed on close, then recreated next time, and needs no `NSPanel` reclass or
+focus tricks. Its notes live in the SQLite store (`db.rs`, `notes.rs`); the note body is the
+minimal HTML the toolbar produces, and `transform_note_text` sends a note's plain text through
+the one LLM client (`llm.rs`) and re-wraps the reply. Every note mutation emits `notes-changed`
+so an open window refreshes; `scratchpad-open-note` asks an already-open window to switch notes.
 
 ## 2. Crate/package layout
 
@@ -93,8 +108,8 @@ of the mirror; the rules live in `docs/engineering/ipc-contract-conventions.md`.
 | `spawn_blocking` pool       | whisper inference                            | CPU/GPU-bound; `WhisperContext` lives behind a `Mutex` and is reused across calls (loading maps hundreds of MB)                                                                        |
 
 Cross-thread communication is `std::sync::mpsc` channels with reply channels — no shared mutable
-state beyond the settings `RwLock`, the profile cache `RwLock`, the pipeline state `Mutex`, and
-the level atomic.
+state beyond the settings `RwLock`, the profile cache `RwLock`, the pipeline state `Mutex`, the
+level atomic, and the SQLite `Connection` `Mutex` in `db.rs`.
 
 ## 4. Data model and persistence
 
@@ -114,12 +129,30 @@ one-time, self-erasing migration (`profiles::reconcile`) moves it into a profile
 startup.
 
 Cloud STT profiles follow the same file-backed pattern under `<app-data>/stt-profiles/`
-(`stt_profiles.rs`). Beyond that: audio is **never** persisted; transcripts persist only when
-the user opts into history (`historyEnabled`, default off — `history.rs`, text only, capped,
-clearable); the last result is otherwise in-memory. Session usage aggregates for the Insights
-view (`stats.rs`) and dictionary-suggestion tallies (`suggestions.rs`) are in-memory only —
-counts and sums, never content — and reset on quit. That is a privacy feature, not an omission;
-`pnpm check:privacy` trips on the cheap-to-catch violations.
+(`stt_profiles.rs`).
+
+Durable structured data lives in one SQLite file (`<app-data>/velata.db`, rusqlite bundled,
+WAL — `db.rs`), which owns the only `Connection` behind a `Mutex` (shared as `Arc<Db>`). The
+app-data dir is locked to 0700 and the db file to 0600 before any row lands (the WAL sidecars
+hold the same text). Schema migrates forward through `PRAGMA user_version`: each step and its
+version bump commit as one transaction, so a crash mid-step rolls back whole and the runner is
+idempotent. A corrupt or unopenable db is renamed aside to `velata.db.corrupt-<unix-ts>` (never
+deleted) and a fresh one created in its place; the v1 migration also imports the legacy
+`history.json` once, leaving the file behind. Four tables, all opt-in and off by default:
+`history`, `notes`, and `note_versions` hold user content (capped; notes are soft-deleted
+only, never destroyed), and `insights_daily` holds per-local-day counts and dates (words,
+dictations, AI dictations, fixes, duration — never the text, never audio). The pipeline's
+history and insights writes run on `spawn_blocking` at the success point so file/DB I/O stays
+off the async runtime; the synchronous note commands run on Tauri's command thread pool.
+
+Beyond that: audio is **never** persisted; transcripts persist only when the user opts into
+history (`historyEnabled`, default off — `history.rs`, text only, capped, retention
+`historyRetentionDays` enforced on append and at startup, clearable); the last result is
+otherwise in-memory. All-time Insights numbers come from `insights_daily` only when
+`appStatsEnabled` is on; the Scratchpad's notes only when `scratchpadEnabled` is on. Session
+usage aggregates (`stats.rs`) and dictionary-suggestion tallies (`suggestions.rs`) are
+in-memory only — counts and sums, never content — and reset on quit. That is a privacy
+feature, not an omission; `pnpm check:privacy` trips on the cheap-to-catch violations.
 
 ## 5. Key decisions and tradeoffs
 

@@ -1,5 +1,12 @@
 # 03 — Information architecture for v2
 
+> **Update 2026-06-13 (Wispr-parity build).** A two-section sidebar now supersedes the
+> seven-page IA defined below: **Features** (Home · Insights · Dictionary · Snippets · Style ·
+> Transforms · Scratchpad) and **Settings** (Dictation · Modes · Models · Output · General ·
+> About). The page-anatomy rules in §4 (grouped cards; one flat row per feature; one control
+> and at most one hint line) still apply to every page. This grouping was decided during the
+> Wispr-parity build; the rest of this document is kept for its rationale.
+
 Status: design proposal. Written 2026-06-11 against `main` (cd63494) + the in-flight Refine
 work (`docs/REFINE.md`). Baseline facts and vocabulary: `00-current-state.md`. This document
 is the keystone: 04–09 follow its structure and naming. Companion docs: 01 (competitive
