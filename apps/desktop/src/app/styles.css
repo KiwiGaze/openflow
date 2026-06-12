@@ -260,11 +260,15 @@ button:focus-visible,
   padding: 18px 22px;
 }
 
+.content > * {
+  max-width: 960px;
+  margin-inline: auto;
+}
+
 .tab-body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 640px;
 }
 
 .card {
