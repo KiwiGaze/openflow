@@ -41,6 +41,7 @@ const base: Settings = {
   transforms: [],
   polishRules: { concise: false, clarity: true, structure: false, tone: true },
   showInDock: false,
+  scratchpadEnabled: false,
   tipsEnabled: true,
   tipsSeen: [],
   dictationCount: 0,

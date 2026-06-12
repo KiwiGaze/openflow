@@ -241,6 +241,10 @@ pub struct Settings {
     pub confirmed_stt_profiles: Vec<String>,
     /// Keep a Dock icon (Regular activation). Off = menu-bar-only (Accessory).
     pub show_in_dock: bool,
+    /// Opt-in (default off): the Scratchpad notes surface. Off, no note is
+    /// written and every note command refuses — notes are stored only when the
+    /// user turns this on.
+    pub scratchpad_enabled: bool,
     pub onboarding_completed: bool,
 }
 
@@ -277,6 +281,7 @@ impl Default for Settings {
             auto_cleanup_level: CleanupLevel::Ai,
             confirmed_stt_profiles: Vec::new(),
             show_in_dock: false,
+            scratchpad_enabled: false,
             onboarding_completed: false,
         }
     }
@@ -520,6 +525,7 @@ mod tests {
         assert!(json.contains("\"appStatsEnabled\":false"));
         assert!(json.contains("\"snippets\":[]"));
         assert!(json.contains("\"showInDock\":false"));
+        assert!(json.contains("\"scratchpadEnabled\":false"));
         assert!(json.contains("\"autoCleanupLevel\":\"ai\""));
         // Polish rules serialize camelCase; the defaults keep Polish's
         // pre-rules identity (clarity + tone on, concise + structure opt-in).

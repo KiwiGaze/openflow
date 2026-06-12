@@ -10,6 +10,7 @@
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -17,6 +18,7 @@ use rusqlite::Connection;
 use serde::Deserialize;
 
 use crate::error::{AppError, AppResult};
+use crate::notes::{Note, NoteSummary, NoteVersion, MAX_NOTE_CONTENT_BYTES, NOTE_VERSION_CAP};
 
 /// Highest schema version this build knows how to run. Each step is applied in
 /// order; the runner stops here.
@@ -26,6 +28,9 @@ const SCHEMA_VERSION: i64 = 1;
 /// is not `Sync`). Cheap to clone-share via `Arc<Db>`.
 pub struct Db {
     conn: Mutex<Connection>,
+    /// Disambiguates note and version ids minted within the same millisecond
+    /// (the `${ms}-${seq}` scheme history uses).
+    note_seq: AtomicU64,
 }
 
 impl Db {
@@ -59,7 +64,15 @@ impl Db {
 
         Ok(Self {
             conn: Mutex::new(conn),
+            note_seq: AtomicU64::new(0),
         })
+    }
+
+    /// Mints a `${ms}-${seq}` id (the scheme history uses). The sequence only
+    /// disambiguates two ids minted in the same millisecond.
+    fn next_id(&self, at: i64) -> String {
+        let seq = self.note_seq.fetch_add(1, Ordering::SeqCst);
+        format!("{at}-{seq}")
     }
 
     fn open_and_migrate(path: &Path) -> AppResult<Connection> {
@@ -254,6 +267,213 @@ impl Db {
         conn.execute("DELETE FROM insights_daily", [])?;
         Ok(())
     }
+
+    // ---- Scratchpad notes (text only — never audio) ------------------------
+
+    /// Non-deleted notes for the list, pinned first then most-recently updated.
+    /// `search` filters case-insensitively over title and body (LIKE), so the
+    /// caller can wire a single search box to both fields. Previews are derived
+    /// here with the shared tag-strip so the list never ships raw HTML.
+    pub fn notes_list(&self, search: Option<&str>) -> AppResult<Vec<NoteSummary>> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        // A NULL search means "no filter"; an explicit `%term%` is built once so
+        // the bound parameter stays parameterized (no string interpolation).
+        let pattern = search
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| format!("%{}%", escape_like(s)));
+        let mut stmt = conn.prepare(
+            "SELECT id, title, content, updated_at, pinned FROM notes \
+             WHERE deleted_at IS NULL \
+               AND (?1 IS NULL OR title LIKE ?1 ESCAPE '\\' OR content LIKE ?1 ESCAPE '\\') \
+             ORDER BY pinned DESC, updated_at DESC",
+        )?;
+        let rows = stmt
+            .query_map([pattern], |row| {
+                let content: String = row.get(2)?;
+                Ok(NoteSummary {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    preview: crate::notes::preview(&content),
+                    updated_at: row.get(3)?,
+                    pinned: row.get::<_, i64>(4)? != 0,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// A single non-deleted note by id, or `None` if missing or deleted.
+    pub fn note_get(&self, id: &str) -> AppResult<Option<Note>> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        let note = conn
+            .query_row(
+                "SELECT id, title, content, created_at, updated_at, pinned FROM notes \
+                 WHERE id = ?1 AND deleted_at IS NULL",
+                [id],
+                row_to_note,
+            )
+            .map(Some)
+            .or_else(|err| match err {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                other => Err(other),
+            })?;
+        Ok(note)
+    }
+
+    /// Creates an empty note (no title, no body) with timestamps set to now.
+    pub fn note_create(&self) -> AppResult<Note> {
+        let now = now_ms();
+        let id = self.next_id(now);
+        let conn = self.conn.lock().expect("db lock poisoned");
+        conn.execute(
+            "INSERT INTO notes (id, title, content, created_at, updated_at, pinned, deleted_at) \
+             VALUES (?1, '', '', ?2, ?2, 0, NULL)",
+            rusqlite::params![id, now],
+        )?;
+        Ok(Note {
+            id,
+            title: String::new(),
+            content: String::new(),
+            created_at: now,
+            updated_at: now,
+            pinned: false,
+        })
+    }
+
+    /// Updates a note's title and body and bumps `updated_at`. A body over the
+    /// 1 MB guard is rejected — never truncated, so the user's words are safe.
+    pub fn note_update(&self, id: &str, title: &str, content: &str) -> AppResult<()> {
+        if content.len() > MAX_NOTE_CONTENT_BYTES {
+            return Err(AppError::Settings(
+                "This note is too large to save. Shorten it and try again.".into(),
+            ));
+        }
+        let conn = self.conn.lock().expect("db lock poisoned");
+        conn.execute(
+            "UPDATE notes SET title = ?2, content = ?3, updated_at = ?4 \
+             WHERE id = ?1 AND deleted_at IS NULL",
+            rusqlite::params![id, title, content, now_ms()],
+        )?;
+        Ok(())
+    }
+
+    /// Pins or unpins a note (pinned notes sort to the top of the list).
+    pub fn note_set_pinned(&self, id: &str, pinned: bool) -> AppResult<()> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        conn.execute(
+            "UPDATE notes SET pinned = ?2, updated_at = ?3 \
+             WHERE id = ?1 AND deleted_at IS NULL",
+            rusqlite::params![id, pinned as i64, now_ms()],
+        )?;
+        Ok(())
+    }
+
+    /// Soft-deletes a note: sets `deleted_at` so it leaves the list but its
+    /// bytes (and versions) stay on disk. User data is never destroyed.
+    pub fn note_soft_delete(&self, id: &str) -> AppResult<()> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        conn.execute(
+            "UPDATE notes SET deleted_at = ?2 WHERE id = ?1 AND deleted_at IS NULL",
+            rusqlite::params![id, now_ms()],
+        )?;
+        Ok(())
+    }
+
+    /// Every version of a note, newest first.
+    pub fn note_versions(&self, note_id: &str) -> AppResult<Vec<NoteVersion>> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        let mut stmt = conn.prepare(
+            "SELECT id, note_id, content, source, transform_id, created_at \
+             FROM note_versions WHERE note_id = ?1 ORDER BY created_at DESC, id DESC",
+        )?;
+        let rows = stmt
+            .query_map([note_id], row_to_version)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Records a version snapshot, then prunes the note's versions back to the
+    /// newest [`NOTE_VERSION_CAP`] (a safety net, not an archive).
+    pub fn note_version_add(
+        &self,
+        note_id: &str,
+        content: &str,
+        source: &str,
+        transform_id: Option<&str>,
+    ) -> AppResult<()> {
+        let now = now_ms();
+        let id = self.next_id(now);
+        let conn = self.conn.lock().expect("db lock poisoned");
+        conn.execute(
+            "INSERT INTO note_versions (id, note_id, content, source, transform_id, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![id, note_id, content, source, transform_id, now],
+        )?;
+        conn.execute(
+            "DELETE FROM note_versions WHERE note_id = ?1 AND id NOT IN \
+             (SELECT id FROM note_versions WHERE note_id = ?1 \
+              ORDER BY created_at DESC, id DESC LIMIT ?2)",
+            rusqlite::params![note_id, NOTE_VERSION_CAP],
+        )?;
+        Ok(())
+    }
+
+    /// A single version by id (the body the caller restores), or `None`.
+    pub fn note_version_get(&self, version_id: &str) -> AppResult<Option<NoteVersion>> {
+        let conn = self.conn.lock().expect("db lock poisoned");
+        let version = conn
+            .query_row(
+                "SELECT id, note_id, content, source, transform_id, created_at \
+                 FROM note_versions WHERE id = ?1",
+                [version_id],
+                row_to_version,
+            )
+            .map(Some)
+            .or_else(|err| match err {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                other => Err(other),
+            })?;
+        Ok(version)
+    }
+}
+
+fn row_to_note(row: &rusqlite::Row) -> rusqlite::Result<Note> {
+    Ok(Note {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        content: row.get(2)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
+        pinned: row.get::<_, i64>(5)? != 0,
+    })
+}
+
+fn row_to_version(row: &rusqlite::Row) -> rusqlite::Result<NoteVersion> {
+    Ok(NoteVersion {
+        id: row.get(0)?,
+        note_id: row.get(1)?,
+        content: row.get(2)?,
+        source: row.get(3)?,
+        transform_id: row.get(4)?,
+        created_at: row.get(5)?,
+    })
+}
+
+/// Escapes the LIKE wildcards in a user search term so a literal `%` or `_`
+/// matches itself (paired with `ESCAPE '\'` in the query).
+fn escape_like(term: &str) -> String {
+    term.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+/// Unix epoch milliseconds — the timestamp every note row and version stores.
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 /// All-time usage totals summed over `insights_daily`. Counts and durations
@@ -672,5 +892,194 @@ mod tests {
         db.history_append("x", 1, "t", "r", "standard", None, None, 1, false)
             .expect("append to fresh db");
         assert_eq!(db.history_list().expect("list").len(), 1);
+    }
+
+    #[test]
+    fn notes_crud_roundtrip() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        let note = db.note_create().expect("create");
+        assert!(note.title.is_empty());
+        assert!(note.content.is_empty());
+        assert!(!note.pinned);
+
+        db.note_update(&note.id, "Title", "<p>Body</p>")
+            .expect("update");
+        let got = db.note_get(&note.id).expect("get").expect("present");
+        assert_eq!(got.title, "Title");
+        assert_eq!(got.content, "<p>Body</p>");
+        // The update bumped updated_at past created_at-or-equal.
+        assert!(got.updated_at >= got.created_at);
+
+        let list = db.notes_list(None).expect("list");
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].id, note.id);
+        // The preview is the stripped body, not raw HTML.
+        assert_eq!(list[0].preview, "Body");
+
+        db.note_set_pinned(&note.id, true).expect("pin");
+        assert!(db.note_get(&note.id).expect("get").expect("present").pinned);
+    }
+
+    #[test]
+    fn soft_delete_hides_from_list_and_get() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        let note = db.note_create().expect("create");
+        db.note_soft_delete(&note.id).expect("soft delete");
+        assert!(db.note_get(&note.id).expect("get").is_none());
+        assert!(db.notes_list(None).expect("list").is_empty());
+        // The row still exists (soft delete only) — a second delete is a no-op.
+        db.note_soft_delete(&note.id).expect("second delete no-op");
+    }
+
+    #[test]
+    fn notes_search_matches_title_and_content_case_insensitively() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        let a = db.note_create().expect("create a");
+        db.note_update(&a.id, "Groceries", "<p>milk and eggs</p>")
+            .expect("update a");
+        let b = db.note_create().expect("create b");
+        db.note_update(&b.id, "Meeting", "<p>discuss the budget</p>")
+            .expect("update b");
+
+        // Title match, case-insensitive.
+        let by_title = db.notes_list(Some("grocer")).expect("search title");
+        assert_eq!(by_title.len(), 1);
+        assert_eq!(by_title[0].id, a.id);
+
+        // Content match.
+        let by_content = db.notes_list(Some("BUDGET")).expect("search content");
+        assert_eq!(by_content.len(), 1);
+        assert_eq!(by_content[0].id, b.id);
+
+        // Blank search returns everything.
+        assert_eq!(db.notes_list(Some("   ")).expect("blank").len(), 2);
+        // No match returns nothing.
+        assert!(db.notes_list(Some("zzz")).expect("none").is_empty());
+    }
+
+    #[test]
+    fn notes_list_orders_pinned_first_then_recent() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        let first = db.note_create().expect("first");
+        let second = db.note_create().expect("second");
+        let third = db.note_create().expect("third");
+        // Touch `second` last so it is the most-recently updated.
+        db.note_update(&first.id, "first", "").expect("touch first");
+        db.note_update(&third.id, "third", "").expect("touch third");
+        db.note_update(&second.id, "second", "")
+            .expect("touch second");
+        // Pin the oldest-updated note; it must still lead the list.
+        db.note_set_pinned(&first.id, true).expect("pin first");
+
+        let list = db.notes_list(None).expect("list");
+        assert_eq!(list[0].id, first.id, "pinned leads regardless of recency");
+        assert!(list[0].pinned);
+        // The rest follow most-recent-updated first.
+        assert_eq!(list[1].id, second.id);
+        assert_eq!(list[2].id, third.id);
+    }
+
+    #[test]
+    fn note_versions_add_list_get_newest_first_and_capped() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        let note = db.note_create().expect("create");
+        // Insert more than the cap; only the newest NOTE_VERSION_CAP survive.
+        let total = NOTE_VERSION_CAP + 5;
+        for i in 0..total {
+            db.note_version_add(&note.id, &format!("v{i}"), "transform", Some("t1"))
+                .expect("add version");
+        }
+        let versions = db.note_versions(&note.id).expect("list versions");
+        assert_eq!(versions.len() as i64, NOTE_VERSION_CAP);
+        // Newest first: the last inserted leads.
+        assert_eq!(versions[0].content, format!("v{}", total - 1));
+        assert_eq!(versions[0].source, "transform");
+        assert_eq!(versions[0].transform_id.as_deref(), Some("t1"));
+        // The oldest survivor is `total - cap`, so earlier ones were pruned.
+        assert_eq!(
+            versions.last().expect("last").content,
+            format!("v{}", total - NOTE_VERSION_CAP)
+        );
+
+        // Version-get returns the snapshot by id.
+        let head = &versions[0];
+        let fetched = db
+            .note_version_get(&head.id)
+            .expect("get version")
+            .expect("present");
+        assert_eq!(fetched.content, head.content);
+        assert!(db.note_version_get("missing").expect("get").is_none());
+    }
+
+    #[test]
+    fn restore_sequence_snapshots_current_then_swaps_content() {
+        // The command-level restore is: snapshot the CURRENT body as a "restore"
+        // version, then set the note's content to the chosen version's. This
+        // exercises that db sequence directly (the command just orchestrates it).
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        let note = db.note_create().expect("create");
+        db.note_update(&note.id, "t", "<p>original</p>")
+            .expect("write original");
+        db.note_version_add(&note.id, "<p>original</p>", "created", None)
+            .expect("snapshot original");
+        db.note_update(&note.id, "t", "<p>edited</p>")
+            .expect("edit");
+
+        // Restore the "original" snapshot: first snapshot current ("edited").
+        let original = db
+            .note_versions(&note.id)
+            .expect("versions")
+            .into_iter()
+            .find(|v| v.content == "<p>original</p>")
+            .expect("original snapshot");
+        let current = db
+            .note_get(&note.id)
+            .expect("get")
+            .expect("present")
+            .content;
+        db.note_version_add(&note.id, &current, "restore", None)
+            .expect("snapshot before restore");
+        db.note_update(&note.id, "t", &original.content)
+            .expect("apply restore");
+
+        assert_eq!(
+            db.note_get(&note.id)
+                .expect("get")
+                .expect("present")
+                .content,
+            "<p>original</p>"
+        );
+        // The pre-restore body is recoverable as a "restore" version.
+        assert!(db
+            .note_versions(&note.id)
+            .expect("versions")
+            .iter()
+            .any(|v| v.source == "restore" && v.content == "<p>edited</p>"));
+    }
+
+    #[test]
+    fn note_update_rejects_oversized_content() {
+        let dir = temp_dir();
+        let db = Db::open(dir.path()).expect("open");
+        let note = db.note_create().expect("create");
+        let too_big = "a".repeat(MAX_NOTE_CONTENT_BYTES + 1);
+        assert!(db.note_update(&note.id, "t", &too_big).is_err());
+        // The note was not partially written — content stays empty.
+        assert_eq!(
+            db.note_get(&note.id)
+                .expect("get")
+                .expect("present")
+                .content,
+            ""
+        );
+        // Exactly at the limit is allowed.
+        let at_limit = "a".repeat(MAX_NOTE_CONTENT_BYTES);
+        assert!(db.note_update(&note.id, "t", &at_limit).is_ok());
     }
 }

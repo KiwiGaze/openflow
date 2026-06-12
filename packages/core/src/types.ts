@@ -271,6 +271,11 @@ export interface Settings {
   lastTipShownAt: string;
   /** Keep a Dock icon (vs menu-bar-only). */
   showInDock: boolean;
+  /**
+   * Opt-in: the Scratchpad notes surface (default off). Off, no note is
+   * written and every note command refuses — notes are stored only when on.
+   */
+  scratchpadEnabled: boolean;
   onboardingCompleted: boolean;
 }
 
@@ -326,6 +331,47 @@ export interface HistoryEntry {
   wordCount: number;
   /** Whether an LLM pass ran (vs rules-based cleanup only). */
   usedAi: boolean;
+}
+
+/**
+ * One Scratchpad note (text only, never audio). The body is the minimal HTML
+ * the editor toolbar produces; paste is forced to plain text so stored markup
+ * is bounded to our own tags. Mirrors `Note` in `notes.rs`.
+ */
+export interface Note {
+  id: string;
+  title: string;
+  /** Body as minimal HTML (`<p>`, `<b>`, `<i>`, `<u>`, `<code>`, lists). */
+  content: string;
+  /** Unix epoch milliseconds. */
+  createdAt: number;
+  updatedAt: number;
+  pinned: boolean;
+}
+
+/** A note row for the list view. Mirrors `NoteSummary` in `notes.rs`. */
+export interface NoteSummary {
+  id: string;
+  title: string;
+  /** First ~120 characters of the body with tags stripped. */
+  preview: string;
+  updatedAt: number;
+  pinned: boolean;
+}
+
+/**
+ * An immutable snapshot of a note's body, taken before a destructive edit
+ * (transform or restore). Mirrors `NoteVersion` in `notes.rs`.
+ */
+export interface NoteVersion {
+  id: string;
+  noteId: string;
+  content: string;
+  /** Why it exists: 'created', 'transform', or 'restore'. */
+  source: string;
+  /** The settings transform applied (when `source` is 'transform'); else null. */
+  transformId: string | null;
+  createdAt: number;
 }
 
 export interface ModeCount {
@@ -415,6 +461,10 @@ export const EVENTS = {
   changesToggle: 'changes-toggle',
   /** Fired once a history append has committed; views refresh from durable rows. */
   historyChanged: 'history-changed',
+  /** A note was created/updated/pinned/deleted/restored/transformed; refresh the list. */
+  notesChanged: 'notes-changed',
+  /** Ask an open Scratchpad to switch to a note; payload is the note id. */
+  scratchpadOpenNote: 'scratchpad-open-note',
 } as const;
 
 /** Tauri command names callable via `invoke`. */
@@ -461,4 +511,14 @@ export const COMMANDS = {
   openAccessibilitySettings: 'open_accessibility_settings',
   openMicrophoneSettings: 'open_microphone_settings',
   getAppInfo: 'get_app_info',
+  listNotes: 'list_notes',
+  getNote: 'get_note',
+  createNote: 'create_note',
+  updateNote: 'update_note',
+  setNotePinned: 'set_note_pinned',
+  deleteNote: 'delete_note',
+  listNoteVersions: 'list_note_versions',
+  restoreNoteVersion: 'restore_note_version',
+  transformNoteText: 'transform_note_text',
+  openScratchpadWindow: 'open_scratchpad_window',
 } as const;

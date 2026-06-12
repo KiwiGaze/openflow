@@ -14,6 +14,9 @@ import {
   type LlmProfile,
   type LlmTestResult,
   type ModelInfo,
+  type Note,
+  type NoteSummary,
+  type NoteVersion,
   type PermissionsState,
   type PipelineState,
   type Settings,
@@ -83,6 +86,23 @@ export const ipc = {
   openAccessibilitySettings: (): Promise<void> => invoke(COMMANDS.openAccessibilitySettings),
   openMicrophoneSettings: (): Promise<void> => invoke(COMMANDS.openMicrophoneSettings),
   getAppInfo: (): Promise<AppInfo> => invoke(COMMANDS.getAppInfo),
+  listNotes: (search: string | null): Promise<NoteSummary[]> =>
+    invoke(COMMANDS.listNotes, { search }),
+  getNote: (id: string): Promise<Note | null> => invoke(COMMANDS.getNote, { id }),
+  createNote: (): Promise<Note> => invoke(COMMANDS.createNote),
+  updateNote: (id: string, title: string, content: string): Promise<void> =>
+    invoke(COMMANDS.updateNote, { id, title, content }),
+  setNotePinned: (id: string, pinned: boolean): Promise<void> =>
+    invoke(COMMANDS.setNotePinned, { id, pinned }),
+  deleteNote: (id: string): Promise<void> => invoke(COMMANDS.deleteNote, { id }),
+  listNoteVersions: (noteId: string): Promise<NoteVersion[]> =>
+    invoke(COMMANDS.listNoteVersions, { noteId }),
+  restoreNoteVersion: (versionId: string): Promise<Note> =>
+    invoke(COMMANDS.restoreNoteVersion, { versionId }),
+  transformNoteText: (noteId: string, transformId: string | null): Promise<Note> =>
+    invoke(COMMANDS.transformNoteText, { noteId, transformId }),
+  openScratchpadWindow: (noteId: string | null): Promise<void> =>
+    invoke(COMMANDS.openScratchpadWindow, { noteId }),
 };
 
 export const events = {
@@ -114,6 +134,16 @@ export const events = {
   onHistoryChanged: (cb: () => void): Promise<UnlistenFn> =>
     listen(EVENTS.historyChanged, () => {
       cb();
+    }),
+  /** A note changed; refresh the list from durable rows (no payload). */
+  onNotesChanged: (cb: () => void): Promise<UnlistenFn> =>
+    listen(EVENTS.notesChanged, () => {
+      cb();
+    }),
+  /** An open Scratchpad is asked to switch to a note; payload is the note id. */
+  onScratchpadOpenNote: (cb: (noteId: string) => void): Promise<UnlistenFn> =>
+    listen<string>(EVENTS.scratchpadOpenNote, (e) => {
+      cb(e.payload);
     }),
 };
 

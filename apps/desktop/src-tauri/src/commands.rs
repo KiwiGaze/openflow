@@ -6,9 +6,11 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::error::{AppError, AppResult};
 use crate::llm::LlmTestResult;
 use crate::models::{ModelInfoDto, DEFAULT_STT_MODEL_ID};
+use crate::notes::{self, Note, NoteSummary, NoteVersion};
 use crate::permissions::{self, PermissionsState};
 use crate::pipeline::{Job, PipelineState, TranscriptionResult};
 use crate::profiles::LlmProfile;
+use crate::scratchpad::{self, NOTES_CHANGED_EVENT};
 use crate::settings::{Appearance, Settings, SETTINGS_CHANGED_EVENT};
 use crate::state::AppState;
 use crate::stt_profiles::{SttProfile, CLOUD_STT_PREFIX};
@@ -669,4 +671,209 @@ pub fn get_app_info(app: AppHandle, state: State<'_, AppState>) -> AppInfo {
             .to_string(),
         config_path: state.settings.path().display().to_string(),
     }
+}
+
+// ---- Scratchpad notes ------------------------------------------------------
+//
+// Notes are opt-in user content: every note command refuses while the
+// Scratchpad is off, so nothing is read or written behind the user's back. The
+// window itself is not gated (it shows the enable card when off); only the data
+// commands are.
+
+/// The gate every note command shares: refuses unless the Scratchpad is on.
+fn ensure_scratchpad_on(state: &AppState) -> AppResult<()> {
+    if state.settings.get().scratchpad_enabled {
+        Ok(())
+    } else {
+        Err(AppError::Settings("Scratchpad is turned off.".into()))
+    }
+}
+
+/// Lists non-deleted notes (pinned first, then most recent). `search` filters
+/// title and body case-insensitively. Refuses while the Scratchpad is off.
+#[tauri::command]
+pub fn list_notes(
+    state: State<'_, AppState>,
+    search: Option<String>,
+) -> AppResult<Vec<NoteSummary>> {
+    ensure_scratchpad_on(&state)?;
+    state.db.notes_list(search.as_deref())
+}
+
+/// Returns one non-deleted note by id, or null. Refuses while off.
+#[tauri::command]
+pub fn get_note(state: State<'_, AppState>, id: String) -> AppResult<Option<Note>> {
+    ensure_scratchpad_on(&state)?;
+    state.db.note_get(&id)
+}
+
+/// Creates an empty note, snapshots its (empty) body as a "created" version,
+/// and returns it. Refuses while off.
+#[tauri::command]
+pub fn create_note(app: AppHandle, state: State<'_, AppState>) -> AppResult<Note> {
+    ensure_scratchpad_on(&state)?;
+    let note = state.db.note_create()?;
+    state
+        .db
+        .note_version_add(&note.id, &note.content, "created", None)?;
+    let _ = app.emit(NOTES_CHANGED_EVENT, ());
+    Ok(note)
+}
+
+/// Updates a note's title and body. Rejects an oversized body rather than
+/// truncating it. Refuses while off.
+#[tauri::command]
+pub fn update_note(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    title: String,
+    content: String,
+) -> AppResult<()> {
+    ensure_scratchpad_on(&state)?;
+    state.db.note_update(&id, &title, &content)?;
+    let _ = app.emit(NOTES_CHANGED_EVENT, ());
+    Ok(())
+}
+
+/// Pins or unpins a note. Refuses while off.
+#[tauri::command]
+pub fn set_note_pinned(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    pinned: bool,
+) -> AppResult<()> {
+    ensure_scratchpad_on(&state)?;
+    state.db.note_set_pinned(&id, pinned)?;
+    let _ = app.emit(NOTES_CHANGED_EVENT, ());
+    Ok(())
+}
+
+/// Soft-deletes a note (sets `deleted_at`; the bytes stay on disk). Refuses
+/// while off.
+#[tauri::command]
+pub fn delete_note(app: AppHandle, state: State<'_, AppState>, id: String) -> AppResult<()> {
+    ensure_scratchpad_on(&state)?;
+    state.db.note_soft_delete(&id)?;
+    let _ = app.emit(NOTES_CHANGED_EVENT, ());
+    Ok(())
+}
+
+/// Returns a note's version history, newest first. Refuses while off.
+#[tauri::command]
+pub fn list_note_versions(
+    state: State<'_, AppState>,
+    note_id: String,
+) -> AppResult<Vec<NoteVersion>> {
+    ensure_scratchpad_on(&state)?;
+    state.db.note_versions(&note_id)
+}
+
+/// Restores a note to an earlier version: snapshots the CURRENT body as a
+/// "restore" version first (so the restore is itself reversible), then sets the
+/// note's content to the chosen version's. Refuses while off.
+#[tauri::command]
+pub fn restore_note_version(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    version_id: String,
+) -> AppResult<Note> {
+    ensure_scratchpad_on(&state)?;
+    let version = state
+        .db
+        .note_version_get(&version_id)?
+        .ok_or_else(|| AppError::State("that version no longer exists".into()))?;
+    let current = state
+        .db
+        .note_get(&version.note_id)?
+        .ok_or_else(|| AppError::State("that note no longer exists".into()))?;
+    state
+        .db
+        .note_version_add(&version.note_id, &current.content, "restore", None)?;
+    state
+        .db
+        .note_update(&version.note_id, &current.title, &version.content)?;
+    let note = state
+        .db
+        .note_get(&version.note_id)?
+        .ok_or_else(|| AppError::State("that note no longer exists".into()))?;
+    let _ = app.emit(NOTES_CHANGED_EVENT, ());
+    Ok(note)
+}
+
+/// Rewrites a note's body with a transform (Polish when `transform_id` is null,
+/// else the named settings transform). The instruction is resolved server-side;
+/// the note's plain text (tags stripped) is sent through the one LLM client and
+/// the returned text becomes the new body as escaped paragraphs. A "transform"
+/// version of the prior body is snapshotted first. Refuses while off, and
+/// refuses honestly when no AI provider is configured (no silent fallback —
+/// wrong text over the user's note is worse than an error). Refuses while off.
+#[tauri::command]
+pub async fn transform_note_text(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    note_id: String,
+    transform_id: Option<String>,
+) -> Result<Note, AppError> {
+    ensure_scratchpad_on(&state)?;
+    let settings = state.settings.get();
+
+    // Resolve the instruction by id before touching the note, so an unknown id
+    // fails fast without snapshotting or calling the LLM.
+    let instruction = match &transform_id {
+        None => modes::polish_instruction(&settings.polish_rules),
+        Some(id) => settings
+            .transforms
+            .iter()
+            .find(|t| &t.id == id)
+            .map(|t| t.instruction.clone())
+            .ok_or_else(|| AppError::State("that transform no longer exists".into()))?,
+    };
+
+    let note = state
+        .db
+        .note_get(&note_id)?
+        .ok_or_else(|| AppError::State("that note no longer exists".into()))?;
+
+    // Transforms need a provider; say so plainly rather than falling back to a
+    // rules cleanup that would silently change the user's note.
+    let profile = state
+        .profiles
+        .active(&settings.active_llm_profile_id)
+        .ok_or_else(|| AppError::Llm("Add an AI provider to use transforms.".into()))?;
+
+    // Snapshot the body before the destructive rewrite.
+    state.db.note_version_add(
+        &note_id,
+        &note.content,
+        "transform",
+        transform_id.as_deref(),
+    )?;
+
+    // The LLM works on plain text and returns plain text; re-wrap as minimal
+    // HTML for the editor. The selection-rewrite prompt treats the body as data.
+    let plain = notes::strip_tags(&note.content);
+    let system = modes::selection_system_prompt();
+    let user = modes::selection_user_prompt(&plain, &instruction);
+    let rewritten = state.llm.chat(&profile, &system, &user).await?;
+    let content = notes::text_to_html(&rewritten);
+
+    state.db.note_update(&note_id, &note.title, &content)?;
+    let updated = state
+        .db
+        .note_get(&note_id)?
+        .ok_or_else(|| AppError::State("that note no longer exists".into()))?;
+    let _ = app.emit(NOTES_CHANGED_EVENT, ());
+    Ok(updated)
+}
+
+/// Opens the Scratchpad window (creating it if absent, else showing and
+/// focusing it). Not gated on `scratchpad_enabled` — the window shows the
+/// enable card when off, and this is the entry point either way. `note_id`
+/// selects a note on open.
+#[tauri::command]
+pub fn open_scratchpad_window(app: AppHandle, note_id: Option<String>) -> AppResult<()> {
+    scratchpad::open(&app, note_id)
+        .map_err(|e| AppError::State(format!("could not open the Scratchpad: {e}")))
 }

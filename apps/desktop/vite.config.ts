@@ -17,6 +17,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, 'index.html'),
         hud: resolve(import.meta.dirname, 'hud.html'),
         changes: resolve(import.meta.dirname, 'changes.html'),
+        scratchpad: resolve(import.meta.dirname, 'scratchpad.html'),
       },
     },
   },

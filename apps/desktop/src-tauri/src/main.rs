@@ -13,11 +13,13 @@ mod hud;
 mod llm;
 mod models;
 mod modes;
+mod notes;
 mod output;
 mod permissions;
 mod pipeline;
 mod profiles;
 mod resample;
+mod scratchpad;
 mod settings;
 mod shortcuts;
 mod state;
@@ -178,6 +180,16 @@ fn main() {
             commands::open_accessibility_settings,
             commands::open_microphone_settings,
             commands::get_app_info,
+            commands::list_notes,
+            commands::get_note,
+            commands::create_note,
+            commands::update_note,
+            commands::set_note_pinned,
+            commands::delete_note,
+            commands::list_note_versions,
+            commands::restore_note_version,
+            commands::transform_note_text,
+            commands::open_scratchpad_window,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Velata")
