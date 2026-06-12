@@ -303,7 +303,7 @@ export function Onboarding({
               <div>
                 <p className="result-text">{lastResult.text}</p>
                 <div className="row-hint">
-                  {lastResult.refined ? 'polished with AI' : 'cleaned with Standard mode'}
+                  {lastResult.polished ? 'polished with AI' : 'cleaned with Standard mode'}
                 </div>
               </div>
             </div>

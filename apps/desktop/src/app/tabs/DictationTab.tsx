@@ -96,13 +96,13 @@ export function DictationTab({
       <section className="card">
         <h2>After transcribing</h2>
         <Row
-          title="Refine with AI"
+          title="Polish with AI"
           hint="Polish transcripts with your active mode and AI profile. Off = fast rules-based cleanup, no network."
         >
           <Toggle
-            checked={settings.refineAfterDictation}
-            onChange={(checked) => void update({ refineAfterDictation: checked })}
-            label="Refine with AI"
+            checked={settings.polishAfterDictation}
+            onChange={(checked) => void update({ polishAfterDictation: checked })}
+            label="Polish with AI"
           />
         </Row>
       </section>

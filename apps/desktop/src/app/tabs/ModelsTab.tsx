@@ -46,7 +46,7 @@ export function ModelsTab({
     };
     setSelectedId(profile.id);
     void save(profile).then(() => {
-      // The first profile is what the user came for: select it for refinement.
+      // The first profile is what the user came for: select it for polish.
       if (settings.activeLlmProfileId === '') void update({ activeLlmProfileId: profile.id });
     });
   };

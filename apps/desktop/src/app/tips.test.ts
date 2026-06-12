@@ -16,12 +16,12 @@ const standardMode: Mode = {
 };
 
 const base: Settings = {
-  version: 3,
+  version: 4,
   dictationHotkey: 'Alt+Space',
   dictationHotkeyBehavior: 'hold',
   polishHotkey: 'Alt+Shift+P',
   changeOverlayHotkey: 'Alt+O',
-  refineAfterDictation: true,
+  polishAfterDictation: true,
   activeLlmProfileId: '',
   activeModeId: 'standard',
   modes: [standardMode],

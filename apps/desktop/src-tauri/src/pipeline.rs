@@ -1,6 +1,6 @@
 //! The dictation pipeline state machine.
 //!
-//! One pipeline instance owns the flow `record → transcribe → (refine) →
+//! One pipeline instance owns the flow `record → transcribe → (polish) →
 //! insert` for dictation plus the no-recording selection jobs (polish,
 //! transforms), emits progress events to the webviews, and guards against
 //! stale work with a generation counter — cancelling simply bumps the
@@ -54,7 +54,7 @@ pub enum Status {
     Idle,
     Recording,
     Transcribing,
-    Refining,
+    Polishing,
     Inserting,
     /// Brief success flash (✓ + inserted text) before fading back to idle.
     Inserted,
@@ -66,7 +66,7 @@ pub enum Status {
 #[serde(rename_all = "camelCase")]
 pub enum Job {
     Dictation,
-    /// Refine the selection with the built-in instruction — no recording.
+    /// Polish the selection with the built-in instruction — no recording.
     PolishSelection,
     /// Apply a user-defined transform's instruction to the selection — no
     /// recording. Which transform is resolved at dispatch time by id.
@@ -93,7 +93,7 @@ pub struct TranscriptionResult {
     pub original: String,
     pub text: String,
     pub mode_id: String,
-    pub refined: bool,
+    pub polished: bool,
     pub duration_ms: u64,
 }
 
@@ -532,7 +532,7 @@ impl Pipeline {
     /// Tap entry point: polish the current selection with the built-in
     /// fix-grammar instruction — no recording, no Session.
     pub fn polish(self: &Arc<Self>) {
-        self.refine_selection(Job::PolishSelection, String::new(), "polish", None);
+        self.polish_selection(Job::PolishSelection, String::new(), "polish", None);
     }
 
     /// Tap entry point: apply a user-defined transform to the selection. The
@@ -549,7 +549,7 @@ impl Pipeline {
         else {
             return;
         };
-        self.refine_selection(
+        self.polish_selection(
             Job::Transform,
             transform.instruction,
             "transform",
@@ -558,12 +558,12 @@ impl Pipeline {
     }
 
     /// Shared body for the no-recording selection jobs (Polish, Transform):
-    /// resolve the active profile, capture the selection, then refine it with
+    /// resolve the active profile, capture the selection, then polish it with
     /// `instruction` and insert. Runs under the same busy-state and generation
     /// contract as every other job; errors surface as transient HUD states.
     /// Blocks on selection capture, so callers must stay off the main thread
     /// (capture round-trips keystrokes through it).
-    fn refine_selection(
+    fn polish_selection(
         self: &Arc<Self>,
         job: Job,
         instruction: String,
@@ -593,7 +593,7 @@ impl Pipeline {
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         // The transform name rides in the message so the HUD can read
         // "Concise…" instead of a generic label.
-        self.set_state(Status::Refining, Some(job), hud_label);
+        self.set_state(Status::Polishing, Some(job), hud_label);
         hud::position_on_cursor_monitor(&self.app);
 
         let selection = match self.output.capture_selection() {
@@ -624,7 +624,7 @@ impl Pipeline {
         let pipeline = Arc::clone(self);
         tauri::async_runtime::spawn(async move {
             let result = pipeline
-                .finish_selection_refine(
+                .finish_selection_polish(
                     &settings,
                     &profile,
                     selection,
@@ -653,7 +653,7 @@ impl Pipeline {
 
         // AI profile is only resolved when the mode wants AI and the master
         // switch is on, so a no-AI mode never notices a dangling profile.
-        let profile = if mode.uses_llm && settings.refine_after_dictation {
+        let profile = if mode.uses_llm && settings.polish_after_dictation {
             match &mode.ai_profile_id {
                 Some(id) => self.profiles.get(id).or_else(|| {
                     notice.get_or_insert(format!(
@@ -838,9 +838,9 @@ impl Pipeline {
                     .await
             }
             // Sessions are only created for recording jobs; polish and
-            // transforms run through `refine_selection()` without one.
+            // transforms run through `polish_selection()` without one.
             Job::PolishSelection | Job::Transform => Err(AppError::State(
-                "selection refinement does not use a recording session".into(),
+                "selection polish does not use a recording session".into(),
             )),
         }
     }
@@ -863,20 +863,20 @@ impl Pipeline {
             ..
         } = resolved;
 
-        let mut refined = false;
+        let mut polished = false;
         let mut llm_warning: Option<String> = None;
         let final_text = if let Some(profile) = profile {
-            self.set_state(Status::Refining, Some(Job::Dictation), None);
+            self.set_state(Status::Polishing, Some(Job::Dictation), None);
             let system = modes::dictation_system_prompt(&mode, &settings.dictionary);
             match self.llm.chat(&profile, &system, &transcript).await {
                 Ok(text) => {
-                    refined = true;
+                    polished = true;
                     text
                 }
                 Err(err) => {
                     // Never lose a dictation to a flaky provider: fall back to
                     // the rules-based cleanup and tell the user.
-                    log::warn!("LLM refinement failed, falling back to rules: {err}");
+                    log::warn!("AI polish failed, falling back to rules: {err}");
                     llm_warning =
                         Some("AI cleanup unavailable — inserted the plain transcript.".into());
                     text::apply_rules_cleanup(&transcript)
@@ -901,13 +901,13 @@ impl Pipeline {
             &transcript,
             final_text,
             &mode.id,
-            refined,
+            polished,
             started,
         )?;
         // Record the session aggregate only once the text actually reached the
         // user (insert returns Ok even on the clipboard fallback).
         self.stats
-            .record_dictation(words, record_ms, &mode.id, refined);
+            .record_dictation(words, record_ms, &mode.id, polished);
         // Count this successful dictation — the only tip-system counter (05); a
         // count, never a log. Emit so an open settings webview re-evaluates tips.
         let mut counted = self.settings.get();
@@ -920,7 +920,7 @@ impl Pipeline {
         // `insert` stores the same text verbatim, so these are identical.
         if let Some(text) = history_text {
             self.history
-                .append(transcript.clone(), text, mode.id.clone(), refined);
+                .append(transcript.clone(), text, mode.id.clone(), polished);
         }
         // A clipboard fallback (paste failed / no Accessibility) is the
         // highest-priority message — the user must know to press ⌘V to get
@@ -941,7 +941,7 @@ impl Pipeline {
         }
     }
 
-    async fn finish_selection_refine(
+    async fn finish_selection_polish(
         self: &Arc<Self>,
         settings: &Settings,
         profile: &LlmProfile,
@@ -971,7 +971,7 @@ impl Pipeline {
         original: &str,
         final_text: String,
         mode_id: &str,
-        refined: bool,
+        polished: bool,
         started: Instant,
     ) -> AppResult<ProcessOutcome> {
         self.set_state(Status::Inserting, None, None);
@@ -986,7 +986,7 @@ impl Pipeline {
             original: original.to_string(),
             text: final_text,
             mode_id: mode_id.to_string(),
-            refined,
+            polished,
             duration_ms: started.elapsed().as_millis() as u64,
         };
         *self.last_result.lock().expect("pipeline state poisoned") = Some(result.clone());

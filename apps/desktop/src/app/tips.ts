@@ -32,7 +32,7 @@ const TIPS: Tip[] = [
     actionLabel: 'Set up AI',
     actionTab: 'models',
     predicate: (s) =>
-      s.dictationCount >= 4 && s.activeLlmProfileId === '' && s.refineAfterDictation,
+      s.dictationCount >= 4 && s.activeLlmProfileId === '' && s.polishAfterDictation,
   },
 ];
 

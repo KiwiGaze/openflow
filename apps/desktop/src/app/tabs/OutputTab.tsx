@@ -40,7 +40,7 @@ export function OutputTab({ api }: { api: SettingsApi }): JSX.Element {
         {lastResult ? (
           <>
             <p className="result-text">{lastResult.text}</p>
-            {lastResult.refined && lastResult.raw !== lastResult.text && (
+            {lastResult.polished && lastResult.raw !== lastResult.text && (
               <p className="row-hint">Raw transcript: {lastResult.raw}</p>
             )}
             <button

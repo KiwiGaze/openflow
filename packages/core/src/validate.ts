@@ -17,7 +17,7 @@ export function isValidBaseUrl(url: string): boolean {
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]', '0.0.0.0']);
 
-/** True when the endpoint host is loopback — refined text stays on-device. */
+/** True when the endpoint host is loopback — polished text stays on-device. */
 export function isLocalEndpoint(url: string): boolean {
   try {
     return LOCAL_HOSTS.has(new URL(normalizeBaseUrl(url)).hostname);

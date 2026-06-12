@@ -13,7 +13,7 @@ use crate::error::{AppError, AppResult};
 use crate::models::DEFAULT_STT_MODEL_ID;
 use crate::modes;
 
-pub const SETTINGS_VERSION: u32 = 3;
+pub const SETTINGS_VERSION: u32 = 4;
 pub const MAX_RECORDING_SECS: u64 = 300;
 
 /// Emitted (with the full `Settings` payload) after every backend-initiated
@@ -145,7 +145,8 @@ pub struct Settings {
     /// Reveals the word-level diff of the last result. "" disables it.
     pub change_overlay_hotkey: String,
     /// Master switch: may dictation transcripts go to the active profile.
-    pub refine_after_dictation: bool,
+    #[serde(alias = "refineAfterDictation")]
+    pub polish_after_dictation: bool,
     /// Active profile id (a file under `<app-data>/profiles/`); "" = no AI.
     pub active_llm_profile_id: String,
     pub active_mode_id: String,
@@ -194,7 +195,7 @@ impl Default for Settings {
             dictation_hotkey_behavior: HotkeyBehavior::Hold,
             polish_hotkey: "Alt+Shift+P".into(),
             change_overlay_hotkey: "Alt+O".into(),
-            refine_after_dictation: true,
+            polish_after_dictation: true,
             active_llm_profile_id: String::new(),
             active_mode_id: modes::STANDARD_MODE_ID.into(),
             modes: modes::built_in_modes(),
@@ -400,6 +401,25 @@ mod tests {
     }
 
     #[test]
+    fn legacy_refine_after_dictation_key_still_reads() {
+        let dir = temp_dir("polish-alias");
+        fs::write(
+            dir.join("settings.json"),
+            r#"{ "version": 3, "refineAfterDictation": false }"#,
+        )
+        .unwrap();
+        let manager = SettingsManager::load(&dir);
+        let s = manager.get();
+        // Default is true, so false proves the alias carried the old value.
+        assert!(!s.polish_after_dictation);
+        assert_eq!(s.version, SETTINGS_VERSION);
+        // The load rewrote the file under the new key only.
+        let raw = fs::read_to_string(manager.path()).unwrap();
+        assert!(raw.contains("\"polishAfterDictation\": false"));
+        assert!(!raw.contains("refineAfterDictation"));
+    }
+
+    #[test]
     fn unknown_fields_are_tolerated_and_missing_fields_defaulted() {
         let dir = temp_dir("forward-compat");
         fs::write(
@@ -419,7 +439,7 @@ mod tests {
         assert!(json.contains("\"activeModeId\""));
         assert!(json.contains("\"polishHotkey\":\"Alt+Shift+P\""));
         assert!(json.contains("\"changeOverlayHotkey\":\"Alt+O\""));
-        assert!(json.contains("\"refineAfterDictation\":true"));
+        assert!(json.contains("\"polishAfterDictation\":true"));
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"insertMethod\":\"paste\""));
         assert!(json.contains("\"appearance\":\"system\""));

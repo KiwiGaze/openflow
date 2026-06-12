@@ -203,7 +203,7 @@ export function LlmProfileEditor({
       </div>
       {!isLocalEndpoint(profile.baseUrl) && (
         <p className="privacy-note">
-          Heads up: with a cloud profile, refined text (never audio) is sent to the endpoint above.
+          Heads up: with a cloud profile, polished text (never audio) is sent to the endpoint above.
         </p>
       )}
     </section>

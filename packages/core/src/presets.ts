@@ -107,7 +107,7 @@ export const LLM_PRESETS: LlmPreset[] = [
     kind: 'openaiCompatible',
     needsKey: true,
     modelSuggestion: 'gpt-4o-mini',
-    caveat: 'Cloud — refined text (never audio) leaves your Mac.',
+    caveat: 'Cloud — polished text (never audio) leaves your Mac.',
   },
   {
     id: 'groq',

@@ -7,7 +7,7 @@ const result: TranscriptionResult = {
   original: 'the quick fox',
   text: 'the slow fox',
   modeId: 'polish',
-  refined: true,
+  polished: true,
   durationMs: 100,
 };
 

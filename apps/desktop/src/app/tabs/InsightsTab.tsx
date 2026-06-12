@@ -35,7 +35,7 @@ export function InsightsTab({ api }: { api: SettingsApi }): JSX.Element {
               <Stat value={insights.totalWords.toLocaleString()} label="words dictated" />
               <Stat value={String(insights.wordsPerMinute)} label="words / minute" />
               <Stat value={String(insights.dictations)} label="dictations" />
-              <Stat value={`${String(insights.refinedPercent)}%`} label="AI-polished" />
+              <Stat value={`${String(insights.polishedPercent)}%`} label="AI-polished" />
             </div>
 
             {insights.topModes.length > 0 && (

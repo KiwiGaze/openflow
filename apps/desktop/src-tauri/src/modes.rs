@@ -1,4 +1,4 @@
-//! Built-in modes and prompt construction for the LLM refinement step.
+//! Built-in modes and prompt construction for the LLM polish step.
 
 use crate::settings::{DictionaryEntry, Mode};
 use crate::text;
@@ -101,7 +101,7 @@ details: names, dates, numbers, decisions, action items."
     ]
 }
 
-/// System prompt for a dictation refinement call: the mode prompt, the safety
+/// System prompt for a dictation polish call: the mode prompt, the safety
 /// rules (always), the soft default-behavior line (unless the mode
 /// `transforms`), and the user's vocabulary so the LLM keeps custom spellings.
 pub fn dictation_system_prompt(mode: &Mode, dictionary: &[DictionaryEntry]) -> String {
@@ -134,7 +134,7 @@ pub fn preview_system_prompt(
     out
 }
 
-/// Returns a mode's text without AI refinement: Literal passes the transcript
+/// Returns a mode's text without AI polish: Literal passes the transcript
 /// through untouched, Code deterministically turns the whole utterance into
 /// one identifier, every other mode gets the rules-based cleanup. The one
 /// place the mode-id → cleanup decision lives, so live dictation and history
@@ -149,7 +149,7 @@ pub fn no_ai_output(mode_id: &str, text: &str) -> String {
     }
 }
 
-pub const DEFAULT_REFINE_INSTRUCTION: &str =
+pub const DEFAULT_POLISH_INSTRUCTION: &str =
     "Fix grammar, spelling, and clarity. Keep the meaning, tone, and language.";
 
 pub fn selection_system_prompt() -> String {
@@ -165,7 +165,7 @@ instruction says otherwise."
 
 pub fn selection_user_prompt(selection: &str, instruction: &str) -> String {
     let instruction = if instruction.trim().is_empty() {
-        DEFAULT_REFINE_INSTRUCTION
+        DEFAULT_POLISH_INSTRUCTION
     } else {
         instruction.trim()
     };
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn selection_prompt_falls_back_to_default_instruction() {
         let prompt = selection_user_prompt("hello world", "  ");
-        assert!(prompt.contains(DEFAULT_REFINE_INSTRUCTION));
+        assert!(prompt.contains(DEFAULT_POLISH_INSTRUCTION));
         assert!(prompt.ends_with("hello world"));
     }
 }

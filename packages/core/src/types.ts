@@ -10,7 +10,7 @@ export type PipelineStatus =
   | 'idle'
   | 'recording'
   | 'transcribing'
-  | 'refining'
+  | 'polishing'
   | 'inserting'
   /** Brief success flash: ✓ + a preview of the inserted text. */
   | 'inserted'
@@ -44,7 +44,7 @@ export type LlmProviderKind = 'ollama' | 'openaiCompatible';
 export const LLM_PROFILE_VERSION = 1;
 
 /**
- * One refinement connection, stored as `<app-data>/profiles/<id>.json`.
+ * One AI-polish connection, stored as `<app-data>/profiles/<id>.json`.
  * "No AI" is the absence of an active profile, not a provider kind.
  */
 export interface LlmProfile {
@@ -103,7 +103,7 @@ export interface Mode {
   name: string;
   builtIn: boolean;
   /**
-   * When true the mode wants LLM refinement and falls back to rules-based
+   * When true the mode wants LLM polish and falls back to rules-based
    * cleanup if no provider is configured. When false, output is the cleaned
    * transcript only (dictionary still applies).
    */
@@ -113,7 +113,7 @@ export interface Mode {
    * mode may translate/re-cast (still fenced by the invariant safety rules).
    */
   transforms: boolean;
-  /** System prompt used for LLM refinement (the user text only; safety rules
+  /** System prompt used for LLM polish (the user text only; safety rules
    * are appended at call time). */
   prompt: string;
   // ---- Mode v2 overrides (07); null = inherit the global setting ----
@@ -176,8 +176,8 @@ export interface Snippet {
 
 /**
  * A named, one-tap text operation applied to the current selection — a saved
- * Rewrite instruction with its own hotkey. Polish is the built-in default of
- * the same shape.
+ * polish instruction with its own hotkey. The built-in Polish is the same
+ * shape with a fixed instruction.
  */
 export interface Transform {
   /** Stable identity (a UUID); the hotkey resolves the instruction by this. */
@@ -198,7 +198,7 @@ export interface Settings {
   /** Reveals the word-level diff of the last result. Empty disables it. */
   changeOverlayHotkey: string;
   /** Master switch: may dictation transcripts go to the active profile. */
-  refineAfterDictation: boolean;
+  polishAfterDictation: boolean;
   /** Active profile id (a file under `<app-data>/profiles/`); "" = no AI. */
   activeLlmProfileId: string;
   activeModeId: string;
@@ -269,7 +269,7 @@ export interface TranscriptionResult {
   text: string;
   modeId: string;
   /** Whether an LLM pass ran (false means rules-based cleanup only). */
-  refined: boolean;
+  polished: boolean;
   durationMs: number;
 }
 
@@ -279,7 +279,7 @@ export interface HistoryEntry {
   raw: string;
   text: string;
   modeId: string;
-  refined: boolean;
+  polished: boolean;
   /** Unix epoch milliseconds. */
   at: number;
 }
@@ -300,7 +300,7 @@ export interface Insights {
   /** Average speaking pace this session; 0 until some speech is recorded. */
   wordsPerMinute: number;
   /** Percent of dictations that went through the LLM (vs rules cleanup). */
-  refinedPercent: number;
+  polishedPercent: number;
   /** Most-used modes, highest first (up to 3). */
   topModes: ModeCount[];
 }

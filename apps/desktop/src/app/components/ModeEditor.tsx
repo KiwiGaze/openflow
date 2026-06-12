@@ -98,7 +98,7 @@ export function ModeEditor({
       </Row>
       {mode.usesLlm && settings.activeLlmProfileId === '' && (
         <p className="row-hint row-hint-warn">
-          No AI profile is active — this mode falls back to rules cleanup. Add one in the Refine
+          No AI profile is active — this mode falls back to rules cleanup. Add one in the Models
           tab.
         </p>
       )}
