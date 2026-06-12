@@ -70,7 +70,6 @@ pub fn save_settings(
             .collect()
     };
     let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
-        || previous.refine_hotkey != saved.refine_hotkey
         || previous.polish_hotkey != saved.polish_hotkey
         || previous.change_overlay_hotkey != saved.change_overlay_hotkey
         || mode_hotkeys(&previous) != mode_hotkeys(&saved)
@@ -81,7 +80,6 @@ pub fn save_settings(
             // to the last working set as one atomic unit.
             let mut reverted = saved.clone();
             reverted.dictation_hotkey = previous.dictation_hotkey.clone();
-            reverted.refine_hotkey = previous.refine_hotkey.clone();
             reverted.polish_hotkey = previous.polish_hotkey.clone();
             reverted.change_overlay_hotkey = previous.change_overlay_hotkey.clone();
             for mode in &mut reverted.modes {
@@ -192,7 +190,7 @@ pub fn start_dictation(state: State<'_, AppState>) -> AppResult<()> {
     state.pipeline.start(Job::Dictation, None)
 }
 
-/// Stops recording and processes the take: transcribe → clean/refine → insert.
+/// Stops recording and processes the take: transcribe → clean/polish → insert.
 /// Contrast with [`cancel_dictation`], which discards it.
 #[tauri::command]
 pub fn stop_dictation(state: State<'_, AppState>) {
@@ -205,25 +203,14 @@ pub fn cancel_dictation(state: State<'_, AppState>) {
     state.pipeline.cancel();
 }
 
-/// Captures the current selection and starts a voice-rewrite recording.
-#[tauri::command]
-pub async fn start_refine_selection(state: State<'_, AppState>) -> AppResult<()> {
-    // Sync commands run on the main thread, but starting a refine job blocks
-    // on the output worker (selection capture), which round-trips keystrokes
-    // through the main thread — running it inline would deadlock.
-    let pipeline = state.pipeline.clone();
-    tauri::async_runtime::spawn_blocking(move || pipeline.start(Job::RefineSelection, None))
-        .await
-        .map_err(|e| AppError::State(format!("refine task failed: {e}")))?
-}
-
 /// Rewrites the current selection with the built-in fix-grammar instruction —
 /// no recording involved.
 #[tauri::command]
 pub async fn start_polish_selection(state: State<'_, AppState>) -> AppResult<()> {
-    // Same offload as start_refine_selection: polish blocks on selection
-    // capture, which round-trips keystrokes through the main thread.
-    // Errors surface as transient HUD states inside polish().
+    // Sync commands run on the main thread, but polish blocks on selection
+    // capture, which round-trips keystrokes through the main thread — running
+    // it inline would deadlock. Errors surface as transient HUD states inside
+    // polish().
     let pipeline = state.pipeline.clone();
     tauri::async_runtime::spawn_blocking(move || pipeline.polish())
         .await
@@ -352,7 +339,7 @@ pub fn list_llm_profiles(state: State<'_, AppState>) -> Vec<LlmProfile> {
 }
 
 /// Mode editor Preview (06 §6): builds the full system prompt exactly as the
-/// pipeline would, then refines a sample through the active profile — or runs
+/// pipeline would, then polishes a sample through the active profile — or runs
 /// the same rules-based cleanup the pipeline uses when there is no profile, so
 /// the preview is the genuine path, never a mock.
 #[tauri::command]
@@ -385,7 +372,7 @@ pub fn save_llm_profile(
     state.profiles.save(profile)
 }
 
-/// Deletes the profile; refinement turns off if this was the active one.
+/// Deletes the profile; polish turns off if this was the active one.
 #[tauri::command]
 pub fn delete_llm_profile(
     app: AppHandle,
@@ -393,7 +380,7 @@ pub fn delete_llm_profile(
     id: String,
 ) -> AppResult<Vec<LlmProfile>> {
     let list = state.profiles.delete(&id)?;
-    // Deleting the active profile turns refinement off.
+    // Deleting the active profile turns polish off.
     let settings = state.settings.get();
     if settings.active_llm_profile_id == id {
         let mut next = settings;

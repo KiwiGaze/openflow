@@ -1,4 +1,4 @@
-//! Optional LLM refinement over any OpenAI-compatible chat endpoint.
+//! Optional LLM polish over any OpenAI-compatible chat endpoint.
 //!
 //! One client covers all providers: Ollama (`/v1` compatibility layer),
 //! llama.cpp's `llama-server`, LM Studio, OpenAI, Groq, OpenRouter, etc.

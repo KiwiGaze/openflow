@@ -31,7 +31,7 @@ export function Hud(): JSX.Element {
   const visible = hudVisible(state);
   const recording = state.status === 'recording';
   const busy =
-    state.status === 'transcribing' || state.status === 'refining' || state.status === 'inserting';
+    state.status === 'transcribing' || state.status === 'polishing' || state.status === 'inserting';
   const glyph = hudGlyph(state);
 
   return (

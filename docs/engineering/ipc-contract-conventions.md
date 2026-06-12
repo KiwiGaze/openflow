@@ -48,7 +48,7 @@ The webviews never call `invoke()` or `listen()` directly — only through the
 - Every struct/enum that crosses IPC carries
   `#[serde(rename_all = "camelCase")]`. Without it, a snake_case field
   arrives in TS as `undefined` — silently. Enum variants serialize camelCase
-  too (`'refineSelection'`).
+  too (`'polishSelection'`).
 - The TS mirror uses the same field names, the same optionality (`Option<T>`
   ↔ `T | null` — this codebase uses `null`, not `undefined`, for absent
   values), and mirrors doc comments where the meaning is non-obvious.
@@ -71,7 +71,7 @@ The webviews never call `invoke()` or `listen()` directly — only through the
 4. Mirror any new payload/return types in `types.ts`.
 5. Add a typed wrapper to `apps/desktop/src/app/ipc.ts`.
 6. If the command blocks on the output worker (selection, paste), offload via
-   `spawn_blocking` — see `start_refine_selection` and
+   `spawn_blocking` — see `start_polish_selection` and
    [architecture-boundaries.md](architecture-boundaries.md) §constraint 2.
 7. Run `pnpm check:ipc` (steps 1–3 are mechanically verified; 4–5 are caught
    by `pnpm typecheck` only if something consumes them — review covers the

@@ -29,7 +29,7 @@ export function Onboarding({
   const starterModels = models.filter((m) => STARTER_MODELS.includes(m.id));
   const baseModel = models.find((m) => m.id === DEFAULT_MODEL);
   const hotkey = formatAcceleratorMac(settings.dictationHotkey);
-  const rewriteHotkey = formatAcceleratorMac(settings.refineHotkey);
+  const polishHotkey = formatAcceleratorMac(settings.polishHotkey);
 
   const micGranted = permissions?.microphone === 'granted';
   const micDenied = permissions?.microphone === 'denied';
@@ -303,7 +303,7 @@ export function Onboarding({
               <div>
                 <p className="result-text">{lastResult.text}</p>
                 <div className="row-hint">
-                  {lastResult.refined ? 'polished with AI' : 'cleaned with Standard mode'}
+                  {lastResult.polished ? 'polished with AI' : 'cleaned with Standard mode'}
                 </div>
               </div>
             </div>
@@ -318,7 +318,8 @@ export function Onboarding({
               Tap <strong>{hotkey}</strong> (don’t hold) to keep recording hands-free.
             </li>
             <li>
-              Select text, hold <strong>{rewriteHotkey}</strong>, and speak an edit to rewrite it.
+              Select text and tap <strong>{polishHotkey}</strong> to fix grammar in place — no
+              voice.
             </li>
             <li>Switch the writing style anytime from the menu-bar Mode list.</li>
           </ul>

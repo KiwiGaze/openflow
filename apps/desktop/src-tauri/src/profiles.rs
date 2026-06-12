@@ -1,6 +1,6 @@
 //! LLM profiles: one JSON file per profile under `<app-data>/profiles/`.
 //!
-//! A profile is a named connection for refinement (provider, base URL, key,
+//! A profile is a named connection for AI polish (provider, base URL, key,
 //! model). Exactly one profile may be active at a time; the pointer lives in
 //! settings (`activeLlmProfileId`, empty = no AI). The files are the source
 //! of truth: the filename stem is the profile identity, hand-dropped files
@@ -109,7 +109,7 @@ impl ProfileManager {
             .cloned()
     }
 
-    /// The profile selected for refinement, or `None` when "No AI" is chosen
+    /// The profile selected for polish, or `None` when "No AI" is chosen
     /// or the pointer is dangling.
     pub fn active(&self, active_id: &str) -> Option<LlmProfile> {
         if active_id.is_empty() {
@@ -282,7 +282,7 @@ pub fn reconcile(settings: &SettingsManager, profiles: &ProfileManager) {
     if !next.active_llm_profile_id.is_empty() && profiles.get(&next.active_llm_profile_id).is_none()
     {
         log::warn!(
-            "active LLM profile “{}” is missing; refinement is off until one is selected",
+            "active LLM profile “{}” is missing; polish is off until one is selected",
             next.active_llm_profile_id
         );
         next.active_llm_profile_id.clear();

@@ -1,5 +1,8 @@
 # Refine — design
 
+> **Historical (2026-06-12).** The voice "rewrite selection" feature described here was later
+> removed and "refine" was renamed "polish" across the app. Kept unedited as a design record.
+
 Status: implemented 2026-06-11. Written the same day against `main` (cd63494).
 
 Refine is the umbrella for everything that sends text through the user's LLM:

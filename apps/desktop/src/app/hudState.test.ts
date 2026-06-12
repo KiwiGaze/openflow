@@ -4,9 +4,6 @@ import { barScales, hudGlyph, hudLabel, hudVisible } from './hudState.js';
 describe('hudLabel', () => {
   it('describes each stage', () => {
     expect(hudLabel({ status: 'recording', job: 'dictation', message: null })).toBe('Listening…');
-    expect(hudLabel({ status: 'recording', job: 'refineSelection', message: null })).toBe(
-      'Listening for instruction…',
-    );
     expect(hudLabel({ status: 'recording', job: 'dictation', message: 'Notes' })).toBe(
       'Listening — Notes',
     );
@@ -17,17 +14,18 @@ describe('hudLabel', () => {
     expect(hudLabel({ status: 'idle', job: null, message: null })).toBe('');
   });
 
-  it('distinguishes the refining flows', () => {
-    expect(hudLabel({ status: 'refining', job: 'dictation', message: null })).toBe('Cleaning up…');
-    expect(hudLabel({ status: 'refining', job: 'refineSelection', message: null })).toBe(
-      'Rewriting…',
-    );
-    expect(hudLabel({ status: 'refining', job: 'polishSelection', message: null })).toBe(
+  it('distinguishes the polishing flows', () => {
+    expect(hudLabel({ status: 'polishing', job: 'dictation', message: null })).toBe('Polishing…');
+    expect(hudLabel({ status: 'polishing', job: 'polishSelection', message: null })).toBe(
       'Polishing selection…',
     );
     // Transforms show their name from the message, with a generic fallback.
-    expect(hudLabel({ status: 'refining', job: 'transform', message: 'Concise' })).toBe('Concise…');
-    expect(hudLabel({ status: 'refining', job: 'transform', message: null })).toBe('Transforming…');
+    expect(hudLabel({ status: 'polishing', job: 'transform', message: 'Concise' })).toBe(
+      'Concise…',
+    );
+    expect(hudLabel({ status: 'polishing', job: 'transform', message: null })).toBe(
+      'Transforming…',
+    );
   });
 
   it('quotes the inserted text on the success flash and ellipsizes long previews', () => {

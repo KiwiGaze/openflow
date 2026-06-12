@@ -14,8 +14,8 @@ use crate::pipeline::Job;
 use crate::settings::Settings;
 use crate::state::AppState;
 
-/// (Re-)registers every hotkey from settings — the three fixed ones plus each
-/// bound transform. Returns a user-readable error when an accelerator cannot be
+/// (Re-)registers every hotkey from settings — the fixed ones plus each bound
+/// transform. Returns a user-readable error when an accelerator cannot be
 /// parsed or registered (e.g. taken by another app) or two collide, leaving no
 /// partial registrations behind.
 pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
@@ -26,8 +26,6 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
 
     let dictation = Shortcut::from_str(&settings.dictation_hotkey)
         .map_err(|e| format!("dictation hotkey “{}”: {e}", settings.dictation_hotkey))?;
-    let refine = Shortcut::from_str(&settings.refine_hotkey)
-        .map_err(|e| format!("rewrite hotkey “{}”: {e}", settings.refine_hotkey))?;
     let polish = Shortcut::from_str(&settings.polish_hotkey)
         .map_err(|e| format!("polish hotkey “{}”: {e}", settings.polish_hotkey))?;
     // Parse every non-null mode hotkey alongside the globals.
@@ -65,11 +63,11 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         transforms.push((t.id.clone(), sc));
     }
 
-    // Every hotkey must be pairwise distinct — the three fixed ones, the
-    // optional see-changes key, each bound transform, and every mode hotkey
-    // (07 §4). (Shortcut is Copy, so collecting them here leaves the originals
-    // usable for registration below.)
-    let mut all: Vec<Shortcut> = vec![dictation, refine, polish];
+    // Every hotkey must be pairwise distinct — the fixed ones, the optional
+    // see-changes key, each bound transform, and every mode hotkey (07 §4).
+    // (Shortcut is Copy, so collecting them here leaves the originals usable
+    // for registration below.)
+    let mut all: Vec<Shortcut> = vec![dictation, polish];
     all.extend(changes.iter().copied());
     all.extend(transforms.iter().map(|(_, sc)| *sc));
     all.extend(mode_hotkeys.iter().map(|(_, sc)| *sc));
@@ -86,13 +84,6 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
             dispatch(app, Job::Dictation, event.state());
         })
         .map_err(|e| format!("dictation hotkey “{}”: {e}", settings.dictation_hotkey))?;
-
-    if let Err(e) = shortcuts.on_shortcut(refine, move |app, _shortcut, event| {
-        dispatch(app, Job::RefineSelection, event.state());
-    }) {
-        let _ = shortcuts.unregister_all();
-        return Err(format!("rewrite hotkey “{}”: {e}", settings.refine_hotkey));
-    }
 
     // Polish is a tap: only Pressed matters, Released is a no-op.
     if let Err(e) = shortcuts.on_shortcut(polish, move |app, _shortcut, event| {
@@ -148,9 +139,8 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     }
 
     log::info!(
-        "hotkeys registered: dictation={} rewrite={} polish={} see-changes={} transforms={} mode-hotkeys={}",
+        "hotkeys registered: dictation={} polish={} see-changes={} transforms={} mode-hotkeys={}",
         settings.dictation_hotkey,
-        settings.refine_hotkey,
         settings.polish_hotkey,
         settings.change_overlay_hotkey,
         settings
@@ -190,9 +180,8 @@ pub fn set_cancel_key(app: &AppHandle, active: bool) {
 
 fn dispatch(app: &AppHandle, job: Job, state: ShortcutState) {
     let pipeline = app.state::<AppState>().pipeline.clone();
-    // The hotkey handler runs on the main thread. Starting a refine job
-    // blocks on the output worker (selection capture), which round-trips
-    // keystrokes through the main thread — handling it inline would deadlock.
+    // The hotkey handler runs on the main thread; start/finish block on
+    // worker-thread replies, so offload to keep the handler responsive.
     //
     // Pressed/Released are offloaded independently, so the pool could in
     // principle run Released before its Pressed. Harmless here: a reorder only

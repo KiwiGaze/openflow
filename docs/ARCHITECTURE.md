@@ -60,9 +60,9 @@ Per job:
    clipboard. Without the Accessibility permission it degrades to clipboard-only and the HUD
    says so.
 
-Selected-text rewrite prepends a step: the selection is captured **before** recording starts
-(clipboard save → probe marker → ⌘C → read → restore), then the spoken instruction + selection
-go to the LLM and the result replaces the selection via paste.
+Selected-text polish (the polish hotkey or a transform) skips recording entirely: the
+selection is captured (clipboard save → probe marker → ⌘C → read → restore), the prompt +
+selection go to the LLM, and the result replaces the selection via paste.
 
 ## 2. Crate/package layout
 
@@ -108,7 +108,7 @@ into `.part` files and renamed only when complete.
 LLM profiles are one JSON file each under `<app-data>/profiles/` (camelCase, schema-versioned,
 atomic writes, 0600 — they can hold API keys). The filename stem is the profile identity;
 hand-dropped files appear on the next scan, unreadable ones are skipped and never deleted.
-Exactly one profile may be active for refinement; `activeLlmProfileId` in settings points at
+Exactly one profile may be active for polish; `activeLlmProfileId` in settings points at
 it, and an empty id means "No AI". v1 installs carried the LLM config inline in settings; a
 one-time, self-erasing migration (`profiles::reconcile`) moves it into a profile file at
 startup.

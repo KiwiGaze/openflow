@@ -2,9 +2,9 @@ import type { JSX } from 'react';
 import { type HotkeyBehavior, LANGUAGES } from '@openflow/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
+import { PolishShortcuts } from '../components/PolishShortcuts.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
-import { Transforms } from '../components/Transforms.js';
 
 export function DictationTab({
   api,
@@ -47,28 +47,8 @@ export function DictationTab({
           </select>
         </Row>
         <Row
-          title="Polish selection"
-          hint="Fix grammar and clarity in the selected text. No voice."
-        >
-          <HotkeyRecorder
-            value={settings.polishHotkey}
-            label="Polish selection"
-            onChange={(accelerator) => void update({ polishHotkey: accelerator })}
-          />
-        </Row>
-        <Row
-          title="Rewrite selection"
-          hint="Select text, hold, and say the change. Needs an AI profile."
-        >
-          <HotkeyRecorder
-            value={settings.refineHotkey}
-            label="Rewrite selection"
-            onChange={(accelerator) => void update({ refineHotkey: accelerator })}
-          />
-        </Row>
-        <Row
           title="See changes"
-          hint="Reveal a word-level diff of the last cleanup, polish, or rewrite. Empty disables it."
+          hint="Reveal a word-level diff of the last cleanup or polish. Empty disables it."
         >
           <HotkeyRecorder
             value={settings.changeOverlayHotkey}
@@ -106,18 +86,18 @@ export function DictationTab({
       <section className="card">
         <h2>After transcribing</h2>
         <Row
-          title="Refine with AI"
+          title="Polish with AI"
           hint="Polish transcripts with your active mode and AI profile. Off = fast rules-based cleanup, no network."
         >
           <Toggle
-            checked={settings.refineAfterDictation}
-            onChange={(checked) => void update({ refineAfterDictation: checked })}
-            label="Refine with AI"
+            checked={settings.polishAfterDictation}
+            onChange={(checked) => void update({ polishAfterDictation: checked })}
+            label="Polish with AI"
           />
         </Row>
       </section>
 
-      <Transforms api={api} />
+      <PolishShortcuts api={api} />
     </div>
   );
 }

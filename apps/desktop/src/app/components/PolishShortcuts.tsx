@@ -2,6 +2,7 @@ import { type JSX } from 'react';
 import type { Transform } from '@openflow/core';
 import type { SettingsApi } from '../hooks.js';
 import { HotkeyRecorder } from './HotkeyRecorder.js';
+import { Row } from './Row.js';
 
 /** One-click starting points; the user assigns a hotkey afterwards. */
 const TRANSFORM_TEMPLATES: { name: string; instruction: string }[] = [
@@ -28,10 +29,11 @@ const TRANSFORM_TEMPLATES: { name: string; instruction: string }[] = [
 ];
 
 /**
- * Named one-tap selection rewrites — saved Rewrite instructions, each with its
- * own hotkey. Lives beside the Polish/Rewrite hotkeys it generalizes.
+ * The Polish card: the built-in fix-grammar shortcut plus custom prompts
+ * (transforms), each mapped to its own shortcut; all apply to the current
+ * selection via the active AI profile.
  */
-export function Transforms({ api }: { api: SettingsApi }): JSX.Element {
+export function PolishShortcuts({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, update } = api;
 
   const addTransform = (seed: { name: string; instruction: string }): void => {
@@ -56,11 +58,22 @@ export function Transforms({ api }: { api: SettingsApi }): JSX.Element {
 
   return (
     <section className="card">
-      <h2>Transforms</h2>
+      <h2>Polish</h2>
       <p className="row-hint">
-        One-tap rewrites for selected text — like Polish, but with your own instruction and hotkey.
-        Select text in any app and press the transform&rsquo;s hotkey. Needs an AI profile.
+        Prompts mapped to shortcuts. Select text in any app and press a shortcut to rewrite it in
+        place — no voice. Needs an AI profile.
       </p>
+
+      <Row
+        title="Polish"
+        hint="Fixes grammar, spelling, and clarity. Keeps your meaning, tone, and language."
+      >
+        <HotkeyRecorder
+          value={settings.polishHotkey}
+          label="Polish"
+          onChange={(accelerator) => void update({ polishHotkey: accelerator })}
+        />
+      </Row>
 
       {settings.transforms.length > 0 && (
         <div className="transform-list">
@@ -99,14 +112,14 @@ export function Transforms({ api }: { api: SettingsApi }): JSX.Element {
                 rows={2}
                 maxLength={2000}
                 value={t.instruction}
-                placeholder="How should this rewrite the selected text? (empty acts like Polish)"
+                placeholder="How should this rewrite the selection? (leave empty to act like Polish)"
                 aria-label="Transform instruction"
                 onChange={(e) => {
                   patchTransform(t.id, { instruction: e.target.value });
                 }}
               />
               {t.hotkey.trim() === '' && (
-                <p className="row-hint">Set a hotkey above to use this transform.</p>
+                <p className="row-hint">Assign a shortcut to use this prompt.</p>
               )}
             </div>
           ))}

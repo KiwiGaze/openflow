@@ -22,7 +22,8 @@ pub struct HistoryEntry {
     pub raw: String,
     pub text: String,
     pub mode_id: String,
-    pub refined: bool,
+    #[serde(alias = "refined")]
+    pub polished: bool,
     /// Unix epoch milliseconds; the webview formats the date locally.
     pub at: u64,
 }
@@ -68,7 +69,7 @@ impl HistoryStore {
 
     /// Append a dictation (newest first), capped. Best-effort persist — a
     /// history write failure must never affect the dictation that just landed.
-    pub fn append(&self, raw: String, text: String, mode_id: String, refined: bool) {
+    pub fn append(&self, raw: String, text: String, mode_id: String, polished: bool) {
         let at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
@@ -79,7 +80,7 @@ impl HistoryStore {
             raw,
             text,
             mode_id,
-            refined,
+            polished,
             at,
         };
         {
@@ -116,5 +117,31 @@ impl HistoryStore {
         let tmp = self.path.with_extension("json.tmp");
         fs::write(&tmp, json)?;
         fs::rename(&tmp, &self.path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("openflow-history-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn legacy_refined_key_still_reads() {
+        let dir = temp_dir("alias");
+        fs::write(
+            dir.join("history.json"),
+            r#"[{ "id": "1-0", "raw": "r", "text": "t", "modeId": "standard", "refined": true, "at": 1 }]"#,
+        )
+        .unwrap();
+        let entries = HistoryStore::load(&dir).list();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].polished);
     }
 }
