@@ -942,6 +942,143 @@ button:focus-visible,
   border-top: 1px solid var(--border);
 }
 
+/* ---- Home ---- */
+
+.home-greeting {
+  margin-bottom: var(--space-2);
+}
+
+.home-greeting h1 {
+  margin: 0;
+  font-size: var(--text-h1);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.home-greeting .row-hint {
+  margin-top: var(--space-2);
+}
+
+/* Single column by default; a wide window splits into history + a fixed aside. */
+.home-grid {
+  display: grid;
+  gap: var(--space-7);
+  align-items: start;
+}
+
+@media (min-width: 1080px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+}
+
+.home-main,
+.home-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  min-width: 0;
+}
+
+.home-day + .home-day {
+  margin-top: var(--space-6);
+}
+
+.home-day-label {
+  font-size: var(--text-hint);
+  font-weight: var(--weight-medium);
+  color: var(--text-dim);
+  padding: var(--space-2) 0;
+}
+
+.home-entry {
+  border-top: 1px solid var(--border);
+}
+
+.home-entry:first-of-type {
+  border-top: none;
+}
+
+.home-entry-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: var(--space-4) 0;
+  cursor: pointer;
+}
+
+.home-entry-preview {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-entry-meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-faint);
+  font-size: var(--text-hint);
+}
+
+.home-entry-app {
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-entry-detail {
+  padding: 0 0 var(--space-5);
+}
+
+.home-entry-detail .row-title {
+  font-size: var(--text-hint);
+  color: var(--text-dim);
+  margin-bottom: var(--space-1);
+}
+
+.home-entry-result {
+  margin-top: var(--space-2);
+}
+
+.home-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}
+
+.home-stat-row:first-of-type {
+  border-top: none;
+}
+
+.home-stat-value {
+  font-weight: var(--weight-semibold);
+}
+
+.home-setup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border);
+}
+
+.home-setup-row:first-of-type {
+  border-top: none;
+}
+
 /* ---- Misc ---- */
 
 .result-text {

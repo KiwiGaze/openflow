@@ -161,7 +161,7 @@ export function App(): JSX.Element {
             {tip.copy}
           </Callout>
         )}
-        {tab === 'home' && <HomeTab />}
+        {tab === 'home' && <HomeTab api={api} modelsApi={modelsApi} onNavigate={setTab} />}
         {tab === 'insights' && <InsightsTab api={api} />}
         {tab === 'dictionary' && <DictionaryTab api={api} />}
         {tab === 'snippets' && <SnippetsTab api={api} />}
