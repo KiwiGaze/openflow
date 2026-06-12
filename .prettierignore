@@ -7,3 +7,4 @@ apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/capabilities/
 CHANGELOG.md
 .worktrees/
+.claude/

@@ -12,6 +12,7 @@ export default tseslint.config(
       '**/gen/**',
       '**/node_modules/**',
       '.worktrees/**',
+      '.claude/**',
     ],
   },
   js.configs.recommended,
