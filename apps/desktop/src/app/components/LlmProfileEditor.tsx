@@ -8,7 +8,7 @@ import {
   type LlmTestResult,
   normalizeBaseUrl,
   presetForProfile,
-} from '@openflow/core';
+} from '@velata/core';
 import { ipc } from '../ipc.js';
 import { Row } from './Row.js';
 

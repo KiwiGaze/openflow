@@ -1,5 +1,5 @@
 import { type JSX } from 'react';
-import type { Transform } from '@openflow/core';
+import type { Transform } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
 import { HotkeyRecorder } from './HotkeyRecorder.js';
 import { Row } from './Row.js';

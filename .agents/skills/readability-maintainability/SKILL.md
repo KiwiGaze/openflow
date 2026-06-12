@@ -1,6 +1,6 @@
 ---
 name: readability-maintainability
-description: Improve naming, comments, file organization, and module size anywhere in OpenFlow — or review a diff for readability. Use this whenever you write more than a screen of new code, rename things, add or delete comments, or feel tempted to split or merge files, in either Rust or TypeScript.
+description: Improve naming, comments, file organization, and module size anywhere in Velata — or review a diff for readability. Use this whenever you write more than a screen of new code, rename things, add or delete comments, or feel tempted to split or merge files, in either Rust or TypeScript.
 ---
 
 # Readability and maintainability

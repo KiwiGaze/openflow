@@ -15,8 +15,8 @@
   --text-faint: #8e8e93; /* timestamps, disabled hint text */
 
   /* ---- Color: accent + state ---- */
-  --accent: #5b5bd6;
-  --accent-hover: #4a4ac4; /* btn-primary:hover, was filter(brightness) */
+  --accent: #5e6ad2; /* brand periwinkle — appears behind/around the mark, never in it */
+  --accent-hover: #4d59c0; /* btn-primary:hover, was filter(brightness) */
   --accent-text: #ffffff;
   --danger: #c4241f; /* darkened from #d62b2b for margin + dark legibility */
   --danger-bg: #fbeaea;
@@ -30,7 +30,7 @@
   --hud-bg-notice: rgb(122 90 0 / 95%);
   --hud-bg-error: rgb(150 30 28 / 96%);
   --hud-text: #f5f5f7;
-  --hud-bars: #9e9efc;
+  --hud-bars: #9aa4f2;
   --hud-ok: #5dd28a; /* success ✓ glyph; pill bg stays --hud-bg */
 
   /* ---- Type scale (size / weight / line-height) ---- */
@@ -99,8 +99,8 @@
     --text: #f5f5f7;
     --text-dim: #98989d;
     --text-faint: #818188;
-    --accent: #7c7cf0;
-    --accent-hover: #9090f4;
+    --accent: #7e89e8;
+    --accent-hover: #97a0ef;
     --danger: #ff6961;
     --danger-bg: #3a1e1d;
     --ok: #5dd28a;
@@ -127,8 +127,8 @@
   --text: #f5f5f7;
   --text-dim: #98989d;
   --text-faint: #818188;
-  --accent: #7c7cf0;
-  --accent-hover: #9090f4;
+  --accent: #7e89e8;
+  --accent-hover: #97a0ef;
   --danger: #ff6961;
   --danger-bg: #3a1e1d;
   --ok: #5dd28a;

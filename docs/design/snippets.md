@@ -7,8 +7,8 @@ built, with the original reasoning intact.
 
 People repeat themselves. The same email address, the same calendar link, the same
 "thanks, I'll take a look and get back to you" — typed or dictated again and again. Today
-OpenFlow has no shorthand for this; the personal dictionary fixes _spelling_ ("open flow" →
-"OpenFlow"), but it is the wrong tool for "expand four spoken words into a four-line block,"
+Velata has no shorthand for this; the personal dictionary fixes _spelling_ ("open flow" →
+"Velata"), but it is the wrong tool for "expand four spoken words into a four-line block,"
 because dictionary entries are meant to be short, whole-word, and one-to-one.
 
 A dictation app is the natural home for expansion: the trigger surface (your voice) is already
@@ -111,7 +111,7 @@ Data model: `snippets: Vec<Snippet>` in `settings.json` (camelCase mirror in
 `packages/core/src/types.ts`), schema **v3**, default empty; blank triggers/expansions dropped in
 `normalize()`. No IPC commands beyond the existing `save_settings` — snippets ride in the
 settings blob like the dictionary does. UI: a **Snippets** tab beside Dictionary
-(`SnippetsTab.tsx`), validated by `validateSnippet` in `@openflow/core`.
+(`SnippetsTab.tsx`), validated by `validateSnippet` in `@velata/core`.
 
 ## Privacy fit
 
@@ -135,4 +135,4 @@ snippet never causes a connection that dictation alone would not.
   but needs caret control we do not have via paste; defer.
 - Import/export: snippets are plain JSON in settings already; a "Show in Finder" affordance (as
   used for profiles) is likely enough, no dedicated importer.
-- Sharing across a team is **out** — that needs a service, and OpenFlow has none by design.
+- Sharing across a team is **out** — that needs a service, and Velata has none by design.

@@ -1,13 +1,13 @@
 ---
 name: code-review
-description: Review an OpenFlow diff, branch, or PR — or process incoming review comments. Use this whenever asked to review changes, assess a PR, double-check work before merging, or respond to CodeRabbit/human review feedback in this repo; it encodes the repo's blockers, per-area rules, and the over-engineering filter.
+description: Review an Velata diff, branch, or PR — or process incoming review comments. Use this whenever asked to review changes, assess a PR, double-check work before merging, or respond to CodeRabbit/human review feedback in this repo; it encodes the repo's blockers, per-area rules, and the over-engineering filter.
 ---
 
 # Code review
 
 ## Purpose
 
-Apply OpenFlow's actual bar: privacy and contract violations are hard
+Apply Velata's actual bar: privacy and contract violations are hard
 blockers, boring-and-explicit beats clever, and review noise (style nits the
 linter owns, speculative-abstraction demands) is itself a defect. The same
 bar applies to reviews you write and reviews you receive.

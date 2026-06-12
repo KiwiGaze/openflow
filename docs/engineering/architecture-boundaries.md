@@ -25,14 +25,14 @@ also implements, no direct network I/O (`check-privacy.mjs` fails the build
 on `fetch`/XHR/WebSocket in the webview). Pure _presentation_ logic (which
 tab is open, HUD fade timing, optimistic form state) belongs here.
 
-**`packages/core` (`@openflow/core`) owns the shared TS surface:** the IPC
+**`packages/core` (`@velata/core`) owns the shared TS surface:** the IPC
 mirror (`types.ts`) and pure, dependency-free utilities (hotkey parsing,
 formatting, validation, diff, CSV/JSON import-export, presets, languages).
 The litmus test for putting code in core: it is pure, both webviews (or a
 webview and a test) need it, and it imports nothing but other core modules.
 Core must never import from `@tauri-apps/*` or React.
 
-Dependency direction is one-way: `apps/desktop/src` → `@openflow/core`.
+Dependency direction is one-way: `apps/desktop/src` → `@velata/core`.
 Nothing imports from `apps/desktop`, and core imports nothing workspace-local.
 
 ## The IPC boundary
@@ -44,9 +44,9 @@ wire, both sides change in the same PR.
 
 ## Threading model (deliberate — do not "fix")
 
-- `cpal::Stream` is `!Send`: it lives on the dedicated `openflow-audio`
+- `cpal::Stream` is `!Send`: it lives on the dedicated `velata-audio`
   thread.
-- `Enigo` + `arboard` live on the dedicated `openflow-output` thread (CGEvent
+- `Enigo` + `arboard` live on the dedicated `velata-output` thread (CGEvent
   thread affinity; also serializes paste/copy sequences).
 - Whisper runs in `spawn_blocking` behind a `Mutex`; the loaded context is
   reused because loading maps hundreds of MB.

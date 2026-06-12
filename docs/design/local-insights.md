@@ -12,13 +12,13 @@ tool that offers it does so by shipping your usage to a server, because the dash
 business model.
 
 But the computation is entirely local. The only reason "insights" usually means "telemetry" is
-commercial, not technical. OpenFlow is in the rare position of being able to hand users a mirror
+commercial, not technical. Velata is in the rare position of being able to hand users a mirror
 of their own usage that, by construction, never leaves the Mac. That contrast is itself the
 feature.
 
 ## The line we will not cross — and the one we can
 
-OpenFlow persists nothing and sends nothing. Insights has to respect that. The unlock is a
+Velata persists nothing and sends nothing. Insights has to respect that. The unlock is a
 distinction:
 
 > An **aggregate** is not **content**. "You have dictated 22,000 words" is a number. Your words
@@ -90,7 +90,7 @@ settings flag. No new IPC events — the Insights view pulls on open.
 
 ## Privacy fit
 
-The point of the doc. The design choices that make it OpenFlow-native rather than a tracked
+The point of the doc. The design choices that make it Velata-native rather than a tracked
 dashboard wearing a privacy hat:
 
 - **Opt-in, and off by default** for anything written to disk; Tier 1 writes nothing.

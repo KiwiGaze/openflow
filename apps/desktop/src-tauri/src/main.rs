@@ -174,7 +174,7 @@ fn main() {
             commands::get_app_info,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building OpenFlow")
+        .expect("error while building Velata")
         .run(|app, event| {
             // Quit ends in libc exit() (⌘Q via -[NSApplication terminate:],
             // tray quit via app.exit(0) → process exit), which never drops

@@ -6,7 +6,7 @@
 //! cannot be click-through. A plain window would activate the app on click and
 //! send the target app's `⌘Z` to us instead — so the window is reclassed into a
 //! macOS non-activating `NSPanel`: it receives mouse events without activating
-//! OpenFlow, leaving the app the user dictated into focused and its undo intact.
+//! Velata, leaving the app the user dictated into focused and its undo intact.
 //!
 //! Like the HUD, the window is created once and never reopened (tauri#14102);
 //! the webview content fades in and out, and the panel toggles between

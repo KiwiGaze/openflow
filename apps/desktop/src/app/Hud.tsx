@@ -1,5 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
-import type { PipelineState } from '@openflow/core';
+import type { PipelineState } from '@velata/core';
 import { events, subscribe } from './ipc.js';
 import { barScales, hudGlyph, hudLabel, hudVisible } from './hudState.js';
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
-import type { HistoryEntry } from '@openflow/core';
+import type { HistoryEntry } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
 import { ipc } from '../ipc.js';
 

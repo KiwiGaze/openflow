@@ -1,4 +1,4 @@
-# OpenFlow — Product Requirements
+# Velata — Product Requirements
 
 **Status:** MVP shipped · **Platform:** macOS 13+ (Apple Silicon first) · **License:** MIT
 
@@ -12,7 +12,7 @@ have no trustworthy, free, local option with the same "hold a key, get clean tex
 
 ## 2. Product
 
-OpenFlow is a local-first macOS menu-bar app:
+Velata is a local-first macOS menu-bar app:
 
 1. **Dictate anywhere.** Hold a global hotkey (default `⌥ Space`), speak, release. The speech is
    transcribed on-device (whisper.cpp + Metal), cleaned up, and pasted into the active app.
@@ -22,7 +22,7 @@ OpenFlow is a local-first macOS menu-bar app:
 
 ### Positioning
 
-|              | Wispr Flow                      | Superwhisper             | **OpenFlow**                                 |
+|              | Wispr Flow                      | Superwhisper             | **Velata**                                   |
 | ------------ | ------------------------------- | ------------------------ | -------------------------------------------- |
 | STT location | Cloud only                      | Local or cloud           | **Local only**                               |
 | AI cleanup   | Cloud, always on                | Cloud, BYO key           | **Optional: local Ollama, BYO key, or none** |
@@ -94,7 +94,7 @@ A **mode** decides how the transcript becomes written text. Built-ins:
 
 ### 4.4 Personal dictionary
 
-`from → to` pairs ("open flow" → "OpenFlow"). Applied as whole-word, case-insensitive
+`from → to` pairs ("open flow" → "Velata"). Applied as whole-word, case-insensitive
 replacements after transcription, fed to whisper as a vocabulary-biasing initial prompt, and
 listed in LLM prompts so polish preserves the exact spellings. This is table-stakes in every
 competing product and the first thing users notice missing.

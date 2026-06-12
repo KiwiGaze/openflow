@@ -1,6 +1,6 @@
-# @openflow/core
+# @velata/core
 
-The shared TypeScript surface of OpenFlow: the hand-written mirror of the
+The shared TypeScript surface of Velata: the hand-written mirror of the
 Rust IPC contract plus pure utilities used by the webviews.
 
 - `src/types.ts` — the IPC mirror: every serde struct that crosses Tauri IPC,

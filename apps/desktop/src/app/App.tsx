@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { todayIso } from '@openflow/core';
+import { todayIso } from '@velata/core';
 import { useModels, useSettings } from './hooks.js';
 import { Onboarding } from './Onboarding.js';
 import { eligibleTip } from './tips.js';
@@ -76,7 +76,7 @@ export function App(): JSX.Element {
   };
 
   if (!api) {
-    return <div className="splash">OpenFlow</div>;
+    return <div className="splash">Velata</div>;
   }
 
   if (!api.settings.onboardingCompleted) {
@@ -92,7 +92,7 @@ export function App(): JSX.Element {
   return (
     <div className="shell">
       <nav className="sidebar" aria-label="Settings">
-        <div className="sidebar-brand">OpenFlow</div>
+        <div className="sidebar-brand">Velata</div>
         <div
           role="tablist"
           aria-orientation="vertical"

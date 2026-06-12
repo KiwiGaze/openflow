@@ -18,7 +18,7 @@ The terms a user repeats are sitting right there in their own usage — but disc
 ## Idea
 
 Surface gentle, accept-or-ignore suggestions for dictionary entries, derived only from signals
-OpenFlow can read without keeping a transcript. Entries that came from a suggestion wear a small
+Velata can read without keeping a transcript. Entries that came from a suggestion wear a small
 badge (a ✨ or "suggested" tag) so the list stays honest about where each one came from.
 
 Two deterministic signals, no model, no corpus:
@@ -31,7 +31,7 @@ Two deterministic signals, no model, no corpus:
 
 ## The constraint that shapes everything
 
-OpenFlow persists **nothing** — no audio, no transcripts, no history. "Learning" therefore cannot
+Velata persists **nothing** — no audio, no transcripts, no history. "Learning" therefore cannot
 mean accumulating a corpus on disk. The design has to produce suggestions from _ephemeral_ state.
 
 | Approach               | Where candidates live                           | Disk?        | Verdict                             |
@@ -46,7 +46,7 @@ suggestions. It dies on quit. Accepting a suggestion writes a normal dictionary 
 exactly as a hand-typed one is today); the ✨ badge records that it began as a suggestion.
 Nothing else touches disk, and nothing is ever transmitted.
 
-This mirrors a principle OpenFlow already lives by: a hint computed from local state is fine;
+This mirrors a principle Velata already lives by: a hint computed from local state is fine;
 exporting the state that produced it is not.
 
 ## UX
@@ -64,7 +64,7 @@ Dictionary                                                   [ + Add ]
   └──────────────────────────────────────────────────────────┘
 
   Your entries
-  open flow      → OpenFlow
+  open flow      → Velata
   Redisson       → Redisson        ✨ added from a suggestion
 ```
 
@@ -93,7 +93,7 @@ This is the doc where privacy _is_ the feature, and the architecture has to earn
 - Candidate counts live in RAM, are bounded, and are erased on quit. No corpus, no file.
 - Only **candidate tokens** are ever held — not sentences, not the surrounding text.
 - Accepting writes one ordinary dictionary entry; declining leaves no trace.
-- Zero network. The "OpenFlow noticed you say X often" line is computed entirely on-device, the
+- Zero network. The "Velata noticed you say X often" line is computed entirely on-device, the
   same way local hints already are.
 
 If we ever want persistent, cross-session suggestions (e.g. "you've said this across many days"),

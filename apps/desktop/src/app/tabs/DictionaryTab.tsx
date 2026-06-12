@@ -4,7 +4,7 @@ import {
   hasDictionaryEntry,
   parseDictionaryCsv,
   validateDictionaryEntry,
-} from '@openflow/core';
+} from '@velata/core';
 import { useDictionarySuggestions } from '../hooks.js';
 import type { SettingsApi } from '../hooks.js';
 import { ipc } from '../ipc.js';
@@ -135,7 +135,7 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
           <span className="dict-arrow">→</span>
           <input
             type="text"
-            placeholder="Replace with… (e.g. “OpenFlow”)"
+            placeholder="Replace with… (e.g. “Velata”)"
             value={to}
             onChange={(e) => {
               setTo(e.target.value);
@@ -150,7 +150,7 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
         {settings.dictionary.length === 0 ? (
           <p className="row-hint">
             Nothing here yet. When a name or term gets misheard, add it — e.g. “open flow” →
-            “OpenFlow”.
+            “Velata”.
           </p>
         ) : (
           <div className="dict-list">

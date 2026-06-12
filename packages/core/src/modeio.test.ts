@@ -50,22 +50,22 @@ describe('parseModeImport', () => {
   it('rejects non-JSON, wrong schema, and a newer major version', () => {
     expect(parseModeImport('{ not json').ok).toBe(false);
     expect(parseModeImport('{"schema":"something/1","mode":{}}').ok).toBe(false);
-    const newer = parseModeImport('{"schema":"openflow.mode/2","mode":{"name":"x","prompt":"y"}}');
+    const newer = parseModeImport('{"schema":"velata.mode/2","mode":{"name":"x","prompt":"y"}}');
     expect(newer).toEqual({
       ok: false,
-      error: 'This mode was made with a newer version of OpenFlow.',
+      error: 'This mode was made with a newer version of Velata.',
     });
   });
 
   it('rejects an empty name or prompt', () => {
-    expect(
-      parseModeImport('{"schema":"openflow.mode/1","mode":{"name":" ","prompt":"y"}}').ok,
-    ).toBe(false);
+    expect(parseModeImport('{"schema":"velata.mode/1","mode":{"name":" ","prompt":"y"}}').ok).toBe(
+      false,
+    );
   });
 
   it('defaults missing flags, clamps an invalid language to null', () => {
     const r = parseModeImport(
-      '{"schema":"openflow.mode/1","mode":{"name":"X","prompt":"do it","language":"english"}}',
+      '{"schema":"velata.mode/1","mode":{"name":"X","prompt":"do it","language":"english"}}',
     );
     expect(r.ok).toBe(true);
     if (r.ok) {
@@ -77,7 +77,7 @@ describe('parseModeImport', () => {
 
   it('round-trips the auto-detect language', () => {
     const r = parseModeImport(
-      '{"schema":"openflow.mode/1","mode":{"name":"X","prompt":"do it","language":"auto"}}',
+      '{"schema":"velata.mode/1","mode":{"name":"X","prompt":"do it","language":"auto"}}',
     );
     expect(r.ok).toBe(true);
     if (r.ok) {

@@ -1,4 +1,4 @@
-import type { PipelineState } from '@openflow/core';
+import type { PipelineState } from '@velata/core';
 
 /** The pipeline fields these label helpers read (the tip renders separately). */
 type HudState = Pick<PipelineState, 'status' | 'job' | 'message'>;

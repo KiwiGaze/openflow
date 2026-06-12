@@ -1,7 +1,7 @@
 import type { Mode } from './types.js';
 
-export const MODE_SCHEMA = 'openflow.mode/1';
-const SCHEMA_PREFIX = 'openflow.mode/';
+export const MODE_SCHEMA = 'velata.mode/1';
+const SCHEMA_PREFIX = 'velata.mode/';
 const MAX_NAME = 80;
 const MAX_PROMPT = 8000;
 const MAX_FILE_BYTES = 64 * 1024;
@@ -94,7 +94,7 @@ export function parseModeImport(text: string): ModeImportResult {
     return { ok: false, error: "This file isn't a valid mode." };
   }
   if (schema !== MODE_SCHEMA) {
-    return { ok: false, error: 'This mode was made with a newer version of OpenFlow.' };
+    return { ok: false, error: 'This mode was made with a newer version of Velata.' };
   }
   const raw = envelope.mode;
   if (typeof raw !== 'object' || raw === null) {

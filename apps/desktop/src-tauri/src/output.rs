@@ -40,7 +40,7 @@ pub enum CopyReason {
 }
 
 /// Marker used to detect "nothing was selected" when capturing a selection.
-const SELECTION_PROBE: &str = "\u{200B}openflow-selection-probe\u{200B}";
+const SELECTION_PROBE: &str = "\u{200B}velata-selection-probe\u{200B}";
 
 /// Time for the target app to process a synthetic Cmd+C / Cmd+V.
 const KEYSTROKE_SETTLE: Duration = Duration::from_millis(140);
@@ -74,7 +74,7 @@ impl OutputSystem {
     pub fn spawn(app: AppHandle) -> Self {
         let (tx, rx) = mpsc::channel::<OutputCmd>();
         std::thread::Builder::new()
-            .name("openflow-output".into())
+            .name("velata-output".into())
             .spawn(move || worker(app, rx))
             .expect("failed to spawn output thread");
         Self { tx }

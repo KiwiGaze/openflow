@@ -6,7 +6,7 @@ follow-ups.
 
 ## Why
 
-OpenFlow has two ways to edit a selection:
+Velata has two ways to edit a selection:
 
 - **Polish** (`⌥⇧P`, tap) applies one fixed instruction — _fix grammar, spelling, clarity_ — and
   is fast and predictable.

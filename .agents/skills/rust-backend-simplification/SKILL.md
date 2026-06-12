@@ -1,6 +1,6 @@
 ---
 name: rust-backend-simplification
-description: Simplify, clean up, or refactor OpenFlow's Rust core (apps/desktop/src-tauri) — dead code, vague errors, missing doc comments, duplicated logic, oversized modules. Use this before touching pipeline.rs, audio.rs, output.rs, stt.rs, or any threading/locking code, because several load-bearing constraints there are invisible in a diff and easy to break.
+description: Simplify, clean up, or refactor Velata's Rust core (apps/desktop/src-tauri) — dead code, vague errors, missing doc comments, duplicated logic, oversized modules. Use this before touching pipeline.rs, audio.rs, output.rs, stt.rs, or any threading/locking code, because several load-bearing constraints there are invisible in a diff and easy to break.
 ---
 
 # Rust backend simplification

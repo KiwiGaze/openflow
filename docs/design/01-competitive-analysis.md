@@ -1,8 +1,8 @@
 # 01 — Competitive analysis: UX benchmarking and opportunity map
 
 Status: research document. Written 2026-06-11. Web-verified where possible; uncertain claims
-marked (unverified). Treats 00-current-state.md as the factual baseline for OpenFlow.
-Uses OpenFlow vocabulary from §7 of that document (Mode, AI profile, Polish selection, etc.).
+marked (unverified). Treats 00-current-state.md as the factual baseline for Velata.
+Uses Velata vocabulary from §7 of that document (Mode, AI profile, Polish selection, etc.).
 
 ---
 
@@ -13,7 +13,7 @@ Ten products were analyzed: five direct competitors (Wispr Flow, Superwhisper, R
 macOS; and five transferable-pattern products (ChatGPT Desktop, Claude Desktop, Cursor,
 TypingMind, Open WebUI) that are not dictation tools but demonstrate strong patterns in
 onboarding, provider management, custom instructions, and command surfaces worth adapting to
-OpenFlow. The five transferable-pattern products are analyzed for those UX patterns only, not
+Velata. The five transferable-pattern products are analyzed for those UX patterns only, not
 as dictation competitors. Primary sources: live websites, product changelogs, and web
 search results as of June 2026. Where a feature could not be confirmed, it is marked (unverified).
 
@@ -62,7 +62,7 @@ automatic and opaque.
 
 **Patterns worth stealing:**
 
-- Automatic per-app tone adaptation (maps to OpenFlow's per-app mode switching, on ROADMAP).
+- Automatic per-app tone adaptation (maps to Velata's per-app mode switching, on ROADMAP).
 - Wake word as an alternative activation path.
 - The "no credit card trial" reduces commitment friction for new installs.
 
@@ -98,7 +98,7 @@ LLM. Bootstrapped, privacy-award-winning product.
 - No selected-text rewrite via voice (as a first-class feature). Dictation into an active text
   field is the primary flow.
 - Windows and iOS versions are less mature than macOS.
-- "Modes" vocabulary overloaded: Superwhisper's mode = full pipeline bundle; OpenFlow's mode =
+- "Modes" vocabulary overloaded: Superwhisper's mode = full pipeline bundle; Velata's mode =
   output style only. Risk of confusion when users migrate.
 
 **Onboarding approach:** Rebuilt flow (v1.44.0); onboarding toasts contextually appear after
@@ -130,7 +130,7 @@ hotkey on selected text. Both are privacy-first and BYO-key.
 **UX strengths (refine.sh)**
 
 - Custom prompts and style guides: users define exactly how checking should behave. Closest
-  thing to OpenFlow's per-mode prompts, but for passive proofreading.
+  thing to Velata's per-mode prompts, but for passive proofreading.
 - Real-time and on-demand modes. Inline translation when writing in a non-English phrase.
 - Explanation for each suggestion ("why was this changed"), which increases trust and aids
   learning for non-native speakers.
@@ -139,7 +139,7 @@ hotkey on selected text. Both are privacy-first and BYO-key.
 **UX strengths (getrefine.app)**
 
 - `Cmd+Shift+R` on any selected text → rewrite, fix, translate, or transform. Same core flow
-  as OpenFlow's Rewrite selection and Polish selection features.
+  as Velata's Rewrite selection and Polish selection features.
 - Chainable modes (flows): run mode A then mode B in sequence with one hotkey.
 - MIT-licensed. No account required. Ollama + OpenAI + Anthropic supported.
 - Free to use.
@@ -159,7 +159,7 @@ provider is configured once globally.
 
 **Patterns worth stealing:**
 
-- Chainable mode flows (run Standard → Email in sequence) — maps to OpenFlow's pipeline idea.
+- Chainable mode flows (run Standard → Email in sequence) — maps to Velata's pipeline idea.
 - Explanation-per-change in the output, especially valuable for non-native-speaker user segment.
 - The refine.sh onboarding pattern: lead with the privacy claim as a visual, concrete screen.
 
@@ -177,7 +177,7 @@ provider is configured once globally.
 - Dictation history surfaced as a named command, not buried in a settings tab. "Copy Last
   Transcription" is an explicit command, not a tray menu item.
 - Dictation Pill: a floating indicator during recording — a well-executed visual metaphor that
-  stays in flow without covering the active app (similar intent to OpenFlow's HUD).
+  stays in flow without covering the active app (similar intent to Velata's HUD).
 - The launcher context means Raycast AI dictation is discovered as part of a broader tool
   users already trust. No separate install needed.
 - Profiles (role + tools + communication style) and Memory (built over time from conversations)
@@ -205,7 +205,7 @@ Profiles and Memory are global across all Raycast AI features.
 - Surfacing "Copy Last Transcription" as an explicit named command users can trigger and search
   for, not just a menu item they have to find.
 - The Dictation Pill as a visual pattern for non-intrusive recording feedback.
-- Profiles + Memory as a combined personalization surface — relevant for OpenFlow's AI profile
+- Profiles + Memory as a combined personalization surface — relevant for Velata's AI profile
   concept plus any future user preference persistence.
 
 ---
@@ -256,16 +256,16 @@ preferences. No prompt customization; transcription only.
 **What it is:** OpenAI's macOS desktop app. Conversational AI, voice, computer use, coding
 agent. Analyzed for UX patterns, not as a dictation competitor.
 
-**Patterns worth stealing for OpenFlow:**
+**Patterns worth stealing for Velata:**
 
-- Global `⌥Space` hotkey for quick AI access (same default as OpenFlow — validates the
+- Global `⌥Space` hotkey for quick AI access (same default as Velata — validates the
   hotkey convention). The companion window "stays in front of all windows" pattern maps to
-  OpenFlow's HUD-always-present approach.
+  Velata's HUD-always-present approach.
 - Per-context AI customization (custom instructions configurable per chat / project) shows
   how to make prompt-level personalization feel accessible to non-technical users.
-- The "Slash commands" pattern for quickly switching behavior in-flow — relevant to OpenFlow's
+- The "Slash commands" pattern for quickly switching behavior in-flow — relevant to Velata's
   potential command mode (on ROADMAP).
-- Notifications for background task completion maps to OpenFlow's pattern of HUD notice + tray
+- Notifications for background task completion maps to Velata's pattern of HUD notice + tray
   recovery; ChatGPT's approach is more visible to users working across many windows.
 
 ---
@@ -275,19 +275,19 @@ agent. Analyzed for UX patterns, not as a dictation competitor.
 **What it is:** Anthropic's macOS/Windows/iOS desktop app. Chat, agentic (Cowork), code agent.
 Analyzed for UX patterns, not as a dictation competitor.
 
-**Patterns worth stealing for OpenFlow:**
+**Patterns worth stealing for Velata:**
 
 - One-click MCP connector marketplace reduced a two-minute config-file install to a single
-  click. This is the gold standard for BYO-provider UX. OpenFlow's AI profile setup (manual
+  click. This is the gold standard for BYO-provider UX. Velata's AI profile setup (manual
   base-URL + key entry) is the equivalent pain point to solve.
 - "Local vs. cloud" badge derived from the connection type (localhost → local; remote → cloud)
-  is exactly the pattern OpenFlow already implements for AI profiles — validation that the
+  is exactly the pattern Velata already implements for AI profiles — validation that the
   approach is correct and recognizable to users.
 - Three modes (Chat / Cowork / Code) in a single shell with a sidebar switcher shows how to
-  surface multiple job types without a separate app. Relevant if OpenFlow adds command mode or
+  surface multiple job types without a separate app. Relevant if Velata adds command mode or
   transcription-only mode alongside dictation.
 - Project-scoped custom instructions (custom system prompts per project) maps directly to
-  OpenFlow's per-mode prompt customization.
+  Velata's per-mode prompt customization.
 
 ---
 
@@ -296,19 +296,19 @@ Analyzed for UX patterns, not as a dictation competitor.
 **What it is:** AI-native code editor (VS Code fork). Analyzed for custom instructions and
 onboarding UX patterns, not as a dictation competitor.
 
-**Patterns worth stealing for OpenFlow:**
+**Patterns worth stealing for Velata:**
 
 - Import existing settings on first launch. Cursor detects VS Code and pulls extensions,
-  settings.json, and keybindings. OpenFlow analog: detect an existing settings.json on first
+  settings.json, and keybindings. Velata analog: detect an existing settings.json on first
   launch and offer to continue where the user left off — useful for re-installs after a
   fresh macOS setup.
 - Project-level + personal-level rules hierarchy. Users can set personal conventions and
-  project rules that stack without conflicting. OpenFlow analog: a global default mode stacked
+  project rules that stack without conflicting. Velata analog: a global default mode stacked
   with per-app mode overrides.
-- `.cursor/rules` files checked into git — rules are portable and versionable. OpenFlow's
+- `.cursor/rules` files checked into git — rules are portable and versionable. Velata's
   profile files already follow this pattern (file-backed, hand-droppable). Reinforce this in
   documentation and the "Show in Finder" affordance.
-- Agent mode progress visibility: Cursor shows which files it read and why. OpenFlow's HUD
+- Agent mode progress visibility: Cursor shows which files it read and why. Velata's HUD
   only shows pipeline stage label. Users want to know "what is it doing right now" when
   latency exceeds ~1 second.
 
@@ -320,19 +320,19 @@ onboarding UX patterns, not as a dictation competitor.
 library, one-time or subscription pricing. Analyzed for provider management and custom
 instructions UX, not as a dictation competitor.
 
-**Patterns worth stealing for OpenFlow:**
+**Patterns worth stealing for Velata:**
 
 - **Provider management as a first-class UI surface.** TypingMind shows all configured
   providers, lets users test them with one click, and selects the active one per conversation.
-  OpenFlow's AI profile tab is close to this but lacks the "active per context" layer.
+  Velata's AI profile tab is close to this but lacks the "active per context" layer.
 - BYOK model shown at sign-up as the primary pricing story — users understand immediately they
-  pay the provider, not the app, for LLM calls. OpenFlow's cloud-is-opt-in story is the same;
+  pay the provider, not the app, for LLM calls. Velata's cloud-is-opt-in story is the same;
   it deserves equally prominent framing in onboarding.
 - Per-agent custom system prompts (Characters) with a named, icon-ed UI make custom prompts
-  feel like distinct personas rather than raw text boxes. Relevant to how OpenFlow surfaces
+  feel like distinct personas rather than raw text boxes. Relevant to how Velata surfaces
   mode prompts.
 - One-time $39 purchase model proves users will pay once for an AI tool if the value is clear.
-  Relevant as OpenFlow considers any future paid tier.
+  Relevant as Velata considers any future paid tier.
 
 ---
 
@@ -342,27 +342,27 @@ instructions UX, not as a dictation competitor.
 Most popular local LLM frontend (50K+ GitHub stars). Analyzed for local LLM management and
 onboarding patterns, not as a dictation competitor.
 
-**Patterns worth stealing for OpenFlow:**
+**Patterns worth stealing for Velata:**
 
 - Model management as a browseable catalogue. Open WebUI shows all available Ollama models
   with size, speed, and capability notes in a table. Users pull models directly from the UI
-  without touching a terminal. OpenFlow's model manager already does this for STT; the pattern
+  without touching a terminal. Velata's model manager already does this for STT; the pattern
   should extend to AI profiles (show what model is loaded, VRAM usage if Ollama, last-used).
 - "Two-minute Docker install → first prompt" onboarding shows that local, technical software
   can still feel approachable. The mechanism: a single command with immediate visual payoff.
 - System-prompt templates (Modelfiles / custom characters) are reusable named objects. Maps to
-  OpenFlow's mode-as-named-prompt. The key UX lesson: give custom instructions a name and an
+  Velata's mode-as-named-prompt. The key UX lesson: give custom instructions a name and an
   icon so they feel like things, not free-form text boxes.
 - Optional cloud backends shown alongside local ones in one unified list, with a clear
-  "local / remote" label. Validates OpenFlow's existing local/cloud badge pattern.
+  "local / remote" label. Validates Velata's existing local/cloud badge pattern.
 
 ---
 
-## 3. Comparison matrix (direct competitors + OpenFlow)
+## 3. Comparison matrix (direct competitors + Velata)
 
-Rows are capabilities. Columns are the five direct competitors plus OpenFlow.
+Rows are capabilities. Columns are the five direct competitors plus Velata.
 
-| Capability                          | Wispr Flow              | Superwhisper                      | Refine (getrefine.app) | Raycast AI               | MacWhisper                      | **OpenFlow**                    |
+| Capability                          | Wispr Flow              | Superwhisper                      | Refine (getrefine.app) | Raycast AI               | MacWhisper                      | **Velata**                      |
 | ----------------------------------- | ----------------------- | --------------------------------- | ---------------------- | ------------------------ | ------------------------------- | ------------------------------- |
 | Hold-to-talk + tap-latch hands-free | ✓                       | ✓                                 | ✗                      | ✓                        | partial (system-wide secondary) | ✓                               |
 | Toggle behavior (alt to hold)       | ✓                       | ✓                                 | ✗                      | ✓                        | ✗                               | ✓                               |
@@ -388,21 +388,21 @@ Rows are capabilities. Columns are the five direct competitors plus OpenFlow.
 
 ## 4. Feature-gap analysis
 
-### Where OpenFlow is behind
+### Where Velata is behind
 
-| Gap                                                   | Who does it best                  | Why it matters                                                                                                                                                                                       | Severity |
-| ----------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| No per-app mode auto-activation                       | Superwhisper                      | Users dictate differently in Slack vs. Notes vs. code editors. Manual mode switching via tray is friction on every context switch.                                                                   | High     |
-| No history                                            | Superwhisper, Raycast, MacWhisper | Users lose output if paste fails or they close the wrong window. "Copy Last Result" in the tray is one step, not searchable or replayable.                                                           | High     |
-| No per-mode dedicated hotkey                          | Superwhisper                      | Power users switch modes by hotkey, not by opening the tray. Eliminates a 2–3 step flow.                                                                                                             | Medium   |
-| Modes are prompt-only, not full pipeline bundles      | Superwhisper                      | Users cannot set "this mode uses Parakeet, that one uses large-v3" — one STT model for all modes.                                                                                                    | Medium   |
-| No STT engine choice beyond Whisper                   | Superwhisper, MacWhisper          | Parakeet is materially faster for English on Apple Silicon. OpenFlow's single-engine lock is an architectural simplification that is now visible as a limitation.                                    | Medium   |
-| Onboarding omits rewrite hotkey, modes, AI refinement | Superwhisper                      | Users complete setup and do not know three core features exist. Discovery requires reading docs.                                                                                                     | Medium   |
-| No history reprocessing                               | Superwhisper                      | The ability to re-run an old transcript through a better or different mode is a power-user feature that distinguishes Superwhisper clearly.                                                          | Low      |
-| No cancel via Esc                                     | Superwhisper, Wispr Flow          | `Esc` is the universal cancel convention. OpenFlow cancels only via new job or tray. Surprising behavior gap.                                                                                        | Medium   |
-| No streaming-feel output                              | Wispr Flow, Superwhisper          | Text appears instantaneously after release in cloud tools. OpenFlow inserts all at once after transcription + refinement. Even faking streaming with a progress indicator reduces perceived latency. | Medium   |
+| Gap                                                   | Who does it best                  | Why it matters                                                                                                                                                                                     | Severity |
+| ----------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| No per-app mode auto-activation                       | Superwhisper                      | Users dictate differently in Slack vs. Notes vs. code editors. Manual mode switching via tray is friction on every context switch.                                                                 | High     |
+| No history                                            | Superwhisper, Raycast, MacWhisper | Users lose output if paste fails or they close the wrong window. "Copy Last Result" in the tray is one step, not searchable or replayable.                                                         | High     |
+| No per-mode dedicated hotkey                          | Superwhisper                      | Power users switch modes by hotkey, not by opening the tray. Eliminates a 2–3 step flow.                                                                                                           | Medium   |
+| Modes are prompt-only, not full pipeline bundles      | Superwhisper                      | Users cannot set "this mode uses Parakeet, that one uses large-v3" — one STT model for all modes.                                                                                                  | Medium   |
+| No STT engine choice beyond Whisper                   | Superwhisper, MacWhisper          | Parakeet is materially faster for English on Apple Silicon. Velata's single-engine lock is an architectural simplification that is now visible as a limitation.                                    | Medium   |
+| Onboarding omits rewrite hotkey, modes, AI refinement | Superwhisper                      | Users complete setup and do not know three core features exist. Discovery requires reading docs.                                                                                                   | Medium   |
+| No history reprocessing                               | Superwhisper                      | The ability to re-run an old transcript through a better or different mode is a power-user feature that distinguishes Superwhisper clearly.                                                        | Low      |
+| No cancel via Esc                                     | Superwhisper, Wispr Flow          | `Esc` is the universal cancel convention. Velata cancels only via new job or tray. Surprising behavior gap.                                                                                        | Medium   |
+| No streaming-feel output                              | Wispr Flow, Superwhisper          | Text appears instantaneously after release in cloud tools. Velata inserts all at once after transcription + refinement. Even faking streaming with a progress indicator reduces perceived latency. | Medium   |
 
-### Where OpenFlow is ahead or differentiated
+### Where Velata is ahead or differentiated
 
 - **Verifiable privacy.** Audio cannot leave the machine by architecture, not policy. Network-
   blockable with Little Snitch. No screenshots. No telemetry. No account. Wispr Flow is the
@@ -410,7 +410,7 @@ Rows are capabilities. Columns are the five direct competitors plus OpenFlow.
   retention but users cannot verify it.
 - **Zero cost, unlimited.** No word cap, no subscription, no paid tier. Wispr Flow's 2,000
   word/week cap is its most-mocked feature; Superwhisper's free tier caps at 3 modes and
-  small-only STT. OpenFlow is unlimited local by default.
+  small-only STT. Velata is unlimited local by default.
 - **Source-auditable.** MIT-licensed, readable code, no binary blobs. The privacy claim is
   verifiable, not a policy statement.
 - **Selected-text voice rewrite + Polish selection.** No direct competitor offers both voice-
@@ -418,7 +418,7 @@ Rows are capabilities. Columns are the five direct competitors plus OpenFlow.
   be adding similar functionality (unverified, in beta).
 - **AI-optional graceful degradation.** Modes degrade to rules-based cleanup if no LLM is
   configured. Product is fully useful offline and with zero cloud config.
-- **Small footprint.** Tauri/Rust vs. Electron. OpenFlow does not idle at 800 MB RAM.
+- **Small footprint.** Tauri/Rust vs. Electron. Velata does not idle at 800 MB RAM.
 
 ### Where every competitor is weak (open opportunity)
 
@@ -426,14 +426,14 @@ Rows are capabilities. Columns are the five direct competitors plus OpenFlow.
   transcript to cleaned output, or why. Refine.sh does this for grammar checking; no one does
   it for dictation. A "show diff" affordance (raw vs. cleaned) would be unique.
 - **Dictionary import/export.** All tools require manual entry of custom vocabulary. No tool
-  supports importing a `.txt` wordlist or exporting to share across installs. OpenFlow's ROADMAP
+  supports importing a `.txt` wordlist or exporting to share across installs. Velata's ROADMAP
   includes this; none of the direct competitors have shipped it.
 - **Privacy-first onboarding as a differentiator.** Every privacy-first tool buries the
   privacy story in a marketing page. No tool uses onboarding itself to make the privacy
   architecture visible and tactile (e.g., a network monitor showing zero outbound connections
   during a dictation).
 - **Non-native-speaker UX.** No tool explicitly addresses the non-native speaker segment in
-  its onboarding or feature labeling. The Polish selection feature in OpenFlow is directly
+  its onboarding or feature labeling. The Polish selection feature in Velata is directly
   useful for this segment but is not surfaced in onboarding.
 - **Reprocessing existing transcripts.** Superwhisper has history reprocessing but it applies
   the same mode to a past result. No tool enables "translate this existing dictation" or
@@ -479,7 +479,7 @@ Ranked P0 (do first) to P3 (do later). Each item is self-contained for roadmap u
   tuning mode prompts specifically want to see what the LLM changed. Dictionary + LLM changes
   are currently invisible.
 - User impact: Builds trust in AI cleanup; helps users tune prompts; helps non-native speakers
-  learn. Directly serves OpenFlow's stated user segment (non-native English speakers).
+  learn. Directly serves Velata's stated user segment (non-native English speakers).
 - Cost: S (data already exists: `rawTranscript` vs. final text; UI is one additional row in
   an existing card).
 
@@ -523,7 +523,7 @@ Ranked P0 (do first) to P3 (do later). Each item is self-contained for roadmap u
 - What: Animate or show a character counter / "typing" effect in the HUD during the
   transcription stage. Does not require actual streaming from whisper; just makes the wait
   feel active.
-- Evidence: Wispr Flow and Superwhisper produce near-instant text in cloud mode; OpenFlow's
+- Evidence: Wispr Flow and Superwhisper produce near-instant text in cloud mode; Velata's
   batch insert after silent wait feels slow by comparison even when total latency is similar.
   ROADMAP already lists "streaming-feel latency".
 - User impact: Perceived latency is the top UX complaint in dictation tools. This change costs
@@ -551,7 +551,7 @@ Ranked P0 (do first) to P3 (do later). Each item is self-contained for roadmap u
 - What: Add a "Auto-activate in apps" field to each mode. Uses the active app's bundle ID (no
   additional permissions; macOS exposes front-most app to any process). Tray shows "(auto)"
   next to active mode when overridden.
-- Evidence: Superwhisper and Wispr Flow both implement this. It is on OpenFlow's ROADMAP.
+- Evidence: Superwhisper and Wispr Flow both implement this. It is on Velata's ROADMAP.
   Users who dictate across multiple apps cite it as the feature most likely to drive daily use
   over manual switching.
 - User impact: Eliminates mode switching friction for users with distinct dictation contexts
@@ -565,7 +565,7 @@ Ranked P0 (do first) to P3 (do later). Each item is self-contained for roadmap u
   `from → to` pair per line, or `word` alone for vocabulary hints. Also: "Show in Finder"
   pointing to the dictionary section of settings.json.
 - Evidence: No competitor has implemented this. It is a gap across the entire category and is
-  on OpenFlow's ROADMAP. A shared wordlist (company names, medical terms, project names) is
+  on Velata's ROADMAP. A shared wordlist (company names, medical terms, project names) is
   a recurring user need.
 - User impact: Reduces setup time for new installs and enables sharing dictionaries within
   teams (relevant to privacy-required professional segment).
@@ -576,7 +576,7 @@ Ranked P0 (do first) to P3 (do later). Each item is self-contained for roadmap u
 - What: Add "Add AI profile…" as a tray item that opens the AI profile tab directly, pre-
   populated with provider detection (if Ollama is running locally, auto-fill localhost:11434).
 - Evidence: TypingMind's provider management shows how a one-click test-and-save flow reduces
-  the setup drop-off. OpenFlow's current flow requires: Settings → AI Provider tab → select
+  the setup drop-off. Velata's current flow requires: Settings → AI Provider tab → select
   provider → fill fields → test → save. Ollama auto-detection removes two manual steps.
 - User impact: AI refinement is the largest single-step upgrade for existing users; reducing
   setup friction directly increases activation of the LLM features.
@@ -600,9 +600,9 @@ Ranked P0 (do first) to P3 (do later). Each item is self-contained for roadmap u
 **P3-B: Non-native-speaker onboarding path**
 
 - What: At the Welcome step, add a language detector (from browser/OS locale). If non-English,
-  show an additional tooltip: "OpenFlow will clean up grammar and phrasing in your chosen
+  show an additional tooltip: "Velata will clean up grammar and phrasing in your chosen
   language — no need to think in English first." Surface Polish selection prominently.
-- Evidence: OpenFlow's PRD identifies non-native speakers as a primary user segment; no
+- Evidence: Velata's PRD identifies non-native speakers as a primary user segment; no
   competitor addresses them explicitly in onboarding. The Polish selection feature is directly
   valuable but invisible.
 - User impact: Increases activation of Polish selection and AI cleanup features for this
@@ -621,7 +621,7 @@ Ranked P0 (do first) to P3 (do later). Each item is self-contained for roadmap u
 **P3-D: Audio cues**
 
 - What: Optional start and stop tones, with a volume slider. Off by default.
-- Evidence: On OpenFlow's ROADMAP. Both Superwhisper and Wispr Flow offer this. Users who
+- Evidence: On Velata's ROADMAP. Both Superwhisper and Wispr Flow offer this. Users who
   dictate away from their screen (while walking, presenting) rely on audio cues to know the
   app is recording.
 - User impact: Primarily useful for mobile-workflow users; lower priority for desktop-seated
@@ -639,14 +639,14 @@ Ranked P0 (do first) to P3 (do later). Each item is self-contained for roadmap u
    invisible to users who click through setup. A single "More you can do" screen at step 6
    fixes this at near-zero cost.
 
-3. **Superwhisper's modes-as-pipeline-bundles is the design target.** The current OpenFlow
+3. **Superwhisper's modes-as-pipeline-bundles is the design target.** The current Velata
    mode (prompt + AI flag) is a simplified subset. The full bundle (STT model + prompt + AI
    profile + hotkey + per-app activation) is achievable incrementally: per-mode hotkeys (P1-C)
    and per-mode STT model (P2-A) each add one field without a redesign.
 
 4. **History + reprocessing is the highest-leverage power-user feature.** Superwhisper's
    searchable history and re-run-through-mode feature are repeatedly cited as the reason power
-   users choose it over alternatives. OpenFlow has the architecture for this (ROADMAP); the
+   users choose it over alternatives. Velata has the architecture for this (ROADMAP); the
    question is implementation priority.
 
 5. **The "show diff" affordance is a unique opportunity.** No competitor shows raw vs. cleaned
@@ -654,15 +654,15 @@ Ranked P0 (do first) to P3 (do later). Each item is self-contained for roadmap u
    both the non-native-speaker and the prompt-tuning power user.
 
 6. **Privacy is a genuine lead, not just a tagline.** Wispr Flow's screenshot capture and cloud
-   dependency have become mainstream complaints, not just niche concerns. OpenFlow's verifiable,
+   dependency have become mainstream complaints, not just niche concerns. Velata's verifiable,
    architecture-level privacy is a real wedge. The onboarding and settings UI should make this
    visible and tactile, not just stated.
 
 7. **Streaming-feel latency matters more than raw latency.** Users perceive instant-insert (cloud
-   tools) as faster than batch-insert (OpenFlow) even when the wall-clock time is similar.
+   tools) as faster than batch-insert (Velata) even when the wall-clock time is similar.
    A cheap animation during the transcription stage closes most of the perception gap.
 
-8. **The free tier word-cap is the most-mocked aspect of Wispr Flow.** OpenFlow's unlimited
+8. **The free tier word-cap is the most-mocked aspect of Wispr Flow.** Velata's unlimited
    local is a concrete, quantifiable differentiator. Say so explicitly in the Settings/About
    tab and in onboarding.
 

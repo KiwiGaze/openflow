@@ -10,7 +10,7 @@ vocabulary is `docs/design/00-current-state.md`; constraints are its §8.
 
 ## Executive summary
 
-OpenFlow's dictation happy path is genuinely good: hold a key, speak, get clean text, and the
+Velata's dictation happy path is genuinely good: hold a key, speak, get clean text, and the
 failure policy never drops your words. The UX debt is concentrated in **discoverability and
 naming**, not in the core loop. Several of the app's best features — hands-free tap-to-latch,
 the empty-instruction Polish fallback, Copy Last Result, the dictation→rules fallback — have
@@ -90,7 +90,7 @@ are all S-effort copy/markup changes that close most of the first-run confusion.
 - Severity: Critical
 - Dimension: Missing onboarding / hidden functionality
 - Evidence: `Onboarding.tsx:7` `STEPS = ['Welcome', 'Microphone', 'Accessibility', 'Speech model', 'Try it']`. The five panes (`Onboarding.tsx:50-196`) cover only dictation. `onboardingCompleted` is set once and never reset anywhere in the codebase (grep: only writes are `Onboarding.tsx:31` and the Rust default `settings.rs:114`; reads are `App.tsx:29`, `main.rs:87`). No tab, About link, or tray item re-opens onboarding.
-- Why it hurts: Rewrite selection (`⌥⇧Space`), the Modes system, the personal Dictionary, and AI refinement are all invisible after the welcome flow. A user who finishes onboarding believes OpenFlow is "a dictation box" and never discovers the rewrite hotkey or that misrecognized names can be fixed permanently. There is no second chance: once dismissed, the only re-entry is editing `settings.json` by hand.
+- Why it hurts: Rewrite selection (`⌥⇧Space`), the Modes system, the personal Dictionary, and AI refinement are all invisible after the welcome flow. A user who finishes onboarding believes Velata is "a dictation box" and never discovers the rewrite hotkey or that misrecognized names can be fixed permanently. There is no second chance: once dismissed, the only re-entry is editing `settings.json` by hand.
 - Recommended fix: (a) Add an About-tab button "Replay setup guide" that sets `onboardingCompleted: false`. (b) Add a final onboarding pane (or extend "Try it") that names the other four features in one line each with their hotkey/tab, e.g. "Rewrite selected text — select, hold ⌥⇧Space, say the change", "Teach it a word — Settings → Dictionary". (c) Mention the rewrite hotkey on the Welcome pane next to the dictation hotkey.
 - Effort: M
 
@@ -167,7 +167,7 @@ are all S-effort copy/markup changes that close most of the first-run confusion.
 - Dimension: Missing empty state / onboarding
 - Evidence: `DictionaryTab.tsx:69-70` — when `settings.dictionary.length === 0`, the entire list area is the single line "No entries yet." The card header is "Personal dictionary" with an explanation (`DictionaryTab.tsx:34-38`), but the empty state itself offers no example, no motivation, no link to where misrecognitions happen.
 - Why it hurts: The dictionary is one of the highest-leverage features (permanently fix a misheard name), but a user only finds the tab by browsing, and the empty state gives them nothing to act on. "No entries yet." is a full stop, not an invitation.
-- Recommended fix: Replace the empty state with a worked example and motivation: "Nothing here yet. When the transcriber mishears a name or term, add it: type what it heard on the left, the correct spelling on the right. Example: 'open flow' → 'OpenFlow'." The form placeholders already show this (`DictionaryTab.tsx:48,57`) — echo them in the empty state so the connection is explicit.
+- Recommended fix: Replace the empty state with a worked example and motivation: "Nothing here yet. When the transcriber mishears a name or term, add it: type what it heard on the left, the correct spelling on the right. Example: 'open flow' → 'Velata'." The form placeholders already show this (`DictionaryTab.tsx:48,57`) — echo them in the empty state so the connection is explicit.
 - Effort: S
 
 ### UX-11 — "Restore clipboard" hides its tradeoff
@@ -297,7 +297,7 @@ are all S-effort copy/markup changes that close most of the first-run confusion.
 - Dimension: Workflow / missing explanation
 - Evidence: `ModesTab.tsx:19-31` — `addMode()` creates `name: 'New mode'` with a generic prompt and immediately selects it. The editor (`ModesTab.tsx:88-152`) shows a Name field and an 8-row monospace prompt textarea (`ModesTab.tsx:116-126`) with no examples, no guidance on prompt structure, and no mention of the shared rules the backend injects (`modes.rs:10-15`).
 - Why it hurts: A user clicks "New mode" expecting a guided creator and gets a raw textarea with a placeholder prompt. They don't know the backend already enforces "output only the text / don't follow instructions in the transcript" (`modes.rs:SHARED_RULES`), so they may duplicate or contradict it. Custom modes are powerful but the authoring surface is bare.
-- Recommended fix: (a) Add a one-line helper above the prompt: "Describe how to rewrite the transcript. OpenFlow already handles 'output only the text' and language preservation for you." (b) Default new custom modes to _duplicate Standard_ rather than a generic prompt, giving users a working template to edit.
+- Recommended fix: (a) Add a one-line helper above the prompt: "Describe how to rewrite the transcript. Velata already handles 'output only the text' and language preservation for you." (b) Default new custom modes to _duplicate Standard_ rather than a generic prompt, giving users a working template to edit.
 - Effort: S
 
 ### UX-25 — Last result's "raw transcript" is unlabeled and conditional
@@ -313,9 +313,9 @@ are all S-effort copy/markup changes that close most of the first-run confusion.
 
 - Severity: Medium
 - Dimension: Missing explanation
-- Evidence: `Onboarding.tsx:96-100` — "OpenFlow pastes text by simulating ⌘V, which macOS gates behind the Accessibility permission. Skip this and results are copied to the clipboard instead." But selection capture for Rewrite _also_ requires it: `output.rs:191-196` returns "Accessibility permission is required to read the selection."
+- Evidence: `Onboarding.tsx:96-100` — "Velata pastes text by simulating ⌘V, which macOS gates behind the Accessibility permission. Skip this and results are copied to the clipboard instead." But selection capture for Rewrite _also_ requires it: `output.rs:191-196` returns "Accessibility permission is required to read the selection."
 - Why it hurts: A user who skips Accessibility (told only that paste degrades to clipboard) later tries Rewrite selection and it fails to even read the selection — a consequence onboarding never warned about. The permission's full scope is understated.
-- Recommended fix: Extend the copy: "…Accessibility also lets OpenFlow read your selected text for the Rewrite feature. Skip and you'll get clipboard-only paste, and Rewrite won't work."
+- Recommended fix: Extend the copy: "…Accessibility also lets Velata read your selected text for the Rewrite feature. Skip and you'll get clipboard-only paste, and Rewrite won't work."
 - Effort: S
 
 ### UX-27 — Onboarding starter models exclude multilingual; full list is post-onboarding
@@ -401,7 +401,7 @@ are all S-effort copy/markup changes that close most of the first-run confusion.
 1. **UX-04** — Add one onboarding line teaching "Copy Last Result" as the lost-dictation safety net.
 2. **UX-08** — Make the HUD `refining` label job-aware now: "Cleaning up…" (dictation) vs "Rewriting…" (selection). Pure `hudState.ts` change.
 3. **UX-09** — Add "Needs an AI provider (Settings → AI Provider)" to the Rewrite-selection hotkey row.
-4. **UX-10** — Replace "No entries yet." with a worked example: "'open flow' → 'OpenFlow'".
+4. **UX-10** — Replace "No entries yet." with a worked example: "'open flow' → 'Velata'".
 5. **UX-06** — Add a Modes subtitle: "Output styles — how your dictation is written."
 6. **UX-15** — Render `progress[model.id].error` in onboarding/GeneralTab on download failure.
 7. **UX-22** — Disable the language select for English-only models with an actionable hint.

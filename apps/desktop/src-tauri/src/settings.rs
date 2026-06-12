@@ -18,7 +18,7 @@ pub const MAX_RECORDING_SECS: u64 = 300;
 
 /// Emitted (with the full `Settings` payload) after every backend-initiated
 /// settings change so open webviews stay in sync. Mirrored as
-/// `EVENTS.settingsChanged` in `@openflow/core`.
+/// `EVENTS.settingsChanged` in `@velata/core`.
 pub const SETTINGS_CHANGED_EVENT: &str = "settings-changed";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -28,7 +28,7 @@ pub enum HotkeyBehavior {
     Toggle,
 }
 
-/// Window theme. `System` follows macOS; `Light`/`Dark` force it for OpenFlow.
+/// Window theme. `System` follows macOS; `Light`/`Dark` force it for Velata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Appearance {
@@ -345,7 +345,7 @@ mod tests {
     use super::*;
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("openflow-test-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("velata-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -370,7 +370,7 @@ mod tests {
         s.dictation_hotkey = "F5".into();
         s.dictionary.push(DictionaryEntry {
             from: "open flow".into(),
-            to: "OpenFlow".into(),
+            to: "Velata".into(),
         });
         manager.set(s).unwrap();
 

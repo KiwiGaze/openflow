@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TranscriptionResult } from '@openflow/core';
+import type { TranscriptionResult } from '@velata/core';
 import { initialChangesState, nextChangesState } from './changesState.js';
 
 const result: TranscriptionResult = {

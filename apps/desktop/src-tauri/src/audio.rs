@@ -46,7 +46,7 @@ impl AudioSystem {
         let level_for_thread = Arc::clone(&level);
 
         std::thread::Builder::new()
-            .name("openflow-audio".into())
+            .name("velata-audio".into())
             .spawn(move || worker(rx, level_for_thread))
             .expect("failed to spawn audio thread");
 

@@ -1,6 +1,6 @@
 # Agent skills
 
-Repo-local skills for AI coding agents working on OpenFlow. Each directory
+Repo-local skills for AI coding agents working on Velata. Each directory
 holds one `SKILL.md` (name + description frontmatter, then purpose, files to
 inspect, procedure, rules, commands, checklist, common mistakes, expected
 output). They condense `docs/engineering/` into task-shaped procedures —

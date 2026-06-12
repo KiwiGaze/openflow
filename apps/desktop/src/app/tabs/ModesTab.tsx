@@ -8,7 +8,7 @@ import {
   slugifyMode,
   todayIso,
   uniqueModeName,
-} from '@openflow/core';
+} from '@velata/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { useLlmProfiles } from '../hooks.js';
 import { ipc } from '../ipc.js';
@@ -205,7 +205,7 @@ export function ModesTab({
         {showGallery && (
           <div className="template-gallery">
             <p className="row-hint">
-              Start from a template, then edit it freely. Your copy never changes when OpenFlow
+              Start from a template, then edit it freely. Your copy never changes when Velata
               updates.
             </p>
             {MODE_TEMPLATES.map((template) => (

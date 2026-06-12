@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 #
-# CodeRabbit configuration for OpenFlow.
+# CodeRabbit configuration for Velata.
 # Reference: https://docs.coderabbit.ai/reference/configuration
 # This encodes the review rules in CLAUDE.md and CONTRIBUTING.md so automated
 # review enforces the same things a human maintainer would.
@@ -48,8 +48,8 @@ reviews:
         `AppError`s that surface as HUD notices — never silently drop dictation
         output (worst case it lands on the clipboard). Comments explain *why*
         (invariants, OS quirks), not *what*. Preserve the threading model:
-        `cpal::Stream` is `!Send` and lives on the `openflow-audio` thread;
-        `Enigo`/`arboard` live on the `openflow-output` thread (CGEvent
+        `cpal::Stream` is `!Send` and lives on the `velata-audio` thread;
+        `Enigo`/`arboard` live on the `velata-output` thread (CGEvent
         affinity); whisper runs in `spawn_blocking` behind a `Mutex`. Do not move
         these onto async executors. HUD invariant: the HUD window is created once
         at startup and is never hidden or shown again (Tauri #14102) — content

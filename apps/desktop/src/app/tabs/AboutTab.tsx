@@ -1,5 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
-import type { AppInfo } from '@openflow/core';
+import type { AppInfo } from '@velata/core';
 import { ipc } from '../ipc.js';
 
 export function AboutTab(): JSX.Element {
@@ -12,7 +12,7 @@ export function AboutTab(): JSX.Element {
   return (
     <div className="tab-body">
       <section className="card">
-        <h2>About OpenFlow</h2>
+        <h2>About Velata</h2>
         <p className="row-hint">
           Local-first AI voice input. Hold a key, speak, and get clean text in any app.
         </p>
@@ -25,7 +25,7 @@ export function AboutTab(): JSX.Element {
             <dt>Data folder (models)</dt>
             <dd className="mono">{info.dataDir}</dd>
             <dt>Source code</dt>
-            <dd className="mono">github.com/KiwiGaze/openflow</dd>
+            <dd className="mono">github.com/KiwiGaze/velata</dd>
           </dl>
         )}
       </section>

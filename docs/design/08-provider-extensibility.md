@@ -7,7 +7,7 @@ Speech recognition + AI profiles). Bundling/switching and dangling-reference rul
 `07-profiles.md` (mode overrides). This document **extends** the file-backed `LlmProfile` design;
 it never replaces it.
 
-The brief asks OpenFlow to support many providers on both sides of the pipeline: on the LLM side
+The brief asks Velata to support many providers on both sides of the pipeline: on the LLM side
 OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, LM Studio, llama.cpp, Ollama, and custom
 OpenAI-compatible endpoints; on the STT side whisper.cpp (today), Faster-Whisper/whisper-server,
 the OpenAI Whisper API, Groq, Deepgram, and AssemblyAI. The two sides need very different
@@ -24,7 +24,7 @@ treatments and that asymmetry is the central design decision:
 
 ### 1.1 The decision and why
 
-OpenFlow already routes every provider — Ollama, OpenAI, Groq, OpenRouter, LM Studio,
+Velata already routes every provider — Ollama, OpenAI, Groq, OpenRouter, LM Studio,
 llama.cpp — through **one** OpenAI-compatible `/v1/chat/completions` client (`llm.rs`; 00 §8,
 "one LLM client for all providers"). That is a stated architecture decision and it stays. Adding
 "providers" is therefore not a code problem; it is a _prefill_ problem. Users get base URLs and
@@ -280,7 +280,7 @@ configured cloud/remote engines with their model field. Wireframe in §5.
 
 ## 3. The privacy gate — cloud STT sends audio
 
-This is the load-bearing section. Cloud STT crosses OpenFlow's core promise. The README/PRD say
+This is the load-bearing section. Cloud STT crosses Velata's core promise. The README/PRD say
 "audio never leaves your Mac"; an OpenAI/Groq/Deepgram/AssemblyAI engine **uploads the full
 recording**. This stays _within_ 00 §8.1 (cloud = opt-in, BYO-key) — but only if the consent is
 loud, the locality is always visible, and the docs stop over-claiming.
@@ -303,12 +303,12 @@ confirmation. It must name _what_ is sent, _to whom_, and that this _differs fro
 
 > **Title:** Send your audio to a cloud service?
 >
-> **Body:** OpenFlow normally transcribes speech entirely on your Mac — your audio never leaves the
+> **Body:** Velata normally transcribes speech entirely on your Mac — your audio never leaves the
 > device. **{EngineName}** is different: each time you dictate, the full audio recording is uploaded
 > to **{provider host}** over the internet for transcription, using your own API key.
 >
-> Your audio is sent to a third party you've chosen. OpenFlow does not store it, but what that
-> service does with it is governed by _their_ policy, not OpenFlow's. The on-device whisper engine
+> Your audio is sent to a third party you've chosen. Velata does not store it, but what that
+> service does with it is governed by _their_ policy, not Velata's. The on-device whisper engine
 > remains available and stays the default.
 >
 > **Buttons:** `[ Keep on-device ]` `[ Use {EngineName} (uploads audio) ]`
@@ -338,11 +338,11 @@ _invariant_ is intact (nothing leaves by default, cloud opt-in BYO-key, no serve
 only the _prose_ changes, which currently over-promises for a build that can do cloud STT.
 
 - **README / PRD / Models privacy line.** Replace "audio never leaves your Mac" with: _"By default,
-  OpenFlow transcribes entirely on your Mac and your audio never leaves the device. Cloud speech
+  Velata transcribes entirely on your Mac and your audio never leaves the device. Cloud speech
   engines are off unless you add one yourself (bring your own key); turning one on uploads your audio
-  to that provider, and OpenFlow tells you clearly before it does."_
+  to that provider, and Velata tells you clearly before it does."_
 - **PRIVACY.md** gains a "Cloud speech engines" subsection: opt-in only, BYO-key, audio uploaded per
-  dictation to the chosen provider, OpenFlow stores nothing, the provider's policy governs the audio,
+  dictation to the chosen provider, Velata stores nothing, the provider's policy governs the audio,
   on-device stays the default.
 - **Models Speech card summary line** flips with the active engine: default → "Speech is processed on
   your Mac."; cloud → "Speech is sent to {EngineName} (cloud)."

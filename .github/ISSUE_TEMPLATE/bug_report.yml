@@ -36,5 +36,5 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Relevant lines from `~/Library/Logs/app.openflow.desktop/` (no transcripts are logged).
+      description: Relevant lines from `~/Library/Logs/app.velata.desktop/` (no transcripts are logged).
       render: text

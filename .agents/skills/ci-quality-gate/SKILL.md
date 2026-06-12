@@ -1,6 +1,6 @@
 ---
 name: ci-quality-gate
-description: Run, fix, or modify OpenFlow's quality gates — the pnpm check/check:rust/check:all commands, the CI workflow, or any failing lint/typecheck/test/clippy step. Use this before claiming any change is done, when CI fails, or when a check command errors locally, including "works on my machine" mysteries like typecheck failing on a fresh clone.
+description: Run, fix, or modify Velata's quality gates — the pnpm check/check:rust/check:all commands, the CI workflow, or any failing lint/typecheck/test/clippy step. Use this before claiming any change is done, when CI fails, or when a check command errors locally, including "works on my machine" mysteries like typecheck failing on a fresh clone.
 ---
 
 # CI quality gate
@@ -36,8 +36,8 @@ without splitting that source of truth.
 
 ## Rules
 
-- TS checks need `pnpm -r build` first: `@openflow/desktop` imports
-  `@openflow/core` from `dist/`. Hundreds of `no-unsafe-*` lint errors on a
+- TS checks need `pnpm -r build` first: `@velata/desktop` imports
+  `@velata/core` from `dist/`. Hundreds of `no-unsafe-*` lint errors on a
   fresh tree mean exactly this.
 - The Rust job builds the frontend first because tauri-build validates
   `frontendDist` — `pnpm check:rust` mirrors that; don't "optimize" it away.
@@ -55,7 +55,7 @@ pnpm check              # TS half          pnpm check:rust   # Rust half
 pnpm lint:fix           # auto-fixable lint
 pnpm format             # prettier write (format:check is the gate)
 # single tests:
-pnpm --filter @openflow/core test hotkey
+pnpm --filter @velata/core test hotkey
 cd apps/desktop/src-tauri && cargo test resample::
 ```
 

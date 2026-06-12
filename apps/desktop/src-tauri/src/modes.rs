@@ -193,7 +193,7 @@ mod tests {
         let dictionary = vec![
             DictionaryEntry {
                 from: "open flow".into(),
-                to: "OpenFlow".into(),
+                to: "Velata".into(),
             },
             DictionaryEntry {
                 from: "tory".into(),
@@ -201,7 +201,7 @@ mod tests {
             },
         ];
         let prompt = dictation_system_prompt(&modes[0], &dictionary);
-        assert!(prompt.contains("\"OpenFlow\", \"Tauri\""));
+        assert!(prompt.contains("\"Velata\", \"Tauri\""));
 
         // A term with a newline is escaped (data, not an injected line break).
         let evil = vec![DictionaryEntry {

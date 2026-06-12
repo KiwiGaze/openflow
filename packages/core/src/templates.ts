@@ -22,7 +22,7 @@ export interface ModeTemplate {
 /**
  * Starting points for custom modes (06 §2). A template, once used, creates a
  * normal editable mode and is never linked again — the user's copy does not
- * change when OpenFlow updates. Bundled in the binary like the built-in modes
+ * change when Velata updates. Bundled in the binary like the built-in modes
  * and reviewed/versioned with them; not on-disk assets.
  */
 export const MODE_TEMPLATES: ModeTemplate[] = [

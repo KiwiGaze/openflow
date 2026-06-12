@@ -1,4 +1,4 @@
-/** Typed wrappers around Tauri IPC. All names come from `@openflow/core`. */
+/** Typed wrappers around Tauri IPC. All names come from `@velata/core`. */
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -19,7 +19,7 @@ import {
   type Settings,
   type SttProfile,
   type TranscriptionResult,
-} from '@openflow/core';
+} from '@velata/core';
 
 export const ipc = {
   getSettings: (): Promise<Settings> => invoke(COMMANDS.getSettings),

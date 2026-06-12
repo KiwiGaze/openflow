@@ -17,7 +17,7 @@ pub const STT_PROFILE_VERSION: u32 = 1;
 
 /// `Settings::stt_model_id` prefix marking a cloud engine: `cloud:<profile-id>`.
 /// Anything else is an on-device whisper model id. Mirrored as
-/// `CLOUD_STT_PREFIX` in `@openflow/core` — update both together.
+/// `CLOUD_STT_PREFIX` in `@velata/core` — update both together.
 pub const CLOUD_STT_PREFIX: &str = "cloud:";
 
 /// Which client transcribes. Only `openaiAudio` (the generic multipart client

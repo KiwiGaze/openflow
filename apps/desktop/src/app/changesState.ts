@@ -1,4 +1,4 @@
-import type { PipelineStatus, TranscriptionResult } from '@openflow/core';
+import type { PipelineStatus, TranscriptionResult } from '@velata/core';
 
 /** What the changes overlay is currently showing. */
 export interface ChangesState {

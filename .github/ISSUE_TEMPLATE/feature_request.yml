@@ -6,7 +6,7 @@ body:
     id: problem
     attributes:
       label: Problem
-      description: What are you trying to do that OpenFlow makes hard or impossible?
+      description: What are you trying to do that Velata makes hard or impossible?
     validations:
       required: true
   - type: textarea

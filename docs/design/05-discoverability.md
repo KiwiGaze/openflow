@@ -118,9 +118,9 @@ tips; HUD tips are text-only.
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------------------------- |
 | `tip.latch`      | `dictationCount == 3 && behavior=='hold'` and (no tap-latch has been observed — approximated as: still on `hold` after 3 dictations)                              | HUD flash line                                    | "Tip: tap and release the dictation key — don't hold — to keep recording hands-free. Tap it again to stop."           | — (text only)                          | Auto after flash; id stored |
 | `tip.modes`      | `dictationCount >= 3 && modes.every(m => m.builtIn)`                                                                                                              | Settings card on **Dictation**                    | "Modes change how your words come out — Email, Notes, code, or your own. Pick one in the menu bar, or make your own." | "Open Modes" → `S:Modes`               | × button; id stored         |
-| `tip.ai`         | `dictationCount >= 4 && activeLlmProfileId=='' && refineAfterDictation==true`                                                                                     | Settings card on **Dictation**                    | "Want sharper cleanup? Add a local Ollama model or your own API key and OpenFlow will polish transcripts with AI."    | "Set up AI" → `S:Models` (AI profiles) | × button; id stored         |
+| `tip.ai`         | `dictationCount >= 4 && activeLlmProfileId=='' && refineAfterDictation==true`                                                                                     | Settings card on **Dictation**                    | "Want sharper cleanup? Add a local Ollama model or your own API key and Velata will polish transcripts with AI."      | "Set up AI" → `S:Models` (AI profiles) | × button; id stored         |
 | `tip.polish`     | `polishHotkey set && dictationCount >= 2 && (has used Rewrite — see note) && activeLlmProfileId != ''`                                                            | HUD flash line (after a Rewrite)                  | "You can also tap ⌥⇧P to fix grammar in any selected text — no talking needed."                                       | — (text only)                          | Auto after flash; id stored |
-| `tip.dictionary` | `dictionary.length == 0 && dictationCount >= 5`                                                                                                                   | Settings card on **Output** (next to Last result) | "If a name or term comes out wrong a lot, teach OpenFlow the fix once in the Dictionary."                             | "Open Dictionary" → `S:Dictionary`     | × button; id stored         |
+| `tip.dictionary` | `dictionary.length == 0 && dictationCount >= 5`                                                                                                                   | Settings card on **Output** (next to Last result) | "If a name or term comes out wrong a lot, teach Velata the fix once in the Dictionary."                               | "Open Dictionary" → `S:Dictionary`     | × button; id stored         |
 | `tip.accuracy`   | `sttModelId is an `.en`/base tier && two consecutive "Didn't catch anything"/low-confidence notices` (counted in a transient in-memory streak, **not** persisted) | Settings card on **Models**                       | "Struggling with accuracy? A larger speech model hears more — at the cost of a second or two per dictation."          | "Choose a model" → `S:Models`          | × button; id stored         |
 
 **Catalog size: 6 tips.** Three HUD-eligible (`latch`, `polish`, and none others are text-only
@@ -129,7 +129,7 @@ persisted settings; it lives as a runtime counter in `pipeline.rs` (reset on any
 is therefore _not_ a stored field — it never survives a restart, which is acceptable because
 the tip is a nicety, not load-bearing.
 
-**Note on "has used Rewrite/tap" signals.** OpenFlow persists no usage history (00 §6, privacy
+**Note on "has used Rewrite/tap" signals.** Velata persists no usage history (00 §6, privacy
 feature). `tip.latch` and `tip.polish` therefore approximate from settings facts rather than
 true usage: `tip.latch` fires off the _configured behavior still being hold_ after 3
 dictations; `tip.polish` is gated to fire only as the flash line **immediately following a
@@ -160,7 +160,7 @@ the existing explanatory line (which is already good, keep it):
 
 > Heading: **Personal dictionary**
 > Hint (keep): "Fix words the transcriber keeps getting wrong — names, products, jargon."
-> Ghost row (dimmed, `aria-hidden`, not removable): `open flow  →  OpenFlow`
+> Ghost row (dimmed, `aria-hidden`, not removable): `open flow  →  Velata`
 > Below the ghost: "Add your first correction above."
 
 Primary action: the existing `from → to` add form (already present). The ghost row replaces
@@ -239,7 +239,7 @@ merely missing.
 | Output → Insert method                   | **sharpen** (current "Paste needs the Accessibility permission." is a footnote, not a description)                                | "How text reaches your app. Paste needs Accessibility; clipboard-only always works."                   |
 | Output → Restore clipboard               | keep                                                                                                                              | "Put your previous clipboard back after pasting."                                                      |
 | Dictionary → card                        | keep                                                                                                                              | "Fix words the transcriber keeps getting wrong — names, products, jargon."                             |
-| General → Launch at login                | keep                                                                                                                              | "Start OpenFlow in the menu bar when you sign in."                                                     |
+| General → Launch at login                | keep                                                                                                                              | "Start Velata in the menu bar when you sign in."                                                       |
 | General → Show tips                      | add (§2.5)                                                                                                                        | "One-time hints about features you haven't tried. Never repeats, never interrupts dictation."          |
 
 Rows deliberately **without** a hint: Models → speech model rows (the size + description line
@@ -272,7 +272,7 @@ they seed the empty Last-result placeholder. Curated spoken-instruction list (8�
 
 Below the list, the **empty-instruction behavior** (gap #7) gets its one inline line:
 
-> "Say nothing and release — OpenFlow just cleans up grammar and clarity."
+> "Say nothing and release — Velata just cleans up grammar and clarity."
 
 ### 5.2 Mode prompt editor — rotating placeholder
 

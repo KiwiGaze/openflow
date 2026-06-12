@@ -10,9 +10,9 @@ check in [review-checklist.md](review-checklist.md).
 
 ```
 apps/desktop/          The one application: React webviews + src-tauri Rust core
-packages/core/         @openflow/core — shared TS types (IPC mirror) + pure utilities
+packages/core/         @velata/core — shared TS types (IPC mirror) + pure utilities
 docs/                  ARCHITECTURE, DEVELOPMENT, PRD + design/ + engineering/
-scripts/               Repo tooling: check-ipc.mjs, check-privacy.mjs, generate-icon.mjs, release.sh
+scripts/               Repo tooling: check-ipc.mjs, check-privacy.mjs, release.sh (icon source: docs/design/velata-icon/render.py)
 .agents/skills/        Repo-local skills for AI coding agents (procedures + guardrails)
 .github/               CI (ci.yml), release (release.yml), PR/issue templates
 ```
@@ -40,7 +40,7 @@ Rules:
   `pnpm check:rust` mirrors the `rust` job; `pnpm check:all` is both. If you
   change one side, change the other in the same commit — the pair drifting is
   a bug.
-- Build before typecheck: `@openflow/desktop` imports `@openflow/core` from
+- Build before typecheck: `@velata/desktop` imports `@velata/core` from
   its `dist/`, so from a cold clone run `pnpm -r build` (or just `pnpm check`)
   before `typecheck`, type-aware lint, or tests.
 - `pnpm dev` is the only dev entry point (`tauri dev`: Vite + Rust with hot
@@ -64,12 +64,12 @@ Rules:
   managers take a directory path, which tests point at a tempdir. Prefer
   extending that pattern over introducing mocking machinery.
 - The real-model STT integration test is `#[ignore]` and opt-in:
-  `OPENFLOW_TEST_MODEL=/path/to/ggml-tiny.en.bin cargo test -- --ignored`.
+  `VELATA_TEST_MODEL=/path/to/ggml-tiny.en.bin cargo test -- --ignored`.
 
 ## Logging and errors
 
 - Rust: `log::warn!`/`log::info!` via `tauri_plugin_log` (terminal +
-  `~/Library/Logs/app.openflow.desktop/`). Log messages may name modules and
+  `~/Library/Logs/app.velata.desktop/`). Log messages may name modules and
   errors freely — they are for triage.
 - Never log transcript text, selection contents, audio data, or API keys.
   Provider response bodies on the audio path are logged status-only
@@ -86,7 +86,7 @@ Rules:
 
 The app reads none at runtime — configuration is `settings.json` plus profile
 files, and that is a privacy feature: behavior cannot be changed invisibly
-from the environment. The only env var in the repo is `OPENFLOW_TEST_MODEL`
+from the environment. The only env var in the repo is `VELATA_TEST_MODEL`
 (opt-in STT integration test). Adding a runtime env var requires updating
 PRIVACY.md and this section — treat it as a design change.
 

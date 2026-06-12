@@ -1,6 +1,6 @@
 ---
 name: monorepo-structure
-description: Decide where code, files, scripts, and docs belong in the OpenFlow monorepo. Use this whenever you create a new file, move code between packages, add a script or dependency, or are unsure whether something belongs in packages/core, apps/desktop/src (React), or apps/desktop/src-tauri (Rust) — even if the task doesn't mention "structure".
+description: Decide where code, files, scripts, and docs belong in the Velata monorepo. Use this whenever you create a new file, move code between packages, add a script or dependency, or are unsure whether something belongs in packages/core, apps/desktop/src (React), or apps/desktop/src-tauri (Rust) — even if the task doesn't mention "structure".
 ---
 
 # Monorepo structure
@@ -8,7 +8,7 @@ description: Decide where code, files, scripts, and docs belong in the OpenFlow 
 ## Purpose
 
 Put new code where the next reader will look for it, and keep the boundary
-rules intact: Rust owns the OS, React renders, `@openflow/core` carries the
+rules intact: Rust owns the OS, React renders, `@velata/core` carries the
 shared contract. Misplaced code is how backend logic leaks into the webview
 and how the IPC mirror drifts.
 
@@ -44,7 +44,7 @@ and how the IPC mirror drifts.
 
 ## Rules
 
-- One-way dependency: `apps/desktop/src` → `@openflow/core`. Core never
+- One-way dependency: `apps/desktop/src` → `@velata/core`. Core never
   imports Tauri, React, or anything workspace-local.
 - No new top-level directories or workspace packages without prior agreement
   in an issue — that is an architecture decision.

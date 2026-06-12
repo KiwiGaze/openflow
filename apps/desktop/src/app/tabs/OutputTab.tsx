@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { type InsertMethod } from '@openflow/core';
+import { type InsertMethod } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
 import { usePipeline } from '../hooks.js';
 import { History } from '../components/History.js';

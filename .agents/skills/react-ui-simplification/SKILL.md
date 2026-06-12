@@ -1,6 +1,6 @@
 ---
 name: react-ui-simplification
-description: Simplify or clean up OpenFlow's React webviews (apps/desktop/src) — oversized tab components, duplicated constants, loose casts, hook hygiene, IPC wiring. Use this for any change to App.tsx, Hud.tsx, Changes.tsx, tabs/, components/, or hooks.ts, and especially before extracting components or "improving" state management.
+description: Simplify or clean up Velata's React webviews (apps/desktop/src) — oversized tab components, duplicated constants, loose casts, hook hygiene, IPC wiring. Use this for any change to App.tsx, Hud.tsx, Changes.tsx, tabs/, components/, or hooks.ts, and especially before extracting components or "improving" state management.
 ---
 
 # React UI simplification
@@ -26,7 +26,7 @@ backend values).
 
 ## Procedure
 
-1. Before writing UI logic, ask: does Rust or `@openflow/core` already own
+1. Before writing UI logic, ask: does Rust or `@velata/core` already own
    this value or rule? Import it; never re-declare presets, versions, wire
    prefixes, or validation.
 2. For state: settings flow through `useSettings` (optimistic update,
@@ -65,7 +65,7 @@ pnpm check        # the same plus ipc/privacy/format gates
 
 ## Checklist
 
-- [ ] No value re-declared that `@openflow/core` exports
+- [ ] No value re-declared that `@velata/core` exports
 - [ ] Effects clean up listeners; no per-render `invoke`
 - [ ] No new `as` casts from untyped input
 - [ ] Extractions only at documented seams or genuinely shared logic
@@ -74,7 +74,7 @@ pnpm check        # the same plus ipc/privacy/format gates
 ## Common mistakes
 
 - Hardcoding `'cloud:'`, profile versions, or Ollama defaults in a component
-  — they're exported from `@openflow/core` precisely so they can't drift.
+  — they're exported from `@velata/core` precisely so they can't drift.
 - Adding a state-management library; `useState` + IPC events is the whole
   model and it fits in one file.
 - Splitting a 400-line tab into five fragments that share mutable state —

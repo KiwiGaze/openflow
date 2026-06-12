@@ -1,6 +1,6 @@
 ---
 name: tauri-ipc
-description: Add or change OpenFlow Tauri IPC commands, events, or any serde struct/TS type that crosses the Rust↔webview boundary. Use this for every task that touches invoke/listen, #[tauri::command], packages/core/src/types.ts, COMMANDS/EVENTS, or settings/profile shapes — even a one-field change, because the contract is hand-mirrored and one-sided edits break it silently.
+description: Add or change Velata Tauri IPC commands, events, or any serde struct/TS type that crosses the Rust↔webview boundary. Use this for every task that touches invoke/listen, #[tauri::command], packages/core/src/types.ts, COMMANDS/EVENTS, or settings/profile shapes — even a one-field change, because the contract is hand-mirrored and one-sided edits break it silently.
 ---
 
 # Tauri IPC contract changes

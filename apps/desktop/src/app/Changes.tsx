@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
-import { countChanges, diffWords, type InsertMethod } from '@openflow/core';
+import { countChanges, diffWords, type InsertMethod } from '@velata/core';
 import { events, ipc, subscribe } from './ipc.js';
 import { initialChangesState, nextChangesState } from './changesState.js';
 

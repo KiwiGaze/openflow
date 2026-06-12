@@ -1,8 +1,8 @@
-# OpenFlow v2 — product design package
+# Velata v2 — product design package
 
 Status: complete design set. Written 2026-06-11 against `main` (cd63494) plus the in-flight
 Refine work (`docs/REFINE.md`). Eleven documents: a factual baseline, two research documents,
-seven implementation-ready designs, and a prioritized roadmap. Mission: make OpenFlow the most
+seven implementation-ready designs, and a prioritized roadmap. Mission: make Velata the most
 intuitive, flexible tool in its category — a first-time user understands every major feature
 without documentation; power users keep full control over providers, prompts, and workflows.
 
@@ -26,7 +26,7 @@ Read 00 → 03 → 10 for the shape; the rest are reference designs for whoever 
 
 ## Executive summary
 
-1. **The core loop is good; the debt is discoverability and naming** (02). OpenFlow's best
+1. **The core loop is good; the debt is discoverability and naming** (02). Velata's best
    features — tap-latch hands-free, the rewrite hotkey, Copy Last Result, the never-lose-text
    fallback — have zero teaching surface. Most of P0 is copy, hints, and states, not engineering.
 2. **One switchable concept, not two** (03 D1, 07). The brief's persona "profiles" ship as
@@ -44,7 +44,7 @@ Read 00 → 03 → 10 for the shape; the rest are reference designs for whoever 
    cloud STT uploads _audio_ and therefore needs a first-class consent gate, a louder badge,
    and the rule that automatic fallback may only move toward _less_ data leaving the machine.
 6. **Privacy is the widening lead** (01). Wispr Flow's screenshot capture is now a mainstream
-   complaint; OpenFlow's architecture-level, firewall-verifiable privacy is the wedge. The
+   complaint; Velata's architecture-level, firewall-verifiable privacy is the wedge. The
    design makes it tactile: locality badges everywhere, consent dialogs that name what is sent,
    and a no-telemetry tip system computed from local state only.
 
@@ -66,7 +66,7 @@ Read 00 → 03 → 10 for the shape; the rest are reference designs for whoever 
 
 ## What v2 should look like if launched today
 
-**The 60-second first run.** You launch OpenFlow, read three privacy bullets, and click
+**The 60-second first run.** You launch Velata, read three privacy bullets, and click
 "Download Base (English)" — the one explicit network action, running in the background while
 you grant the microphone and decide about Accessibility (clipboard-only is presented as a
 working outcome, not a failure). On the "Try it" screen you dictate into a real text field in
@@ -84,7 +84,7 @@ shorter."
 **Customization that explains itself.** The Modes page opens with "Output styles — how your
 dictation is written." A template gallery (Email, Commit message, Meeting notes, Translation,
 Slack, Academic, Support reply, Study notes, Social post) turns a blank textarea into one-click
-personas; the editor states what OpenFlow appends automatically, previews any prompt against a
+personas; the editor states what Velata appends automatically, previews any prompt against a
 sample, and an Advanced section adds per-mode AI profile / speech model / language / hotkey —
 every row "Inherit — currently …" so the bundle never surprises. Modes export as small JSON
 files; sharing is files and a repo gallery, not a marketplace.
@@ -118,7 +118,7 @@ any of them.
 ## Design explorations — making dictation do more, still local
 
 Status: brainstorm. Written against the shipped app (`main`). These are ideas we have been
-kicking around for where OpenFlow goes after the core loop — dictate, rewrite, polish — settled.
+kicking around for where Velata goes after the core loop — dictate, rewrite, polish — settled.
 Each is a sketch meant to provoke a decision, not a finished spec.
 
 ## The frame
@@ -126,7 +126,7 @@ Each is a sketch meant to provoke a decision, not a finished spec.
 The core product works: hold a key, speak, get clean text in the active app; select text and
 fix or rewrite it. What it _doesn't_ yet do is the long tail of small, daily conveniences that
 make a tool feel like it disappears into the workflow. This package collects six of those, each
-chosen because it adds capability **without** spending the things that make OpenFlow worth using.
+chosen because it adds capability **without** spending the things that make Velata worth using.
 
 Three principles held every idea to account:
 
@@ -197,4 +197,4 @@ doing together:
 Anything that needs a server or reads the screen: team sync of snippets or dictionaries, cloud
 dashboards, deep editor/IDE scraping, a template or transform marketplace, and any always-
 listening trigger. If an idea here only works by sending data off the machine, it does not belong
-in OpenFlow — and none of the six requires it.
+in Velata — and none of the six requires it.

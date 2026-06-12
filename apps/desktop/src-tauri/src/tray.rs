@@ -8,7 +8,7 @@ use crate::settings::{InsertMethod, SETTINGS_CHANGED_EVENT};
 use crate::state::AppState;
 use crate::stt_profiles::CLOUD_STT_PREFIX;
 
-pub const TRAY_ID: &str = "openflow-tray";
+pub const TRAY_ID: &str = "velata-tray";
 
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let menu = build_menu(app)?;
@@ -17,14 +17,14 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .icon(icon)
         .icon_as_template(true)
         .menu(&menu)
-        .tooltip("OpenFlow")
+        .tooltip("Velata")
         .on_menu_event(handle_menu_event)
         .build(app)?;
     Ok(())
 }
 
 /// Shows a dot beside the menu-bar icon while the mic is live — a privacy/trust
-/// signal that you can always see when OpenFlow is listening (P2-7).
+/// signal that you can always see when Velata is listening (P2-7).
 pub fn set_recording(app: &AppHandle, recording: bool) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         let _ = tray.set_title(Some(if recording { "●" } else { "" }));
@@ -106,7 +106,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     menu.append(&MenuItem::with_id(
         app,
         "quit",
-        "Quit OpenFlow",
+        "Quit Velata",
         true,
         None::<&str>,
     )?)?;

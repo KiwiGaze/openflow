@@ -17,7 +17,7 @@ takes settings to v2 and ships first. **Everything below builds on v2 and bumps 
 
 The brief asks for one-click-switchable **Profiles** — Developer, Student, Writer, Researcher,
 Executive, Custom — each bundling an LLM, an STT model, instructions, an output format, and a
-shortcut. OpenFlow already ships exactly one switchable bundle: the **Mode**. D1 (03) decided
+shortcut. Velata already ships exactly one switchable bundle: the **Mode**. D1 (03) decided
 to grow the Mode into that bundle rather than add a second concept. This section defends that.
 
 A separate `Profile` entity beside `Mode` would cost, concretely:
@@ -459,7 +459,7 @@ to change these."
 │  ──────────────────────────   │
 │   Settings…                   │
 │  ──────────────────────────   │
-│   Quit OpenFlow               │
+│   Quit Velata               │
 └──────────────────────────────┘
 ```
 
@@ -518,7 +518,7 @@ to change these."
   appearance into modes would multiply the HUD's state space against the never-hide invariant
   (00 §8.2) for no clear user gain. Cut.
 - **Per-mode insert method.** **Cut for v2.** Insert method (paste vs clipboard) is an Output-page
-  global (03). It is an environment/accessibility property of the user's machine ("can OpenFlow
+  global (03). It is an environment/accessibility property of the user's machine ("can Velata
   paste here?"), not a property of the persona — Developer and Executive both want paste when
   Accessibility is granted and both fall back to clipboard when it isn't. Bundling it per-mode
   would invite the confusing combination "Notes pastes but Email only copies" with no persona
