@@ -1,6 +1,7 @@
 import { useEffect, useState, type JSX } from 'react';
 import type { AppInfo } from '@velata/core';
 import { ipc } from '../ipc.js';
+import { WHATS_NEW } from '../whatsNew.js';
 
 export function AboutTab(): JSX.Element {
   const [info, setInfo] = useState<AppInfo | null>(null);
@@ -28,6 +29,22 @@ export function AboutTab(): JSX.Element {
             <dd className="mono">github.com/KiwiGaze/velata</dd>
           </dl>
         )}
+      </section>
+
+      <section className="card">
+        <h2>What's new</h2>
+        {WHATS_NEW.map((note, index) => (
+          <div key={index} className="whats-new-entry">
+            <div className="whats-new-meta">
+              Version {note.version} · {note.date}
+            </div>
+            <ul className="privacy-list">
+              {note.highlights.map((highlight) => (
+                <li key={highlight}>{highlight}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </section>
 
       <section className="card">

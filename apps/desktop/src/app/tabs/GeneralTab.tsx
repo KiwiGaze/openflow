@@ -78,10 +78,23 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
             Hold {formatAcceleratorMac(settings.dictationHotkey)} (or tap to latch hands-free; tap
             again to stop)
           </dd>
-          <dt>Cancel</dt>
-          <dd>Esc while recording</dd>
+          <dt>See changes</dt>
+          <dd>
+            {settings.changeOverlayHotkey
+              ? `Tap ${formatAcceleratorMac(settings.changeOverlayHotkey)} to see what cleanup changed`
+              : 'Off — set a hotkey on the Dictation page'}
+          </dd>
           <dt>Polish selection</dt>
-          <dd>Tap {formatAcceleratorMac(settings.polishHotkey)}</dd>
+          <dd>
+            {settings.polishHotkey ? `Tap ${formatAcceleratorMac(settings.polishHotkey)}` : 'Off'}{' '}
+            (configured on the Transforms page)
+          </dd>
+          <dt>Run a mode</dt>
+          <dd>Each mode can carry its own hotkey, set per mode on the Modes page</dd>
+          <dt>Run a transform</dt>
+          <dd>Each transform can carry its own hotkey, set per transform on the Transforms page</dd>
+          <dt>Cancel or close</dt>
+          <dd>Esc stops recording, or closes this window. Cmd+W also closes this window</dd>
           <dt>Copy last result</dt>
           <dd>From the menu bar, “Copy last dictation”</dd>
         </dl>

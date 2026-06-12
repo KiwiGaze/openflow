@@ -1207,6 +1207,17 @@ button:focus-visible,
   line-height: 1.6;
 }
 
+.whats-new-entry + .whats-new-entry {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.whats-new-meta {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 .ollama-models {
   padding: 6px 0;
 }
