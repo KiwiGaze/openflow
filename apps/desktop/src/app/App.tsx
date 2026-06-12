@@ -6,34 +6,42 @@ import { Onboarding } from './Onboarding.js';
 import { eligibleTip } from './tips.js';
 import { Callout } from './components/Callout.js';
 import { TAB_ICONS } from './components/tabIcons.js';
+import { nextTabId, SIDEBAR_SECTIONS, type TabId } from './sidebarTabs.js';
 import { AboutTab } from './tabs/AboutTab.js';
 import { DictationTab } from './tabs/DictationTab.js';
 import { DictionaryTab } from './tabs/DictionaryTab.js';
 import { GeneralTab } from './tabs/GeneralTab.js';
+import { HomeTab } from './tabs/HomeTab.js';
 import { InsightsTab } from './tabs/InsightsTab.js';
 import { ModelsTab } from './tabs/ModelsTab.js';
 import { ModesTab } from './tabs/ModesTab.js';
 import { OutputTab } from './tabs/OutputTab.js';
+import { ScratchpadTab } from './tabs/ScratchpadTab.js';
 import { SnippetsTab } from './tabs/SnippetsTab.js';
+import { StyleTab } from './tabs/StyleTab.js';
+import { TransformsTab } from './tabs/TransformsTab.js';
 
-const TABS = [
-  { id: 'dictation', label: 'Dictation' },
-  { id: 'modes', label: 'Modes' },
-  { id: 'models', label: 'Models' },
-  { id: 'output', label: 'Output' },
-  { id: 'dictionary', label: 'Dictionary' },
-  { id: 'snippets', label: 'Snippets' },
-  { id: 'insights', label: 'Insights' },
-  { id: 'general', label: 'General' },
-  { id: 'about', label: 'About' },
-] as const;
+export type { TabId };
 
-export type TabId = (typeof TABS)[number]['id'];
+/**
+ * Esc must close the window like Cmd+W, but never while the user is typing or
+ * recording a hotkey: a text field swallows Esc for its own editing, and the
+ * HotkeyRecorder (its active chip carries `.hotkey-recording`) uses Esc to
+ * cancel — that cancel must win. Plain buttons (sidebar tabs) do not block Esc.
+ */
+function escapeShouldClose(active: Element | null): boolean {
+  if (!active) return true;
+  const tag = active.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return false;
+  if (active instanceof HTMLElement && active.isContentEditable) return false;
+  if (active.closest('.hotkey-recording')) return false;
+  return true;
+}
 
 export function App(): JSX.Element {
   const api = useSettings();
   const modelsApi = useModels();
-  const [tab, setTab] = useState<TabId>('dictation');
+  const [tab, setTab] = useState<TabId>('home');
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   // Apply the theme override before content paints; `system` defers to the
@@ -42,12 +50,17 @@ export function App(): JSX.Element {
     document.documentElement.dataset.theme = api?.settings.appearance ?? 'system';
   }, [api?.settings.appearance]);
 
-  // Cmd+W closes the settings window (UX-14). close() routes through the Rust
-  // CloseRequested handler, which hides it and drops back to Accessory — the
-  // same path as the red traffic-light, so the app stays in the menu bar.
+  // Cmd+W and Esc close the settings window (UX-14). close() routes through the
+  // Rust CloseRequested handler, which hides it and drops back to Accessory —
+  // the same path as the red traffic-light, so the app stays in the menu bar.
   useEffect(() => {
     const onKeyDown = (e: globalThis.KeyboardEvent): void => {
       if (e.metaKey && e.key.toLowerCase() === 'w') {
+        e.preventDefault();
+        void getCurrentWindow().close();
+        return;
+      }
+      if (e.key === 'Escape' && !e.metaKey && escapeShouldClose(document.activeElement)) {
         e.preventDefault();
         void getCurrentWindow().close();
       }
@@ -58,21 +71,14 @@ export function App(): JSX.Element {
     };
   }, []);
 
-  // Arrow/Home/End move selection within the tablist and follow focus (the
-  // ARIA tabs pattern with roving tabindex).
+  // Arrow/Home/End move selection across both sections as one ring and follow
+  // focus (the ARIA tabs pattern with roving tabindex).
   const onTabsKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
-    const idx = TABS.findIndex((t) => t.id === tab);
-    let nextIdx: number | null = null;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') nextIdx = (idx + 1) % TABS.length;
-    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft')
-      nextIdx = (idx - 1 + TABS.length) % TABS.length;
-    else if (e.key === 'Home') nextIdx = 0;
-    else if (e.key === 'End') nextIdx = TABS.length - 1;
-    const next = nextIdx === null ? undefined : TABS[nextIdx];
+    const next = nextTabId(tab, e.key);
     if (!next) return;
     e.preventDefault();
-    setTab(next.id);
-    tabRefs.current[next.id]?.focus();
+    setTab(next);
+    tabRefs.current[next]?.focus();
   };
 
   if (!api) {
@@ -91,35 +97,43 @@ export function App(): JSX.Element {
 
   return (
     <div className="shell">
-      <nav className="sidebar" aria-label="Settings">
+      <nav className="sidebar">
         <div className="sidebar-brand">Velata</div>
-        <div
-          role="tablist"
-          aria-orientation="vertical"
-          className="sidebar-tabs"
-          onKeyDown={onTabsKeyDown}
-        >
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              ref={(el) => {
-                tabRefs.current[t.id] = el;
-              }}
-              role="tab"
-              id={`tab-${t.id}`}
-              aria-selected={tab === t.id}
-              aria-controls="settings-panel"
-              tabIndex={tab === t.id ? 0 : -1}
-              className={`sidebar-item ${tab === t.id ? 'sidebar-active' : ''}`}
-              onClick={() => {
-                setTab(t.id);
-              }}
+        {SIDEBAR_SECTIONS.map((section) => (
+          <div key={section.label}>
+            <div className="sidebar-section-label" aria-hidden>
+              {section.label}
+            </div>
+            <div
+              role="tablist"
+              aria-orientation="vertical"
+              aria-label={section.label}
+              className="sidebar-tabs"
+              onKeyDown={onTabsKeyDown}
             >
-              {TAB_ICONS[t.id]}
-              <span>{t.label}</span>
-            </button>
-          ))}
-        </div>
+              {section.tabs.map((t) => (
+                <button
+                  key={t.id}
+                  ref={(el) => {
+                    tabRefs.current[t.id] = el;
+                  }}
+                  role="tab"
+                  id={`tab-${t.id}`}
+                  aria-selected={tab === t.id}
+                  aria-controls="settings-panel"
+                  tabIndex={tab === t.id ? 0 : -1}
+                  className={`sidebar-item ${tab === t.id ? 'sidebar-active' : ''}`}
+                  onClick={() => {
+                    setTab(t.id);
+                  }}
+                >
+                  {TAB_ICONS[t.id]}
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </nav>
       <main className="content" role="tabpanel" id="settings-panel" aria-labelledby={`tab-${tab}`}>
         {api.saveError && (
@@ -147,13 +161,17 @@ export function App(): JSX.Element {
             {tip.copy}
           </Callout>
         )}
+        {tab === 'home' && <HomeTab />}
+        {tab === 'insights' && <InsightsTab api={api} />}
+        {tab === 'dictionary' && <DictionaryTab api={api} />}
+        {tab === 'snippets' && <SnippetsTab api={api} />}
+        {tab === 'style' && <StyleTab />}
+        {tab === 'transforms' && <TransformsTab />}
+        {tab === 'scratchpad' && <ScratchpadTab />}
         {tab === 'dictation' && <DictationTab api={api} modelsApi={modelsApi} />}
         {tab === 'modes' && <ModesTab api={api} modelsApi={modelsApi} />}
         {tab === 'models' && <ModelsTab api={api} modelsApi={modelsApi} />}
         {tab === 'output' && <OutputTab api={api} />}
-        {tab === 'dictionary' && <DictionaryTab api={api} />}
-        {tab === 'snippets' && <SnippetsTab api={api} />}
-        {tab === 'insights' && <InsightsTab api={api} />}
         {tab === 'general' && <GeneralTab api={api} />}
         {tab === 'about' && <AboutTab />}
       </main>

@@ -23,6 +23,43 @@ function Icon({ children }: { children: JSX.Element }): JSX.Element {
 }
 
 export const TAB_ICONS: Record<string, JSX.Element> = {
+  // house
+  home: (
+    <Icon>
+      <>
+        <path d="M2.5 7.5 8 3l5.5 4.5" />
+        <path d="M3.5 6.8V13a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5V6.8" />
+        <path d="M6.5 13.5V9.5h3v4" />
+      </>
+    </Icon>
+  ),
+  // paintbrush
+  style: (
+    <Icon>
+      <>
+        <path d="M13 3 7 9" />
+        <path d="M6.5 8.5a2 2 0 0 1 2 2c0 1.4-1.3 2.5-3 2.5-.6 0-1.2-.2-1.7-.5.6-.2 1-.8 1-1.5a1.5 1.5 0 0 1 1.7-2.5z" />
+      </>
+    </Icon>
+  ),
+  // wand with sparks
+  transforms: (
+    <Icon>
+      <>
+        <path d="M4 12 11 5" />
+        <path d="M10 3.5 11 4.5M12.5 6l1 1M3 6.5l.7.7M5.5 3l.5.7M5.5 8l.7.5" />
+      </>
+    </Icon>
+  ),
+  // note with pencil
+  scratchpad: (
+    <Icon>
+      <>
+        <path d="M11 8.5V12a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 3 12V4.5A.5.5 0 0 1 3.5 4H7" />
+        <path d="M9 3.5 12.5 7 8 11.5H5.5V9z" />
+      </>
+    </Icon>
+  ),
   // microphone
   dictation: (
     <Icon>
