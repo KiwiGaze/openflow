@@ -166,7 +166,7 @@ export function App(): JSX.Element {
         {tab === 'dictionary' && <DictionaryTab api={api} />}
         {tab === 'snippets' && <SnippetsTab api={api} />}
         {tab === 'style' && <StyleTab api={api} />}
-        {tab === 'transforms' && <TransformsTab />}
+        {tab === 'transforms' && <TransformsTab api={api} />}
         {tab === 'scratchpad' && <ScratchpadTab />}
         {tab === 'dictation' && <DictationTab api={api} modelsApi={modelsApi} />}
         {tab === 'modes' && <ModesTab api={api} modelsApi={modelsApi} />}

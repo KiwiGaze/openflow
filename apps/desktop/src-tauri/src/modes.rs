@@ -1,6 +1,6 @@
 //! Built-in modes and prompt construction for the LLM polish step.
 
-use crate::settings::{AppRule, CleanupLevel, DictionaryEntry, Mode};
+use crate::settings::{AppRule, CleanupLevel, DictionaryEntry, Mode, PolishRules, Transform};
 use crate::text;
 
 pub const STANDARD_MODE_ID: &str = "standard";
@@ -8,6 +8,10 @@ pub const EMAIL_MODE_ID: &str = "email";
 pub const NOTES_MODE_ID: &str = "notes";
 pub const LITERAL_MODE_ID: &str = "literal";
 pub const CODE_MODE_ID: &str = "code";
+
+/// Id of the shipped Prompt Engineer transform. Restored by `normalize()` if
+/// deleted, exactly like a built-in mode.
+pub const PROMPT_ENGINEER_TRANSFORM_ID: &str = "prompt-engineer";
 
 /// Invariant. Appended to every mode prompt at call time; no mode or template
 /// can drop these — they protect the output contract and the injection
@@ -101,6 +105,22 @@ details: names, dates, numbers, decisions, action items."
     ]
 }
 
+/// Transforms Velata ships. Restored by `Settings::normalize` when deleted (the
+/// built-in-modes pattern); user edits to instruction/hotkey persist. The
+/// hotkey is empty until the user binds one.
+pub fn built_in_transforms() -> Vec<Transform> {
+    vec![Transform {
+        id: PROMPT_ENGINEER_TRANSFORM_ID.into(),
+        name: "Prompt Engineer".into(),
+        instruction: "Rewrite the selected text as a clear, specific prompt for an AI \
+model. State the goal, add necessary context, and spell out the desired output \
+format. Keep the user's intent exactly."
+            .into(),
+        hotkey: String::new(),
+        built_in: true,
+    }]
+}
+
 /// System prompt for a dictation polish call: the mode prompt, the safety
 /// rules (always), the soft default-behavior line (unless the mode
 /// `transforms`), and the user's vocabulary so the LLM keeps custom spellings.
@@ -179,6 +199,31 @@ pub fn leveled_output(level: CleanupLevel, mode_id: &str, text: &str) -> String 
 
 pub const DEFAULT_POLISH_INSTRUCTION: &str =
     "Fix grammar, spelling, and clarity. Keep the meaning, tone, and language.";
+
+/// Polish's always-on identity: the grammar/spelling fix. Every enabled rule in
+/// `polish_instruction` appends one sentence after this; all-rules-off yields
+/// exactly this base.
+const POLISH_BASE_INSTRUCTION: &str = "Fix grammar and spelling. Keep the meaning and language.";
+
+/// Builds the built-in Polish instruction from its rule toggles (Transforms
+/// page). Starts from the grammar/spelling fix, then appends one short sentence
+/// per enabled rule. Pure, so the composition is unit-tested without the LLM.
+pub fn polish_instruction(rules: &PolishRules) -> String {
+    let mut out = POLISH_BASE_INSTRUCTION.to_string();
+    if rules.concise {
+        out.push_str(" Make it more concise.");
+    }
+    if rules.clarity {
+        out.push_str(" Reword unclear phrasing for clarity.");
+    }
+    if rules.structure {
+        out.push_str(" Improve the ordering and structure for readability.");
+    }
+    if rules.tone {
+        out.push_str(" Keep the writer's original tone.");
+    }
+    out
+}
 
 pub fn selection_system_prompt() -> String {
     // Selection rewriting is itself a transform ("translate to German" is a
@@ -260,6 +305,79 @@ mod tests {
         let prompt = selection_user_prompt("hello world", "  ");
         assert!(prompt.contains(DEFAULT_POLISH_INSTRUCTION));
         assert!(prompt.ends_with("hello world"));
+    }
+
+    fn rules(concise: bool, clarity: bool, structure: bool, tone: bool) -> PolishRules {
+        PolishRules {
+            concise,
+            clarity,
+            structure,
+            tone,
+        }
+    }
+
+    #[test]
+    fn polish_instruction_all_off_is_just_the_grammar_fix() {
+        let out = polish_instruction(&rules(false, false, false, false));
+        assert_eq!(out, POLISH_BASE_INSTRUCTION);
+    }
+
+    #[test]
+    fn polish_instruction_all_on_appends_every_rule_after_the_base() {
+        let out = polish_instruction(&rules(true, true, true, true));
+        assert!(out.starts_with(POLISH_BASE_INSTRUCTION));
+        assert!(out.contains("more concise"));
+        assert!(out.contains("clarity"));
+        assert!(out.contains("structure for readability"));
+        assert!(out.contains("original tone"));
+    }
+
+    #[test]
+    fn polish_instruction_defaults_keep_the_pre_rules_identity() {
+        // Default rules ≈ the old DEFAULT_POLISH_INSTRUCTION semantics:
+        // grammar base + clarity + tone, with concise/structure as opt-in
+        // dials — so upgrading never makes Polish more aggressive.
+        let out = polish_instruction(&PolishRules::default());
+        assert!(out.starts_with(POLISH_BASE_INSTRUCTION));
+        assert!(out.contains("clarity"));
+        assert!(out.contains("original tone"));
+        assert!(!out.contains("more concise"));
+        assert!(!out.contains("structure for readability"));
+    }
+
+    #[test]
+    fn polish_instruction_single_rules_append_only_that_sentence() {
+        let concise = polish_instruction(&rules(true, false, false, false));
+        assert!(concise.starts_with(POLISH_BASE_INSTRUCTION));
+        assert!(concise.contains("more concise"));
+        assert!(!concise.contains("clarity"));
+        assert!(!concise.contains("readability"));
+        assert!(!concise.contains("tone"));
+
+        let tone = polish_instruction(&rules(false, false, false, true));
+        assert!(tone.starts_with(POLISH_BASE_INSTRUCTION));
+        assert!(tone.contains("original tone"));
+        assert!(!tone.contains("more concise"));
+
+        let clarity = polish_instruction(&rules(false, true, false, false));
+        assert!(clarity.contains("clarity"));
+        assert!(!clarity.contains("readability"));
+
+        let structure = polish_instruction(&rules(false, false, true, false));
+        assert!(structure.contains("structure for readability"));
+        assert!(!structure.contains("clarity"));
+    }
+
+    #[test]
+    fn built_in_transforms_seed_the_prompt_engineer() {
+        let transforms = built_in_transforms();
+        let pe = transforms
+            .iter()
+            .find(|t| t.id == PROMPT_ENGINEER_TRANSFORM_ID)
+            .expect("Prompt Engineer present");
+        assert_eq!(pe.name, "Prompt Engineer");
+        assert!(pe.built_in);
+        assert!(pe.hotkey.is_empty());
     }
 
     fn rule(bundle: &str, mode: &str, cleanup: Option<CleanupLevel>) -> AppRule {

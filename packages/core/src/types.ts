@@ -197,6 +197,25 @@ export interface Transform {
   instruction: string;
   /** Accelerator that applies it; empty = not yet bound (can't fire). */
   hotkey: string;
+  /**
+   * Shipped by Velata and restored if deleted (like a built-in mode). User
+   * edits to its instruction/hotkey persist; only deletion is undone. Existing
+   * custom transforms are user-owned (false).
+   */
+  builtIn: boolean;
+}
+
+/**
+ * Optional rewrites the built-in Polish composes over its always-on
+ * grammar/spelling fix (Transforms page). Each flag adds one instruction
+ * sentence. Defaults preserve Polish's pre-rules identity: clarity and tone
+ * on, concise and structure opt-in.
+ */
+export interface PolishRules {
+  concise: boolean;
+  clarity: boolean;
+  structure: boolean;
+  tone: boolean;
 }
 
 export interface Settings {
@@ -218,6 +237,8 @@ export interface Settings {
   snippets: Snippet[];
   /** Named, hotkey-bound text operations applied to a selection. */
   transforms: Transform[];
+  /** Optional rewrites the built-in Polish layers over its grammar fix. */
+  polishRules: PolishRules;
   /** Whisper model id from the model registry, e.g. `base.en`. */
   sttModelId: string;
   /** ISO 639-1 code or `auto`. */

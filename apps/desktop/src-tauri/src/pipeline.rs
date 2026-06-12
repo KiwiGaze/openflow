@@ -547,9 +547,11 @@ impl Pipeline {
     }
 
     /// Tap entry point: polish the current selection with the built-in
-    /// fix-grammar instruction — no recording, no Session.
+    /// grammar fix plus the user's enabled Polish rules — no recording, no
+    /// Session. The rules compose the instruction (Transforms page).
     pub fn polish(self: &Arc<Self>) {
-        self.polish_selection(Job::PolishSelection, String::new(), "polish", None);
+        let instruction = modes::polish_instruction(&self.settings.get().polish_rules);
+        self.polish_selection(Job::PolishSelection, instruction, "polish", None);
     }
 
     /// Tap entry point: apply a user-defined transform to the selection. The
@@ -1040,8 +1042,8 @@ impl Pipeline {
         started: Instant,
     ) -> AppResult<ProcessOutcome> {
         let system = modes::selection_system_prompt();
-        // An empty instruction selects the built-in fix-grammar default
-        // (Polish); a transform passes its own instruction.
+        // Polish passes its rule-composed instruction and a transform passes its
+        // own; an empty instruction still falls back to the fix-grammar default.
         let user = modes::selection_user_prompt(&selection, instruction);
         // No fallback — wrong text over the user's selection is worse than
         // nothing.

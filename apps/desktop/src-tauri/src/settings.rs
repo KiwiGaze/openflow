@@ -150,6 +150,37 @@ pub struct Transform {
     /// Accelerator that applies it to the selection; empty = not yet bound
     /// (the transform exists but can't fire until the user assigns a key).
     pub hotkey: String,
+    /// Shipped by Velata and restored by `normalize()` if deleted (like a
+    /// built-in mode). User edits to its instruction/hotkey persist; only its
+    /// deletion is undone. Old files default this to false (every existing
+    /// custom transform is user-owned).
+    #[serde(default)]
+    pub built_in: bool,
+}
+
+/// Which optional rewrites the built-in Polish composes on top of its always-on
+/// grammar/spelling fix (Transforms page). Each flag adds one instruction
+/// sentence. Defaults preserve Polish's pre-rules identity — clarity and tone
+/// on (≈ the old fix-grammar default instruction), concise and structure as
+/// opt-in dials. `polish_instruction` in `modes.rs` turns these into the prompt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PolishRules {
+    pub concise: bool,
+    pub clarity: bool,
+    pub structure: bool,
+    pub tone: bool,
+}
+
+impl Default for PolishRules {
+    fn default() -> Self {
+        Self {
+            concise: false,
+            clarity: true,
+            structure: false,
+            tone: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -171,6 +202,8 @@ pub struct Settings {
     pub dictionary: Vec<DictionaryEntry>,
     pub snippets: Vec<Snippet>,
     pub transforms: Vec<Transform>,
+    /// Optional rewrites the built-in Polish layers over its grammar fix.
+    pub polish_rules: PolishRules,
     pub stt_model_id: String,
     pub language: String,
     /// v1 migration only — see `profiles::reconcile`.
@@ -225,7 +258,8 @@ impl Default for Settings {
             modes: modes::built_in_modes(),
             dictionary: Vec::new(),
             snippets: Vec::new(),
-            transforms: Vec::new(),
+            transforms: modes::built_in_transforms(),
+            polish_rules: PolishRules::default(),
             stt_model_id: DEFAULT_STT_MODEL_ID.into(),
             language: "auto".into(),
             llm: None,
@@ -288,6 +322,17 @@ impl Settings {
         // blank mid-edit (that would lose its instruction and hotkey while the
         // user renames it). Only drop structurally-invalid rows with no id.
         self.transforms.retain(|t| !t.id.trim().is_empty());
+        // Built-in transforms are restored if deleted (the built-in-modes
+        // pattern). Unlike modes, an existing copy is left untouched so the
+        // user's edits to its instruction or hotkey persist — only deletion is
+        // undone. An empty-string transform hotkey is the "unbound" sentinel
+        // (kept as-is; the registrar already skips blanks), so no normalization
+        // is needed there.
+        for built_in in modes::built_in_transforms() {
+            if !self.transforms.iter().any(|t| t.id == built_in.id) {
+                self.transforms.push(built_in);
+            }
+        }
         self.version = SETTINGS_VERSION;
     }
 }
@@ -476,6 +521,13 @@ mod tests {
         assert!(json.contains("\"snippets\":[]"));
         assert!(json.contains("\"showInDock\":false"));
         assert!(json.contains("\"autoCleanupLevel\":\"ai\""));
+        // Polish rules serialize camelCase; the defaults keep Polish's
+        // pre-rules identity (clarity + tone on, concise + structure opt-in).
+        // The seeded Prompt Engineer carries the `builtIn` flag.
+        assert!(json.contains(
+            "\"polishRules\":{\"concise\":false,\"clarity\":true,\"structure\":false,\"tone\":true}"
+        ));
+        assert!(json.contains("\"builtIn\":true"));
         // The v1 LLM block is deserialize-only; it must never be written.
         assert!(!json.contains("\"llm\""));
     }
@@ -550,6 +602,7 @@ mod tests {
                 name: "Concise".into(),
                 instruction: "Tighten the wording.".into(),
                 hotkey: "Alt+1".into(),
+                built_in: false,
             },
             // Mid-rename: the name is transiently blank but the instruction and
             // hotkey must survive (a keystroke must not delete the transform).
@@ -558,6 +611,7 @@ mod tests {
                 name: "  ".into(),
                 instruction: "Make it friendlier.".into(),
                 hotkey: "Alt+2".into(),
+                built_in: false,
             },
             // Structurally invalid (no id, e.g. a bad hand-edited file) → dropped.
             Transform {
@@ -565,13 +619,85 @@ mod tests {
                 name: "Orphan".into(),
                 instruction: "x".into(),
                 hotkey: String::new(),
+                built_in: false,
             },
         ];
         let fixed = manager.set(s).unwrap();
-        assert_eq!(fixed.transforms.len(), 2);
+        // The two id-bearing customs survive; the built-in Prompt Engineer is
+        // re-added because the cleared list above dropped it.
         let renamed = fixed.transforms.iter().find(|t| t.id == "b").unwrap();
         assert_eq!(renamed.instruction, "Make it friendlier.");
         assert_eq!(renamed.hotkey, "Alt+2");
+        assert!(fixed.transforms.iter().any(|t| t.id == "a"));
+        assert!(!fixed.transforms.iter().any(|t| t.id.trim().is_empty()));
+        assert!(fixed
+            .transforms
+            .iter()
+            .any(|t| t.id == modes::PROMPT_ENGINEER_TRANSFORM_ID && t.built_in));
+    }
+
+    #[test]
+    fn normalize_restores_deleted_prompt_engineer_but_keeps_user_edits() {
+        let dir = temp_dir("prompt-engineer-restore");
+        let manager = SettingsManager::load(&dir);
+
+        // Deleting it (empty list) brings the built-in back on the next save.
+        let mut s = manager.get();
+        s.transforms.clear();
+        let restored = manager.set(s).unwrap();
+        let pe = restored
+            .transforms
+            .iter()
+            .find(|t| t.id == modes::PROMPT_ENGINEER_TRANSFORM_ID)
+            .expect("Prompt Engineer restored after deletion");
+        assert!(pe.built_in);
+
+        // Editing its instruction and hotkey must persist — normalize re-adds
+        // only when missing, never clobbering an existing built-in.
+        let mut s = manager.get();
+        for t in &mut s.transforms {
+            if t.id == modes::PROMPT_ENGINEER_TRANSFORM_ID {
+                t.instruction = "My own prompt wording.".into();
+                t.hotkey = "Alt+9".into();
+            }
+        }
+        let edited = manager.set(s).unwrap();
+        let pe = edited
+            .transforms
+            .iter()
+            .find(|t| t.id == modes::PROMPT_ENGINEER_TRANSFORM_ID)
+            .expect("Prompt Engineer still present after editing");
+        assert_eq!(pe.instruction, "My own prompt wording.");
+        assert_eq!(pe.hotkey, "Alt+9");
+        assert!(pe.built_in);
+    }
+
+    #[test]
+    fn old_settings_without_polish_rules_or_built_in_load_with_defaults() {
+        // A file predating this change has no `polishRules` and a custom
+        // transform with no `builtIn` field. Both must default rather than
+        // fail the load, and the built-in Prompt Engineer is appended.
+        let dir = temp_dir("polish-rules-defaults");
+        fs::write(
+            dir.join("settings.json"),
+            r#"{ "version": 5,
+                 "transforms": [{ "id": "c1", "name": "Mine", "instruction": "Tighten it.", "hotkey": "Alt+1" }] }"#,
+        )
+        .unwrap();
+        let s = SettingsManager::load(&dir).get();
+
+        assert_eq!(s.polish_rules, PolishRules::default());
+        // The defaults match Polish's old behavior: clarity + tone on,
+        // concise + structure off until the user opts in.
+        assert!(s.polish_rules.clarity && s.polish_rules.tone);
+        assert!(!s.polish_rules.concise && !s.polish_rules.structure);
+
+        let mine = s.transforms.iter().find(|t| t.id == "c1").unwrap();
+        assert!(!mine.built_in);
+        assert!(s
+            .transforms
+            .iter()
+            .any(|t| t.id == modes::PROMPT_ENGINEER_TRANSFORM_ID && t.built_in));
     }
 
     #[test]

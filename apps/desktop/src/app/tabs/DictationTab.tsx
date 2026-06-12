@@ -2,7 +2,6 @@ import type { JSX } from 'react';
 import { type HotkeyBehavior, LANGUAGES } from '@velata/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
-import { PolishShortcuts } from '../components/PolishShortcuts.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
 
@@ -96,8 +95,6 @@ export function DictationTab({
           />
         </Row>
       </section>
-
-      <PolishShortcuts api={api} />
     </div>
   );
 }

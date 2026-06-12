@@ -39,6 +39,7 @@ const base: Settings = {
   confirmedSttProfiles: [],
   snippets: [],
   transforms: [],
+  polishRules: { concise: false, clarity: true, structure: false, tone: true },
   showInDock: false,
   tipsEnabled: true,
   tipsSeen: [],
