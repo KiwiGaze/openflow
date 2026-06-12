@@ -676,18 +676,20 @@ impl Pipeline {
         // AI profile is only resolved when the mode wants AI, the master switch
         // is on, AND the cleanup level allows AI (Off/Rules force it off) — so a
         // no-AI run never resolves, nor notices a dangling, profile it won't use.
-        let profile = if mode.uses_llm
-            && settings.polish_after_dictation
-            && modes::level_allows_llm(cleanup_level)
-        {
-            match &mode.ai_profile_id {
-                Some(id) => self.profiles.get(id).or_else(|| {
-                    notice.get_or_insert(format!(
-                        "{name}: its AI profile is missing — used your active profile instead."
-                    ));
-                    self.profiles.active(&settings.active_llm_profile_id)
-                }),
-                None => self.profiles.active(&settings.active_llm_profile_id),
+        let profile = if mode.uses_llm && settings.polish_after_dictation {
+            if modes::level_allows_llm(cleanup_level) {
+                match &mode.ai_profile_id {
+                    Some(id) => self.profiles.get(id).or_else(|| {
+                        notice.get_or_insert(format!(
+                            "{name}: its AI profile is missing — used your active profile instead."
+                        ));
+                        self.profiles.active(&settings.active_llm_profile_id)
+                    }),
+                    None => self.profiles.active(&settings.active_llm_profile_id),
+                }
+            } else {
+                log::debug!("cleanup level {cleanup_level:?} forced AI off for this dictation");
+                None
             }
         } else {
             None

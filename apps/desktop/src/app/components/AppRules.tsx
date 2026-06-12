@@ -7,6 +7,13 @@ import { ipc } from '../ipc.js';
 const INHERIT = 'inherit';
 type CleanupChoice = typeof INHERIT | CleanupLevel;
 
+const CLEANUP_CHOICES: { value: CleanupChoice; label: string }[] = [
+  { value: INHERIT, label: 'Inherit' },
+  { value: 'off', label: 'Off' },
+  { value: 'rules', label: 'Rules' },
+  { value: 'ai', label: 'AI' },
+];
+
 function choiceToLevel(choice: CleanupChoice): CleanupLevel | null {
   return choice === INHERIT ? null : choice;
 }
@@ -81,10 +88,11 @@ export function AppRules({ api }: { api: SettingsApi }): JSX.Element {
                   });
                 }}
               >
-                <option value={INHERIT}>Inherit</option>
-                <option value="off">Off</option>
-                <option value="rules">Rules</option>
-                <option value="ai">AI</option>
+                {CLEANUP_CHOICES.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </option>
+                ))}
               </select>
               <button
                 className="btn btn-quiet btn-sm"
@@ -127,10 +135,11 @@ export function AppRules({ api }: { api: SettingsApi }): JSX.Element {
             setCleanup(e.target.value as CleanupChoice);
           }}
         >
-          <option value={INHERIT}>Inherit</option>
-          <option value="off">Off</option>
-          <option value="rules">Rules</option>
-          <option value="ai">AI</option>
+          {CLEANUP_CHOICES.map((choice) => (
+            <option key={choice.value} value={choice.value}>
+              {choice.label}
+            </option>
+          ))}
         </select>
         <button
           className="btn"
