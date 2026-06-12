@@ -719,6 +719,12 @@ button:focus-visible,
 
 /* ---- Dictionary ---- */
 
+.dict-views {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
 .dict-form {
   display: flex;
   gap: 8px;
@@ -729,6 +735,19 @@ button:focus-visible,
 .dict-form input {
   flex: 1;
   min-width: 0;
+}
+
+.dict-correction-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: var(--text-hint);
+}
+
+.dict-search {
+  width: 100%;
+  margin: 12px 0 4px;
 }
 
 .dict-arrow {
@@ -788,6 +807,11 @@ button:focus-visible,
 .dict-to {
   font-weight: 600;
   flex: 1;
+}
+
+.dict-row-editing input {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ---- Snippets ---- */
