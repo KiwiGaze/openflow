@@ -9,7 +9,7 @@ use crate::models::{ModelInfoDto, DEFAULT_STT_MODEL_ID};
 use crate::permissions::{self, PermissionsState};
 use crate::pipeline::{Job, PipelineState, TranscriptionResult};
 use crate::profiles::LlmProfile;
-use crate::settings::{Settings, SETTINGS_CHANGED_EVENT};
+use crate::settings::{Appearance, Settings, SETTINGS_CHANGED_EVENT};
 use crate::state::AppState;
 use crate::stt_profiles::{SttProfile, CLOUD_STT_PREFIX};
 use crate::{modes, shortcuts, text, tray};
@@ -105,6 +105,10 @@ pub fn save_settings(
         apply_dock_policy(&app, saved.show_in_dock);
     }
 
+    if previous.appearance != saved.appearance {
+        apply_appearance(&app, saved.appearance);
+    }
+
     if let Err(err) = tray::rebuild_menu(&app) {
         log::warn!("tray rebuild failed: {err}");
     }
@@ -126,6 +130,16 @@ pub fn apply_dock_policy(app: &AppHandle, show_in_dock: bool) {
     }
     #[cfg(not(target_os = "macos"))]
     let _ = (app, show_in_dock);
+}
+
+/// Forces the native window chrome to the chosen theme; `System` follows macOS.
+/// Not an IPC command — called from `main.rs` and `save_settings`.
+pub fn apply_appearance(app: &AppHandle, appearance: Appearance) {
+    app.set_theme(match appearance {
+        Appearance::System => None,
+        Appearance::Light => Some(tauri::Theme::Light),
+        Appearance::Dark => Some(tauri::Theme::Dark),
+    });
 }
 
 fn sync_autostart(app: &AppHandle, enabled: bool) {
