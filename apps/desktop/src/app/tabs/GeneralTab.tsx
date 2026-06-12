@@ -1,7 +1,7 @@
 import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { type Appearance, formatAcceleratorMac } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
-import { ipc } from '../ipc.js';
+import { events, ipc, subscribe } from '../ipc.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
 
@@ -36,20 +36,25 @@ function DataPrivacyCard({ api }: { api: SettingsApi }): JSX.Element {
   const [clearError, setClearError] = useState<string | null>(null);
 
   // Only read notes when the Scratchpad is on — the command refuses while off,
-  // and counting is the only reason to touch it here.
+  // and counting is the only reason to touch it here. notes-changed keeps the
+  // count fresh while the Scratchpad window edits notes.
   useEffect(() => {
     if (!settings.scratchpadEnabled) {
       setNoteCount(null);
       return;
     }
-    void ipc
-      .listNotes(null)
-      .then((notes) => {
-        setNoteCount(notes.length);
-      })
-      .catch((err: unknown) => {
-        console.error('Failed to count notes:', err);
-      });
+    const refresh = (): void => {
+      void ipc
+        .listNotes(null)
+        .then((notes) => {
+          setNoteCount(notes.length);
+        })
+        .catch((err: unknown) => {
+          console.error('Failed to count notes:', err);
+        });
+    };
+    refresh();
+    return subscribe(events.onNotesChanged(refresh));
   }, [settings.scratchpadEnabled]);
 
   const clearHistory = (): void => {

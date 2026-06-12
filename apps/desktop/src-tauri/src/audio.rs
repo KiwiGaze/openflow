@@ -192,27 +192,32 @@ fn open_stream(level: Arc<AtomicU32>, device_name: Option<&str>) -> AppResult<Ac
 /// saved mic was unplugged) capture falls back to the system default — a saved
 /// name must never make dictation fail.
 fn select_input_device(host: &cpal::Host, saved: Option<&str>) -> AppResult<cpal::Device> {
-    let names = list_input_device_names();
-    match select_input_device_name(saved, &names) {
-        Some(name) => {
-            // cpal 0.18 exposes the device name via `Display`, so compare the
-            // formatted name against the saved choice.
-            let found = host
-                .input_devices()
-                .ok()
-                .and_then(|mut devices| devices.find(|d| d.to_string() == name));
-            match found {
-                Some(device) => Ok(device),
-                None => {
-                    log::warn!("input device '{name}' vanished mid-lookup; using system default");
-                    default_input_device(host)
-                }
-            }
+    // No saved preference: straight to the system default — the dictation hot
+    // path must not pay for an enumeration it doesn't need.
+    let Some(saved) = saved else {
+        return default_input_device(host);
+    };
+    // One walk supplies both the name list (for the pure decision) and the
+    // device handle to record from — no second enumeration. cpal 0.18 exposes
+    // the device name via `Display`.
+    let devices: Vec<cpal::Device> = match host.input_devices() {
+        Ok(devices) => devices.collect(),
+        Err(err) => {
+            log::warn!("could not enumerate input devices: {err}");
+            Vec::new()
         }
+    };
+    let names: Vec<String> = devices.iter().map(|d| d.to_string()).collect();
+    match select_input_device_name(Some(saved), &names) {
+        Some(name) => match devices.into_iter().zip(names).find(|(_, n)| *n == name) {
+            Some((device, _)) => Ok(device),
+            // The chosen name came from this same walk, so this arm can't fire
+            // — kept as a fallback because dictation must never panic or fail
+            // over a device lookup.
+            None => default_input_device(host),
+        },
         None => {
-            if let Some(saved) = saved {
-                log::warn!("saved input device '{saved}' is not available; using system default");
-            }
+            log::warn!("saved input device '{saved}' is not available; using system default");
             default_input_device(host)
         }
     }

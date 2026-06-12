@@ -85,11 +85,9 @@ export function DictationTab({
             <option value="">System default</option>
             {/* Keep a saved-but-absent device (e.g. unplugged) visible so the
                 picker reflects the stored choice; recording falls back server-side. */}
-            {inputDevices.length > 0 &&
-              settings.inputDeviceName &&
-              !inputDevices.includes(settings.inputDeviceName) && (
-                <option value={settings.inputDeviceName}>{settings.inputDeviceName}</option>
-              )}
+            {settings.inputDeviceName && !inputDevices.includes(settings.inputDeviceName) && (
+              <option value={settings.inputDeviceName}>{settings.inputDeviceName}</option>
+            )}
             {inputDevices.map((name) => (
               <option key={name} value={name}>
                 {name}
