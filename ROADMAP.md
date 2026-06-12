@@ -1,7 +1,7 @@
 # OpenFlow Roadmap
 
 The MVP ships hold-to-talk local dictation, modes, a personal dictionary, selected-text
-rewriting, and optional LLM polish. Everything below is ordered by expected impact; nothing is
+polish, and optional AI cleanup. Everything below is ordered by expected impact; nothing is
 scheduled until someone owns it.
 
 ## Near term (polish the core)

@@ -21,7 +21,7 @@ This document states exactly what data exists, where it goes, and how to verify 
   dictation") until the app quits. You can opt into a local dictation **history** (General → Save
   history, default off) — text only, stored only on this Mac, capped and clearable anytime.
 - If — and only if — you configure an AI provider, the **text** of a transcript (plus your mode
-  prompt, dictionary words, and, for rewrites, the selected text) is sent to that provider:
+  prompt, dictionary words, and, for selection polish, the selected text) is sent to that provider:
   - **Ollama / llama.cpp / LM Studio:** stays on your machine (localhost) unless you point the
     base URL elsewhere.
   - **OpenAI-compatible cloud (your API key):** goes to the base URL you set, under that
@@ -31,7 +31,7 @@ This document states exactly what data exists, where it goes, and how to verify 
 ## Network connections — the complete list
 
 1. `huggingface.co` — downloading the speech model you pick, when you pick it.
-2. Your configured AI provider's base URL — only when a mode uses AI or you run a rewrite/test.
+2. Your configured AI provider's base URL — only when a mode uses AI or you run a polish/test.
 3. A cloud speech engine's base URL — only if you added one and selected it; this uploads your
    **audio** (the one exception to "audio never leaves"), after the consent dialog.
 

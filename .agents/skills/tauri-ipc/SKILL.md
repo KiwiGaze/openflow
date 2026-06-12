@@ -36,7 +36,7 @@ skill covers the rest.
 5. New event → `pub const <NAME>_EVENT` in the owning module, mirror in
    `EVENTS`, add `events.on<Name>` wrapper. Never emit a string literal.
 6. If the command can block on the output worker (selection capture, paste),
-   offload with `spawn_blocking` exactly like `start_refine_selection` —
+   offload with `spawn_blocking` exactly like `start_polish_selection` —
    running it inline on the main thread deadlocks.
 7. Run the commands below; fix anything `check:ipc` reports.
 

@@ -27,8 +27,6 @@
   pastes the result at your cursor. A quick tap latches hands-free mode.
 - **Polish selected text with one keystroke.** Select text in any app, tap `⌥⇧ P`, and the
   selection is replaced with a grammar-, spelling-, and clarity-fixed version. No voice needed.
-- **Rewrite selected text by voice.** Select text in any app, hold `⌥⇧ Space`, and say what you
-  want: _"make this more polite"_, _"fix the grammar"_, _"turn this into bullet points"_.
 - **Modes** shape the output — Standard, Email, Notes, Literal, or your own custom prompts.
 - **Personal dictionary** teaches it your names, products, and jargon ("open flow" → "OpenFlow").
 - **Optional AI polish.** Plug in [Ollama](https://ollama.com) for fully-local LLM cleanup, or
@@ -85,9 +83,9 @@ Prerequisites: Xcode Command Line Tools, Rust (stable), Node 22+, pnpm 10+, CMak
 - **Hands-free:** tap the hotkey instead of holding; tap again to stop.
 - **Recover a result:** menu bar → _Copy Last Result_.
 - **AI profiles:** Settings → Models. Each profile is a connection (provider, endpoint, model)
-  stored as a file under the app's `profiles/` folder; exactly one is active for refinement.
+  stored as a file under the app's `profiles/` folder; exactly one is active for polish.
   With Ollama, `ollama pull qwen2.5:3b` is a fast, high-quality default for cleanup.
-- Dictation works without any AI profile; _polish_ and _rewrite selection_ require one.
+- Dictation works without any AI profile; _polish_ requires one.
 
 ## Development
 

@@ -16,9 +16,9 @@ OpenFlow is a local-first macOS menu-bar app:
 
 1. **Dictate anywhere.** Hold a global hotkey (default `⌥ Space`), speak, release. The speech is
    transcribed on-device (whisper.cpp + Metal), cleaned up, and pasted into the active app.
-2. **Rewrite anything.** Select text in any app, hold the rewrite hotkey (default `⌥⇧ Space`),
-   and speak an instruction ("make this more polite", "fix the grammar"). The selection is
-   replaced with the rewritten text.
+2. **Polish anything.** Select text in any app and press a polish shortcut (default `⌥⇧ P`) —
+   the built-in fix-grammar prompt or one of your own — and the selection is replaced with the
+   polished text.
 
 ### Positioning
 
@@ -40,7 +40,7 @@ zero cost for unlimited local dictation, and a hackable codebase.
 - **The privacy-required professional** — legal/health/security contexts where audio must not
   leave the device; needs to be able to verify that claim (firewall the app, read the source).
 - **The non-native English speaker** — speaks comfortably but wants grammar and phrasing polished
-  on the way out; the rewrite hotkey doubles as an inline editor for typed text.
+  on the way out; the polish hotkey doubles as an inline editor for typed text.
 - **The developer/tinkerer** — wants a dictation engine they can extend (modes are prompts;
   providers are any OpenAI-compatible endpoint).
 
@@ -62,17 +62,17 @@ release      ─► HUD: Transcribing… → (Polishing…) → text pasted at c
   transcript is inserted; on paste failure the text is left on the clipboard and the HUD says so.
 - "Copy Last Result" lives in the tray menu as a recovery affordance.
 
-### 4.2 Selected-text rewrite
+### 4.2 Selected-text polish
 
 ```
-select text ─► hold ⌥⇧Space ─► speak an instruction ─► release
-            ─► selection captured via ⌘C round-trip, instruction transcribed locally
-            ─► LLM rewrites ─► result pasted over the selection
+select text ─► tap ⌥⇧P (or a transform's own hotkey)
+            ─► selection captured via ⌘C round-trip
+            ─► LLM applies the prompt ─► result pasted over the selection
 ```
 
 - Requires an AI provider; without one the HUD explains how to set it up.
-- Speaking nothing applies the default instruction: _fix grammar, spelling, clarity; keep
-  meaning, tone, and language_.
+- The built-in Polish prompt is: _fix grammar, spelling, clarity; keep meaning, tone, and
+  language_. Custom prompts (transforms) carry their own instruction and hotkey.
 - No fallback insert on failure — replacing a user's selection with something wrong is worse than
   doing nothing.
 
@@ -96,7 +96,7 @@ A **mode** decides how the transcript becomes written text. Built-ins:
 
 `from → to` pairs ("open flow" → "OpenFlow"). Applied as whole-word, case-insensitive
 replacements after transcription, fed to whisper as a vocabulary-biasing initial prompt, and
-listed in LLM prompts so refinement preserves the exact spellings. This is table-stakes in every
+listed in LLM prompts so polish preserves the exact spellings. This is table-stakes in every
 competing product and the first thing users notice missing.
 
 ### 4.5 Onboarding
@@ -119,8 +119,8 @@ Small English 488 MB / Large-v3-turbo quantized 574 MB) → live try-it. Skippab
 ### In (MVP)
 
 Menu-bar app, global hotkeys (hold/toggle/tap-latch), local whisper.cpp transcription with model
-manager, rules-based cleanup, optional LLM refinement (Ollama / OpenAI-compatible), modes,
-personal dictionary, selected-text rewrite, paste-with-clipboard-restore, settings UI,
+manager, rules-based cleanup, optional LLM polish (Ollama / OpenAI-compatible), modes,
+personal dictionary, selected-text polish, paste-with-clipboard-restore, settings UI,
 onboarding, launch-at-login, single-instance.
 
 ### Out (deliberately)

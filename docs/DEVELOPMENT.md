@@ -75,32 +75,31 @@ Automated tests cover the logic; these flows need a human:
 2. Hold `⌥Space` in Notes → speak → release → text pasted; previous clipboard restored.
 3. Quick-tap `⌥Space` → keep talking hands-free → tap again → text pasted.
 4. Tray: switch mode → dictate → output style changes; _Copy Last Result_ works.
-5. With Ollama running (`ollama pull qwen2.5:3b`): Standard mode produces refined text; kill
+5. With Ollama running (`ollama pull qwen2.5:3b`): Standard mode produces polished text; kill
    Ollama mid-flight → dictation still inserts rules-cleaned text + amber notice.
-6. Select a sentence in a browser, hold `⌥⇧Space`, say "make this formal" → selection replaced.
-7. Select a flawed sentence in TextEdit / Safari / Slack, tap `⌥⇧P` → selection replaced with
+6. Select a flawed sentence in TextEdit / Safari / Slack, tap `⌥⇧P` → selection replaced with
    the polished text; no recording HUD appears.
-8. Tap `⌥⇧P`, then click elsewhere in the same field while "Polishing selection…" shows → the
+7. Tap `⌥⇧P`, then click elsewhere in the same field while "Polishing selection…" shows → the
    result is inserted at the caret instead of replacing (nothing is lost).
-9. Settings → Refine: toggle _Refine dictation with AI_ off → dictate with Ollama running →
+8. Settings → Dictation: toggle _Polish with AI_ off → dictate with Ollama running →
    no request appears in `ollama serve` logs; toggle from the tray and confirm Settings follows.
-10. Revoke Accessibility → dictate → clipboard-only notice appears; `⌥⇧P` / `⌥⇧Space` show the
-    grant hint instead.
-11. Settings: change hotkey to a taken combo (e.g. `Cmd+Space`) → clear error, old hotkey kept.
-12. Refine tab: create a second profile, switch the active radio between them mid-session →
+9. Revoke Accessibility → dictate → clipboard-only notice appears; `⌥⇧P` shows the grant
+   hint instead.
+10. Settings: change hotkey to a taken combo (e.g. `Cmd+Space`) → clear error, old hotkey kept.
+11. Models tab: create a second profile, switch the active radio between them mid-session →
     next polish uses the newly selected profile; _Show in Finder_ opens `<app-data>/profiles/`.
-13. Put another app (Safari, an editor) in macOS full-screen, then hold `⌥Space` → the HUD pill
+12. Put another app (Safari, an editor) in macOS full-screen, then hold `⌥Space` → the HUD pill
     shows over the full-screen app and the text still pastes into that app.
-14. Settings → Snippets: add `my email → me@example.com` (inline) → dictate "send it to my email"
+13. Settings → Snippets: add `my email → me@example.com` (inline) → dictate "send it to my email"
     → the address is inserted in place. Add a "spoken alone" snippet and confirm it expands only
     when said by itself, not mid-sentence.
-15. Settings → Refine → Transforms: add the "Concise" template, assign a hotkey, select a wordy
+14. Settings → Dictation → Polish: add the "Concise" template, assign a shortcut, select a wordy
     sentence in any app, press it → the selection is rewritten; the HUD reads "Concise…". Assign
     a hotkey already taken by dictation → clear error, the change is rolled back.
-16. Dictate a sentence naming a product (e.g. "we use TanStack and DeepSeek") → open Dictionary →
+15. Dictate a sentence naming a product (e.g. "we use TanStack and DeepSeek") → open Dictionary →
     both appear under "Noticed while you spoke"; click one to add it ("kept as-is"), dismiss the
     other → it disappears for the session. Insights → the words/pace/streak update after dictating.
-17. Tray → switch to Code mode → hold `⌥Space`, say "get user by id" → `getUserById` is inserted;
+16. Tray → switch to Code mode → hold `⌥Space`, say "get user by id" → `getUserById` is inserted;
     say "constant max retries" → `MAX_RETRIES`. Toggle Show in Dock on → a Dock icon appears and
     survives closing Settings; off → menu-bar only.
 
