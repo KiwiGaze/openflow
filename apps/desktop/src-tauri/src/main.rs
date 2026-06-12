@@ -110,6 +110,7 @@ fn main() {
             // Apply the persistent Dock preference now that settings are loaded
             // (the default above is Accessory; this upgrades to Regular if set).
             commands::apply_dock_policy(&handle, settings.get().show_in_dock);
+            commands::apply_appearance(&handle, settings.get().appearance);
 
             if !settings.get().onboarding_completed {
                 tray::show_settings_window(&handle);
