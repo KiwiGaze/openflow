@@ -2,9 +2,9 @@ import type { JSX } from 'react';
 import { type HotkeyBehavior, LANGUAGES } from '@openflow/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
+import { PolishShortcuts } from '../components/PolishShortcuts.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
-import { Transforms } from '../components/Transforms.js';
 
 export function DictationTab({
   api,
@@ -45,16 +45,6 @@ export function DictationTab({
             <option value="hold">Hold to talk</option>
             <option value="toggle">Tap to start, tap to stop</option>
           </select>
-        </Row>
-        <Row
-          title="Polish selection"
-          hint="Fix grammar and clarity in the selected text. No voice."
-        >
-          <HotkeyRecorder
-            value={settings.polishHotkey}
-            label="Polish selection"
-            onChange={(accelerator) => void update({ polishHotkey: accelerator })}
-          />
         </Row>
         <Row
           title="See changes"
@@ -107,7 +97,7 @@ export function DictationTab({
         </Row>
       </section>
 
-      <Transforms api={api} />
+      <PolishShortcuts api={api} />
     </div>
   );
 }
