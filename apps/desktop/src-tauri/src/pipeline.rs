@@ -26,7 +26,8 @@ use crate::modes;
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
 use crate::settings::{
-    HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS, SETTINGS_CHANGED_EVENT,
+    CleanupLevel, HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS,
+    SETTINGS_CHANGED_EVENT,
 };
 use crate::shortcuts;
 use crate::stats::{local_day, word_count, Insights, Stats};
@@ -109,6 +110,9 @@ struct Session {
     /// Mode id from a per-mode hotkey, used for this job only without changing
     /// the persistent active mode (one-shot, 07 §4). None = use the active mode.
     mode_override: Option<String>,
+    /// Cleanup strength resolved once at start from the frontmost app's rule
+    /// (else the global), so a mid-job app switch can't change the routing.
+    cleanup_level: CleanupLevel,
 }
 
 pub struct Pipeline {
@@ -399,18 +403,24 @@ impl Pipeline {
         let frontmost = apps::frontmost_app();
         *self.last_app.lock().expect("pipeline state poisoned") = frontmost.clone();
 
+        // The frontmost app's rule, if any — drives both the one-shot mode
+        // override and the per-app cleanup level. Resolved here, while we still
+        // hold the app captured at start, so neither can race a later switch.
+        let app_rule = frontmost.as_ref().and_then(|(bundle_id, _)| {
+            settings
+                .app_rules
+                .iter()
+                .find(|r| &r.bundle_id == bundle_id)
+        });
+
         // Per-app rules (07 §9): for a plain dictation (no explicit mode hotkey),
         // a frontmost-app rule supplies a one-shot mode override, exactly like a
         // hotkey. Explicit overrides win; a detection failure just means no rule.
-        let mode_override = mode_override.or_else(|| {
-            frontmost.and_then(|(bundle_id, _)| {
-                settings
-                    .app_rules
-                    .iter()
-                    .find(|r| r.bundle_id == bundle_id)
-                    .map(|r| r.mode_id.clone())
-            })
-        });
+        let mode_override = mode_override.or_else(|| app_rule.map(|r| r.mode_id.clone()));
+
+        // Cleanup strength is independent of the mode: a rule may force Off/Rules
+        // for an app even when a mode hotkey chose the mode (Style page).
+        let cleanup_level = modes::resolve_cleanup_level(app_rule, settings.auto_cleanup_level);
 
         // Preflight the model this job will actually use: a dictation mode can
         // override the speech model (07 §3), so checking the global default
@@ -443,6 +453,7 @@ impl Pipeline {
             generation,
             started: Instant::now(),
             mode_override,
+            cleanup_level,
         });
         self.set_state(Status::Recording, Some(job), recording_label);
         // Bind Esc so a recording started by mistake has a "never mind".
@@ -653,13 +664,22 @@ impl Pipeline {
     /// dangling override never fails the job — it falls through and the first
     /// dangling field (AI profile → STT → language) yields one informational
     /// notice that names the mode.
-    fn resolve_dictation(&self, settings: &Settings, mode: &Mode) -> ResolvedDictation {
+    fn resolve_dictation(
+        &self,
+        settings: &Settings,
+        mode: &Mode,
+        cleanup_level: CleanupLevel,
+    ) -> ResolvedDictation {
         let mut notice: Option<String> = None;
         let name = truncate_mode_name(&mode.name);
 
-        // AI profile is only resolved when the mode wants AI and the master
-        // switch is on, so a no-AI mode never notices a dangling profile.
-        let profile = if mode.uses_llm && settings.polish_after_dictation {
+        // AI profile is only resolved when the mode wants AI, the master switch
+        // is on, AND the cleanup level allows AI (Off/Rules force it off) — so a
+        // no-AI run never resolves, nor notices a dangling, profile it won't use.
+        let profile = if mode.uses_llm
+            && settings.polish_after_dictation
+            && modes::level_allows_llm(cleanup_level)
+        {
             match &mode.ai_profile_id {
                 Some(id) => self.profiles.get(id).or_else(|| {
                     notice.get_or_insert(format!(
@@ -759,6 +779,7 @@ impl Pipeline {
         let settings = self.settings.get();
         let job = session.job;
         let started = session.started;
+        let cleanup_level = session.cleanup_level;
 
         // Resolve mode overrides once, up front. A per-mode hotkey resolves its
         // own mode for this job only; otherwise the active mode.
@@ -767,7 +788,7 @@ impl Pipeline {
             .as_ref()
             .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
             .unwrap_or_else(|| settings.active_mode());
-        let resolved = self.resolve_dictation(&settings, &mode);
+        let resolved = self.resolve_dictation(&settings, &mode, cleanup_level);
 
         // Stop capture and get 16 kHz samples (resampled on the audio thread).
         let audio = Arc::clone(&self.audio);
@@ -843,6 +864,7 @@ impl Pipeline {
                 self.finish_dictation(
                     &settings,
                     resolved,
+                    cleanup_level,
                     with_dictionary,
                     dict_fixes,
                     started,
@@ -863,6 +885,7 @@ impl Pipeline {
         self: &Arc<Self>,
         settings: &Settings,
         resolved: ResolvedDictation,
+        cleanup_level: CleanupLevel,
         transcript: String,
         dict_fixes: usize,
         started: Instant,
@@ -878,27 +901,33 @@ impl Pipeline {
             ..
         } = resolved;
 
+        // The cleanup level (Style page) already decided the LLM step in
+        // `resolve_dictation`: Off/Rules null the profile so the mode's AI never
+        // runs for this dictation. The no-LLM branch then routes by level —
+        // `leveled_output` makes Off a literal passthrough, Rules the
+        // deterministic cleanup, and Ai each mode's own no-AI behavior.
         let mut polished = false;
         let mut llm_warning: Option<String> = None;
-        let final_text = if let Some(profile) = profile {
-            self.set_state(Status::Polishing, Some(Job::Dictation), None);
-            let system = modes::dictation_system_prompt(&mode, &settings.dictionary);
-            match self.llm.chat(&profile, &system, &transcript).await {
-                Ok(text) => {
-                    polished = true;
-                    text
-                }
-                Err(err) => {
-                    // Never lose a dictation to a flaky provider: fall back to
-                    // the rules-based cleanup and tell the user.
-                    log::warn!("AI polish failed, falling back to rules: {err}");
-                    llm_warning =
-                        Some("AI cleanup unavailable — inserted the plain transcript.".into());
-                    text::apply_rules_cleanup(&transcript)
+        let final_text = match profile {
+            Some(profile) => {
+                self.set_state(Status::Polishing, Some(Job::Dictation), None);
+                let system = modes::dictation_system_prompt(&mode, &settings.dictionary);
+                match self.llm.chat(&profile, &system, &transcript).await {
+                    Ok(text) => {
+                        polished = true;
+                        text
+                    }
+                    Err(err) => {
+                        // Never lose a dictation to a flaky provider: fall back to
+                        // the rules-based cleanup and tell the user.
+                        log::warn!("AI polish failed, falling back to rules: {err}");
+                        llm_warning =
+                            Some("AI cleanup unavailable — inserted the plain transcript.".into());
+                        text::apply_rules_cleanup(&transcript)
+                    }
                 }
             }
-        } else {
-            modes::no_ai_output(&mode.id, &transcript)
+            None => modes::leveled_output(cleanup_level, &mode.id, &transcript),
         };
 
         // Snippets expand on the final text only: dictation-only, verbatim,

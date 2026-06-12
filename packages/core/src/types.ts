@@ -35,6 +35,14 @@ export type HotkeyBehavior = 'hold' | 'toggle';
 /** `paste` simulates Cmd+V into the active app; `clipboard` only copies. */
 export type InsertMethod = 'paste' | 'clipboard';
 
+/**
+ * How much the dictation transcript is reshaped before insertion (Style page).
+ * `off` inserts speech verbatim, `rules` runs the deterministic cleanup, `ai`
+ * keeps each mode's own behavior (LLM when the mode uses it, else rules). A
+ * processing dial layered over the mode, not a second mode concept.
+ */
+export type CleanupLevel = 'off' | 'rules' | 'ai';
+
 /** Window theme. `system` follows macOS; `light`/`dark` force it for Velata. */
 export type Appearance = 'system' | 'light' | 'dark';
 
@@ -139,6 +147,8 @@ export interface DictionaryEntry {
 export interface AppRule {
   bundleId: string;
   modeId: string;
+  /** Per-app cleanup override; null inherits `Settings.autoCleanupLevel`. */
+  cleanupLevel: CleanupLevel | null;
 }
 
 /** A frontmost application's identity, for building app rules. */
@@ -226,6 +236,8 @@ export interface Settings {
   appStatsEnabled: boolean;
   /** Per-app rules: dictate in a chosen mode when an app is frontmost. */
   appRules: AppRule[];
+  /** Global cleanup strength for dictation; an app rule may override per app. */
+  autoCleanupLevel: CleanupLevel;
   /** STT profile ids whose 'audio leaves the Mac' consent the user confirmed. */
   confirmedSttProfiles: string[];
   /** Master switch for one-time feature tips. */

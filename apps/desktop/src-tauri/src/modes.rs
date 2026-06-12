@@ -1,6 +1,6 @@
 //! Built-in modes and prompt construction for the LLM polish step.
 
-use crate::settings::{DictionaryEntry, Mode};
+use crate::settings::{AppRule, CleanupLevel, DictionaryEntry, Mode};
 use crate::text;
 
 pub const STANDARD_MODE_ID: &str = "standard";
@@ -149,6 +149,34 @@ pub fn no_ai_output(mode_id: &str, text: &str) -> String {
     }
 }
 
+/// The effective cleanup level for one dictation (Style page): the frontmost
+/// app's rule wins when it matched AND carries its own level, otherwise the
+/// global. Pure, so the routing is testable without the OS or the pipeline.
+pub fn resolve_cleanup_level(rule: Option<&AppRule>, global: CleanupLevel) -> CleanupLevel {
+    rule.and_then(|r| r.cleanup_level).unwrap_or(global)
+}
+
+/// Whether a cleanup level permits the LLM polish step. `Off` and `Rules` force
+/// it off for this dictation even when the mode `uses_llm`; `Ai` leaves the
+/// mode's choice intact.
+pub fn level_allows_llm(level: CleanupLevel) -> bool {
+    level == CleanupLevel::Ai
+}
+
+/// No-LLM dictation text under an explicit cleanup level. `Off` is a literal
+/// passthrough (like the Literal mode — dictionary/snippets still apply, as
+/// they are user vocabulary, not cleanup); `Rules` forces the deterministic
+/// cleanup regardless of mode; `Ai` keeps each mode's own no-AI behavior. This,
+/// plus `level_allows_llm`, is the whole text-processing decision the pipeline
+/// threads, so the choice lives here rather than being re-derived inline.
+pub fn leveled_output(level: CleanupLevel, mode_id: &str, text: &str) -> String {
+    match level {
+        CleanupLevel::Off => text.to_string(),
+        CleanupLevel::Rules => text::apply_rules_cleanup(text),
+        CleanupLevel::Ai => no_ai_output(mode_id, text),
+    }
+}
+
 pub const DEFAULT_POLISH_INSTRUCTION: &str =
     "Fix grammar, spelling, and clarity. Keep the meaning, tone, and language.";
 
@@ -232,5 +260,61 @@ mod tests {
         let prompt = selection_user_prompt("hello world", "  ");
         assert!(prompt.contains(DEFAULT_POLISH_INSTRUCTION));
         assert!(prompt.ends_with("hello world"));
+    }
+
+    fn rule(bundle: &str, mode: &str, cleanup: Option<CleanupLevel>) -> AppRule {
+        AppRule {
+            bundle_id: bundle.into(),
+            mode_id: mode.into(),
+            cleanup_level: cleanup,
+        }
+    }
+
+    #[test]
+    fn cleanup_level_resolution_prefers_a_rules_own_level() {
+        // A rule that sets a level overrides the global for that app.
+        let r = rule("com.apple.Notes", STANDARD_MODE_ID, Some(CleanupLevel::Off));
+        assert_eq!(
+            resolve_cleanup_level(Some(&r), CleanupLevel::Ai),
+            CleanupLevel::Off
+        );
+        // A rule with no level inherits the global.
+        let bare = rule("com.apple.Notes", STANDARD_MODE_ID, None);
+        assert_eq!(
+            resolve_cleanup_level(Some(&bare), CleanupLevel::Rules),
+            CleanupLevel::Rules
+        );
+        // No matching rule falls back to the global.
+        assert_eq!(
+            resolve_cleanup_level(None, CleanupLevel::Rules),
+            CleanupLevel::Rules
+        );
+    }
+
+    #[test]
+    fn level_off_and_rules_force_the_llm_off() {
+        assert!(level_allows_llm(CleanupLevel::Ai));
+        assert!(!level_allows_llm(CleanupLevel::Rules));
+        assert!(!level_allows_llm(CleanupLevel::Off));
+    }
+
+    #[test]
+    fn leveled_output_forces_rules_or_literal_over_an_ai_mode() {
+        // Standard `uses_llm`, yet Rules must produce the deterministic cleanup
+        // (filler removed, sentence capitalized) — no LLM call for this job.
+        assert_eq!(
+            leveled_output(CleanupLevel::Rules, STANDARD_MODE_ID, "um, hello there"),
+            "Hello there"
+        );
+        // Off inserts the transcript verbatim regardless of the mode.
+        assert_eq!(
+            leveled_output(CleanupLevel::Off, STANDARD_MODE_ID, "um, hello there"),
+            "um, hello there"
+        );
+        // Ai keeps the mode's own no-AI behavior (Literal = passthrough here).
+        assert_eq!(
+            leveled_output(CleanupLevel::Ai, LITERAL_MODE_ID, "um, hello there"),
+            "um, hello there"
+        );
     }
 }

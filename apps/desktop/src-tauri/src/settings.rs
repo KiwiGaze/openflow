@@ -45,6 +45,19 @@ pub enum InsertMethod {
     Clipboard,
 }
 
+/// How much the dictation transcript is reshaped before insertion (Style page).
+/// `Off` inserts speech verbatim, `Rules` runs the deterministic cleanup, `Ai`
+/// keeps each mode's own behavior (LLM when the mode uses it, else rules). It is
+/// a processing dial layered over the mode, not a second mode concept.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CleanupLevel {
+    Off,
+    Rules,
+    #[default]
+    Ai,
+}
+
 /// v1 embedded the LLM connection inline; kept deserialize-only so the
 /// one-time migration into a profile file (`profiles::reconcile`) can read
 /// it. Never serialized — persisting settings erases it from disk.
@@ -96,11 +109,15 @@ pub struct DictionaryEntry {
 
 /// A per-app rule (07 §9): dictating while `bundle_id` is frontmost uses
 /// `mode_id` for that job only, like a mode hotkey — the active mode is unchanged.
+/// A rule always names a mode; `cleanup_level` optionally overrides the global
+/// auto-cleanup level for this app (None = inherit `Settings.auto_cleanup_level`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppRule {
     pub bundle_id: String,
     pub mode_id: String,
+    #[serde(default)]
+    pub cleanup_level: Option<CleanupLevel>,
 }
 
 /// A spoken shorthand that expands into a longer block on insert. Unlike a
@@ -182,6 +199,9 @@ pub struct Settings {
     pub app_stats_enabled: bool,
     /// Per-app rules: dictate in a chosen mode when an app is frontmost (07 §9).
     pub app_rules: Vec<AppRule>,
+    /// Global cleanup strength for dictation (Style page). An app rule with a
+    /// `cleanup_level` overrides this for that app; default `Ai` = mode decides.
+    pub auto_cleanup_level: CleanupLevel,
     /// STT profile ids whose "audio leaves the Mac" consent the user confirmed
     /// (08 §3.2). A profile id only reaches the cloud path once it is in here;
     /// a new endpoint/key (new id) re-confirms.
@@ -220,6 +240,7 @@ impl Default for Settings {
             history_enabled: false,
             app_stats_enabled: false,
             app_rules: Vec::new(),
+            auto_cleanup_level: CleanupLevel::Ai,
             confirmed_stt_profiles: Vec::new(),
             show_in_dock: false,
             onboarding_completed: false,
@@ -454,8 +475,37 @@ mod tests {
         assert!(json.contains("\"appStatsEnabled\":false"));
         assert!(json.contains("\"snippets\":[]"));
         assert!(json.contains("\"showInDock\":false"));
+        assert!(json.contains("\"autoCleanupLevel\":\"ai\""));
         // The v1 LLM block is deserialize-only; it must never be written.
         assert!(!json.contains("\"llm\""));
+    }
+
+    #[test]
+    fn cleanup_level_loads_with_and_without_the_new_fields() {
+        // A file predating the Style page omits both new fields; they must
+        // default (global = Ai, rule level = None) rather than fail the load.
+        let dir = temp_dir("cleanup-defaults");
+        fs::write(
+            dir.join("settings.json"),
+            r#"{ "version": 5, "appRules": [{ "bundleId": "com.apple.Notes", "modeId": "literal" }] }"#,
+        )
+        .unwrap();
+        let s = SettingsManager::load(&dir).get();
+        assert_eq!(s.auto_cleanup_level, CleanupLevel::Ai);
+        assert_eq!(s.app_rules.len(), 1);
+        assert_eq!(s.app_rules[0].cleanup_level, None);
+
+        // A file that sets both round-trips through load and reaches the field.
+        let dir = temp_dir("cleanup-explicit");
+        fs::write(
+            dir.join("settings.json"),
+            r#"{ "version": 5, "autoCleanupLevel": "rules",
+                 "appRules": [{ "bundleId": "com.apple.Terminal", "modeId": "code", "cleanupLevel": "off" }] }"#,
+        )
+        .unwrap();
+        let s = SettingsManager::load(&dir).get();
+        assert_eq!(s.auto_cleanup_level, CleanupLevel::Rules);
+        assert_eq!(s.app_rules[0].cleanup_level, Some(CleanupLevel::Off));
     }
 
     #[test]

@@ -35,6 +35,7 @@ const base: Settings = {
   historyEnabled: false,
   appStatsEnabled: false,
   appRules: [],
+  autoCleanupLevel: 'ai',
   confirmedSttProfiles: [],
   snippets: [],
   transforms: [],

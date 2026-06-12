@@ -12,7 +12,6 @@ import {
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { useLlmProfiles } from '../hooks.js';
 import { ipc } from '../ipc.js';
-import { AppRules } from '../components/AppRules.js';
 import { ModeEditor } from '../components/ModeEditor.js';
 
 export function ModesTab({
@@ -250,8 +249,6 @@ export function ModesTab({
           }}
         />
       )}
-
-      <AppRules api={api} />
     </div>
   );
 }
