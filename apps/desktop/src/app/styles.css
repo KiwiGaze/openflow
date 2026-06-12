@@ -887,6 +887,19 @@ button:focus-visible,
   padding: 1px 5px;
 }
 
+.snippet-row-editing {
+  align-items: flex-start;
+}
+
+.snippet-row-editing .snippet-row-text {
+  gap: 8px;
+}
+
+.snippet-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* ---- Transforms ---- */
 
 .transform-list {
