@@ -13,17 +13,6 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(value >= 100 ? 0 : 1)} ${unit}`;
 }
 
-/** Format milliseconds as a short duration, e.g. 1234 → `1.2s`. */
-export function formatDurationMs(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 0) return '—';
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  const secs = ms / 1000;
-  if (secs < 60) return `${secs.toFixed(1)}s`;
-  const mins = Math.floor(secs / 60);
-  const rest = Math.round(secs % 60);
-  return `${mins}m ${rest}s`;
-}
-
 /** Download progress as a percentage string; `—` until the total is known. */
 export function formatProgress(downloaded: number, total: number): string {
   if (total <= 0) return '—';

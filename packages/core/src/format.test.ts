@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, formatDurationMs, formatProgress, todayIso } from './format.js';
+import { formatBytes, formatProgress, todayIso } from './format.js';
 
 describe('formatBytes', () => {
   it('formats common sizes', () => {
@@ -13,14 +13,6 @@ describe('formatBytes', () => {
   it('handles invalid input', () => {
     expect(formatBytes(-1)).toBe('—');
     expect(formatBytes(Number.NaN)).toBe('—');
-  });
-});
-
-describe('formatDurationMs', () => {
-  it('formats sub-second, seconds and minutes', () => {
-    expect(formatDurationMs(450)).toBe('450ms');
-    expect(formatDurationMs(1234)).toBe('1.2s');
-    expect(formatDurationMs(75_000)).toBe('1m 15s');
   });
 });
 

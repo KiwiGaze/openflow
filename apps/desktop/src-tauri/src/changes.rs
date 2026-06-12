@@ -15,6 +15,7 @@
 
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow};
 
+use crate::hud::monitor_under_cursor;
 use crate::state::AppState;
 
 pub const CHANGES_LABEL: &str = "changes";
@@ -57,23 +58,7 @@ pub fn position_on_cursor_monitor(app: &AppHandle) {
 }
 
 fn try_position(app: &AppHandle, window: &WebviewWindow) -> tauri::Result<()> {
-    let cursor = app.cursor_position().ok();
-    let monitor = match cursor {
-        Some(point) => app
-            .available_monitors()?
-            .into_iter()
-            .find(|m| {
-                let pos = m.position();
-                let size = m.size();
-                point.x >= pos.x as f64
-                    && point.x < (pos.x + size.width as i32) as f64
-                    && point.y >= pos.y as f64
-                    && point.y < (pos.y + size.height as i32) as f64
-            })
-            .or(app.primary_monitor()?),
-        None => app.primary_monitor()?,
-    };
-    let Some(monitor) = monitor else {
+    let Some(monitor) = monitor_under_cursor(app)? else {
         return Ok(());
     };
 
