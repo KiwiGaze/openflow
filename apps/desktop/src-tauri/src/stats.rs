@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use chrono::{Duration, NaiveDate};
+use chrono::{Duration, Local, NaiveDate};
 use serde::Serialize;
 
 #[derive(Default)]
@@ -270,6 +270,13 @@ pub fn streaks(days: &[String], today: &str) -> Streak {
     Streak { current, longest }
 }
 
+/// The user's LOCAL calendar day as `YYYY-MM-DD` — the `insights_daily` bucket
+/// key and the streak calculator's "today". Local (not UTC) so a dictation
+/// counts toward the day on the user's clock.
+pub fn local_day() -> String {
+    Local::now().format("%Y-%m-%d").to_string()
+}
+
 /// Counts whitespace-separated words. Good enough for a usage tally; it does not
 /// try to be linguistically precise.
 pub fn word_count(text: &str) -> u64 {
@@ -341,6 +348,14 @@ mod tests {
         let s = streaks(&days(&["2026-06-13"]), "2026-06-13");
         assert_eq!(s.current, 1);
         assert_eq!(s.longest, 1);
+    }
+
+    #[test]
+    fn streaks_cross_month_boundary() {
+        // Jan 31 → Feb 1 is one calendar day apart; string math would miss it.
+        let s = streaks(&days(&["2026-01-31", "2026-02-01"]), "2026-02-01");
+        assert_eq!(s.current, 2);
+        assert_eq!(s.longest, 2);
     }
 
     #[test]

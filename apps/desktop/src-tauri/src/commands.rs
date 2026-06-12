@@ -330,7 +330,7 @@ pub fn set_changes_interactive(app: AppHandle, interactive: bool) {
 /// session view rather than failing the whole command.
 #[tauri::command]
 pub fn get_insights(state: State<'_, AppState>) -> crate::stats::Insights {
-    use crate::stats::{AllTimeStats, AppWords, PerAppScope, PER_APP_LIMIT};
+    use crate::stats::{local_day, AllTimeStats, AppWords, PerAppScope, PER_APP_LIMIT};
 
     let mut insights = state.pipeline.insights();
     let settings = state.settings.get();
@@ -338,32 +338,41 @@ pub fn get_insights(state: State<'_, AppState>) -> crate::stats::Insights {
     // All-time per-app from history when the user keeps it; otherwise the
     // snapshot's session tally stands.
     if settings.history_enabled {
-        if let Ok(rows) = state.db.history_per_app(PER_APP_LIMIT as i64) {
-            insights.per_app = rows
-                .into_iter()
-                .map(|(name, words)| AppWords { name, words })
-                .collect();
-            insights.per_app_scope = PerAppScope::AllTime;
+        match state.db.history_per_app(PER_APP_LIMIT as i64) {
+            Ok(rows) => {
+                insights.per_app = rows
+                    .into_iter()
+                    .map(|(name, words)| AppWords { name, words })
+                    .collect();
+                insights.per_app_scope = PerAppScope::AllTime;
+            }
+            Err(err) => log::warn!("could not read per-app history: {err}"),
         }
     }
 
     if settings.app_stats_enabled {
-        if let Ok(Some(totals)) = state.db.insights_totals() {
-            let ai_percent = if totals.dictations > 0 {
-                (totals.ai_dictations as f64 / totals.dictations as f64 * 100.0).round() as u32
-            } else {
-                0
-            };
-            insights.all_time = Some(AllTimeStats {
-                words: totals.words,
-                dictations: totals.dictations,
-                ai_percent,
-                fixes: totals.fixes,
-                words_per_minute: crate::stats::pace_wpm(totals.words, totals.duration_ms),
-            });
+        match state.db.insights_totals() {
+            Ok(Some(totals)) => {
+                let ai_percent = if totals.dictations > 0 {
+                    (totals.ai_dictations as f64 / totals.dictations as f64 * 100.0).round() as u32
+                } else {
+                    0
+                };
+                insights.all_time = Some(AllTimeStats {
+                    words: totals.words,
+                    dictations: totals.dictations,
+                    ai_percent,
+                    fixes: totals.fixes,
+                    words_per_minute: crate::stats::pace_wpm(totals.words, totals.duration_ms),
+                });
+            }
+            // No day rows yet — not an error; all_time stays None.
+            Ok(None) => {}
+            Err(err) => log::warn!("could not read insights totals: {err}"),
         }
-        if let Ok(days) = state.db.insights_days() {
-            insights.streak = Some(crate::stats::streaks(&days, &local_day()));
+        match state.db.insights_days() {
+            Ok(days) => insights.streak = Some(crate::stats::streaks(&days, &local_day())),
+            Err(err) => log::warn!("could not read insights days: {err}"),
         }
     }
 
@@ -375,12 +384,6 @@ pub fn get_insights(state: State<'_, AppState>) -> crate::stats::Insights {
 #[tauri::command]
 pub fn clear_insights(state: State<'_, AppState>) -> AppResult<()> {
     state.db.insights_clear()
-}
-
-/// The user's LOCAL calendar day as `YYYY-MM-DD` — the streak calculator's
-/// "today". Local (not UTC) so the streak matches the user's clock.
-fn local_day() -> String {
-    chrono::Local::now().format("%Y-%m-%d").to_string()
 }
 
 /// Returns session-only candidate terms for the dictionary, most-seen first.

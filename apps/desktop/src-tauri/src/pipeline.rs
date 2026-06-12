@@ -29,7 +29,7 @@ use crate::settings::{
     HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS, SETTINGS_CHANGED_EVENT,
 };
 use crate::shortcuts;
-use crate::stats::{word_count, Insights, Stats};
+use crate::stats::{local_day, word_count, Insights, Stats};
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
 use crate::stt_profiles::{SttProfileManager, CLOUD_STT_PREFIX};
 use crate::suggestions::{DictionarySuggestion, Suggestions};
@@ -945,8 +945,10 @@ impl Pipeline {
         //   • `insights_daily` counts/dates (never words or audio) for the
         //     LOCAL calendar day when `app_stats_enabled` — no row is ever
         //     written while the flag is off.
-        // `history-changed` fires only after the history write commits, so views
-        // refresh from durable rows instead of racing the write.
+        // `history-changed` fires once the append attempt has finished, so views
+        // read after the write instead of racing it. `append` swallows DB errors
+        // internally, so the event can follow a failed write — benign: the
+        // refresh just finds nothing new.
         let app = self.app.clone();
         let history = Arc::clone(&self.history);
         let db = Arc::clone(&self.db);
@@ -1075,12 +1077,6 @@ struct ResolvedDictation {
     profile: Option<LlmProfile>,
     /// First dangling-override notice, if any; informational, never fatal.
     notice: Option<String>,
-}
-
-/// The user's LOCAL calendar day as `YYYY-MM-DD` — the `insights_daily` bucket
-/// key. Local (not UTC) so a dictation reads as "today" by the user's clock.
-fn local_day() -> String {
-    chrono::Local::now().format("%Y-%m-%d").to_string()
 }
 
 /// Mode names render up to 16 chars in the HUD and dangling notices (07 §5);

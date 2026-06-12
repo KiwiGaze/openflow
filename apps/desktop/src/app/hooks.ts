@@ -189,9 +189,10 @@ export interface InsightsApi {
 }
 
 /**
- * Usage aggregates; refetched after each completed dictation. Insights re-fetch
- * on `transcription-result` (stats are recorded before that event), so the
- * richer all-time fields stay current without listening to `history-changed`.
+ * Usage aggregates; refetched after each completed dictation. Re-fetches on
+ * `transcription-result`: the pipeline records stats moments AFTER emitting
+ * that event, but the IPC round-trip masks the gap, so the re-fetch reads
+ * fresh numbers without listening to `history-changed`.
  */
 export function useInsights(): InsightsApi {
   const [insights, setInsights] = useState<Insights | null>(null);
