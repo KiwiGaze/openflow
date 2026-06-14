@@ -6,12 +6,9 @@ import { useThemeSync } from './useThemeSync.js';
 import { Onboarding } from './Onboarding.js';
 import { Shell } from './Shell.js';
 import { APP_SECTIONS, APP_TAB_IDS, type TabId } from './sidebarTabs.js';
-import { DictionaryTab } from './tabs/DictionaryTab.js';
 import { HomeTab } from './tabs/HomeTab.js';
-import { InsightsTab } from './tabs/InsightsTab.js';
+import { LibraryTab } from './tabs/LibraryTab.js';
 import { ScratchpadTab } from './tabs/ScratchpadTab.js';
-import { SnippetsTab } from './tabs/SnippetsTab.js';
-import { StyleTab } from './tabs/StyleTab.js';
 import { TransformsTab } from './tabs/TransformsTab.js';
 
 export type { TabId };
@@ -59,10 +56,7 @@ export function App(): JSX.Element {
         </div>
       )}
       {tab === 'home' && <HomeTab api={api} modelsApi={modelsApi} onNavigate={navigate} />}
-      {tab === 'insights' && <InsightsTab api={api} />}
-      {tab === 'dictionary' && <DictionaryTab api={api} />}
-      {tab === 'snippets' && <SnippetsTab api={api} />}
-      {tab === 'style' && <StyleTab api={api} />}
+      {tab === 'library' && <LibraryTab api={api} />}
       {tab === 'transforms' && <TransformsTab api={api} />}
       {tab === 'scratchpad' && <ScratchpadTab api={api} />}
     </Shell>

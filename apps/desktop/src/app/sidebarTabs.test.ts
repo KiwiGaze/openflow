@@ -3,15 +3,7 @@ import { APP_TAB_IDS, nextTabId, SETTINGS_TAB_IDS, type TabId } from './sidebarT
 
 describe('tab rings', () => {
   it('lists the App (Features) tabs in order', () => {
-    expect([...APP_TAB_IDS]).toEqual([
-      'home',
-      'insights',
-      'dictionary',
-      'snippets',
-      'style',
-      'transforms',
-      'scratchpad',
-    ]);
+    expect([...APP_TAB_IDS]).toEqual(['home', 'library', 'transforms', 'scratchpad']);
   });
 
   it('lists the Settings tabs in order', () => {
@@ -28,13 +20,13 @@ describe('tab rings', () => {
 
 describe('nextTabId', () => {
   it('advances on ArrowDown/ArrowRight', () => {
-    expect(nextTabId(APP_TAB_IDS, 'home', 'ArrowDown')).toBe('insights');
-    expect(nextTabId(APP_TAB_IDS, 'home', 'ArrowRight')).toBe('insights');
+    expect(nextTabId(APP_TAB_IDS, 'home', 'ArrowDown')).toBe('library');
+    expect(nextTabId(APP_TAB_IDS, 'home', 'ArrowRight')).toBe('library');
   });
 
   it('retreats on ArrowUp/ArrowLeft', () => {
-    expect(nextTabId(APP_TAB_IDS, 'insights', 'ArrowUp')).toBe('home');
-    expect(nextTabId(APP_TAB_IDS, 'insights', 'ArrowLeft')).toBe('home');
+    expect(nextTabId(APP_TAB_IDS, 'library', 'ArrowUp')).toBe('home');
+    expect(nextTabId(APP_TAB_IDS, 'library', 'ArrowLeft')).toBe('home');
   });
 
   it('wraps within each ring and never crosses to the other window', () => {
@@ -47,8 +39,8 @@ describe('nextTabId', () => {
   });
 
   it('jumps to the first/last tab of the given ring on Home/End', () => {
-    expect(nextTabId(APP_TAB_IDS, 'style', 'Home')).toBe('home');
-    expect(nextTabId(APP_TAB_IDS, 'style', 'End')).toBe('scratchpad');
+    expect(nextTabId(APP_TAB_IDS, 'library', 'Home')).toBe('home');
+    expect(nextTabId(APP_TAB_IDS, 'library', 'End')).toBe('scratchpad');
     expect(nextTabId(SETTINGS_TAB_IDS, 'models', 'Home')).toBe('dictation');
     expect(nextTabId(SETTINGS_TAB_IDS, 'models', 'End')).toBe('about');
   });

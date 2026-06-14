@@ -98,6 +98,15 @@ export const TAB_ICONS: Record<string, JSX.Element> = {
       </>
     </Icon>
   ),
+  // stacked cards
+  library: (
+    <Icon>
+      <>
+        <rect x="2.5" y="5.5" width="11" height="8" rx="1" />
+        <path d="M4 3.5h8M5.5 1.5h5" />
+      </>
+    </Icon>
+  ),
   // book
   dictionary: (
     <Icon>

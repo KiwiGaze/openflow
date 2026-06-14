@@ -8,10 +8,7 @@
 
 export type TabId =
   | 'home'
-  | 'insights'
-  | 'dictionary'
-  | 'snippets'
-  | 'style'
+  | 'library'
   | 'transforms'
   | 'scratchpad'
   | 'dictation'
@@ -37,11 +34,8 @@ export const APP_SECTIONS: readonly SidebarSection[] = [
     label: 'Features',
     tabs: [
       { id: 'home', label: 'Home' },
-      { id: 'insights', label: 'Insights' },
-      { id: 'dictionary', label: 'Dictionary' },
-      { id: 'snippets', label: 'Snippets' },
-      { id: 'style', label: 'Style' },
-      { id: 'transforms', label: 'Transforms' },
+      { id: 'library', label: 'Library' },
+      { id: 'transforms', label: 'Transform' },
       { id: 'scratchpad', label: 'Scratchpad' },
     ],
   },

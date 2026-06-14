@@ -13,8 +13,6 @@ import { useDictionarySuggestions } from '../hooks.js';
 import type { SettingsApi } from '../hooks.js';
 import { ipc } from '../ipc.js';
 
-type View = 'all' | 'personal';
-
 /**
  * Validates an edited, already-trimmed entry against the rest of the
  * dictionary. A vocabulary edit (`from === to`) routes to
@@ -30,7 +28,6 @@ function validateEdit(entry: DictionaryEntry, others: readonly DictionaryEntry[]
 export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, save } = api;
   const { suggestions, dismiss, refresh } = useDictionarySuggestions();
-  const [view, setView] = useState<View>('all');
   const [query, setQuery] = useState('');
   const [correction, setCorrection] = useState(false);
   const [word, setWord] = useState('');
@@ -155,30 +152,7 @@ export function DictionaryTab({ api }: { api: SettingsApi }): JSX.Element {
           match whole words, ignore case, and are also fed to the speech model as vocabulary hints.
         </p>
 
-        <div className="dict-views" role="group" aria-label="Filter dictionary">
-          <button
-            type="button"
-            className={`chip ${view === 'all' ? 'chip-active' : ''}`}
-            aria-pressed={view === 'all'}
-            onClick={() => {
-              setView('all');
-            }}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className={`chip ${view === 'personal' ? 'chip-active' : ''}`}
-            aria-pressed={view === 'personal'}
-            onClick={() => {
-              setView('personal');
-            }}
-          >
-            Personal
-          </button>
-        </div>
-
-        {view === 'all' && suggestions.length > 0 && (
+        {suggestions.length > 0 && (
           <div className="dict-suggestions">
             <div className="row-hint">
               Noticed while you spoke — add the ones you want kept spelled this way (this session
