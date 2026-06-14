@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Transform } from '@velata/core';
 import {
-  noteCountLine,
   noteTitle,
   relativeTime,
+  splitTransformBar,
   transformChips,
   versionLabel,
+  type TransformChip,
 } from './scratchpadView.js';
 
 const transforms: Transform[] = [
@@ -64,10 +65,26 @@ describe('transformChips', () => {
   });
 });
 
-describe('noteCountLine', () => {
-  it('pluralizes the count', () => {
-    expect(noteCountLine([])).toBe('0 notes on this Mac');
-    expect(noteCountLine([{ id: '1' } as never])).toBe('1 note on this Mac');
-    expect(noteCountLine([{ id: '1' }, { id: '2' }] as never)).toBe('2 notes on this Mac');
+describe('splitTransformBar', () => {
+  const chip = (id: string | null, label: string): TransformChip => ({ id, label });
+
+  it('keeps Polish alone inline when there are no transforms', () => {
+    const { visible, overflow } = splitTransformBar([chip(null, 'Polish')]);
+    expect(visible).toEqual([chip(null, 'Polish')]);
+    expect(overflow).toEqual([]);
+  });
+
+  it('keeps Polish plus the first 3 transforms inline, rest in overflow', () => {
+    const chips = [
+      chip(null, 'Polish'),
+      chip('a', 'A'),
+      chip('b', 'B'),
+      chip('c', 'C'),
+      chip('d', 'D'),
+      chip('e', 'E'),
+    ];
+    const { visible, overflow } = splitTransformBar(chips);
+    expect(visible).toEqual([chip(null, 'Polish'), chip('a', 'A'), chip('b', 'B'), chip('c', 'C')]);
+    expect(overflow).toEqual([chip('d', 'D'), chip('e', 'E')]);
   });
 });

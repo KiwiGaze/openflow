@@ -1682,111 +1682,9 @@ button:focus-visible,
   height: 100vh;
 }
 
-.scratchpad-list {
-  width: 280px;
-  flex-shrink: 0;
-  display: flex;
+/* The single-note window has no list pane: the editor fills the window. */
+.scratchpad-single {
   flex-direction: column;
-  border-right: 1px solid var(--border);
-  background: var(--bg);
-}
-
-.scratchpad-list-head {
-  display: flex;
-  gap: var(--space-4);
-  align-items: center;
-  padding: var(--space-6);
-  border-bottom: 1px solid var(--border);
-}
-
-.scratchpad-search {
-  flex: 1;
-  min-width: 0;
-}
-
-.scratchpad-rows {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.scratchpad-empty-list {
-  padding: var(--space-8);
-  margin: 0;
-  color: var(--text-faint);
-  font-size: var(--text-hint);
-  text-align: center;
-}
-
-.scratchpad-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-6);
-  border-bottom: 1px solid var(--border);
-}
-
-.scratchpad-row:hover {
-  background: var(--panel);
-}
-
-.scratchpad-row-active,
-.scratchpad-row-active:hover {
-  background: var(--panel);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
-.scratchpad-row-open {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: 0;
-  text-align: left;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-.scratchpad-row-title {
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.scratchpad-row-preview {
-  color: var(--text-dim);
-  font-size: var(--text-hint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.scratchpad-row-date {
-  color: var(--text-faint);
-  font-size: var(--text-badge);
-}
-
-.scratchpad-pin {
-  flex-shrink: 0;
-  padding: var(--space-1);
-  background: none;
-  border: none;
-  color: var(--text-faint);
-  font-size: var(--text-body);
-  line-height: 1;
-  cursor: pointer;
-}
-
-.scratchpad-pin-on {
-  color: var(--accent);
-}
-
-.scratchpad-editor-pane {
-  flex: 1;
-  min-width: 0;
-  display: flex;
 }
 
 .scratchpad-empty {
@@ -1963,6 +1861,45 @@ button:focus-visible,
   cursor: default;
 }
 
+.scratchpad-more {
+  position: relative;
+}
+
+/* The overflow menu opens upward: the transform bar sits at the window bottom. */
+.scratchpad-more-menu {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sheet);
+}
+
+.scratchpad-more-item {
+  padding: var(--space-2) var(--space-4);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-hint);
+  cursor: pointer;
+}
+
+.scratchpad-more-item:hover {
+  background: var(--chip);
+}
+
+.scratchpad-more-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .scratchpad-actions-spacer {
   flex: 1;
 }
@@ -1976,4 +1913,66 @@ button:focus-visible,
 .scratchpad-confirm-label {
   font-size: var(--text-hint);
   color: var(--text-dim);
+}
+
+/* ---- Scratchpad note cards (App window tab) ---- */
+
+.note-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-5);
+}
+
+.note-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-6) var(--space-7);
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.note-card:hover {
+  border-color: var(--accent);
+}
+
+.note-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.note-card-pin {
+  flex-shrink: 0;
+  font-size: var(--text-hint);
+}
+
+.note-card-title {
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-card-preview {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-hint);
+  line-height: var(--leading-body);
+  /* Clamp the preview to a few lines so cards stay a uniform height. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-card-date {
+  margin-top: auto;
+  color: var(--text-faint);
+  font-size: var(--text-badge);
 }

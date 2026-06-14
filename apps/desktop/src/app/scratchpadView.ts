@@ -1,4 +1,4 @@
-import type { NoteSummary, Settings, Transform } from '@velata/core';
+import type { Settings, Transform } from '@velata/core';
 
 /** A note's display title: the trimmed title, or "Untitled" when empty. */
 export function noteTitle(title: string): string {
@@ -55,8 +55,21 @@ export function transformChips(settings: Settings): TransformChip[] {
   ];
 }
 
-/** The count line for the main-window tab: "N notes on this Mac". */
-export function noteCountLine(notes: NoteSummary[]): string {
-  const n = notes.length;
-  return `${n} ${n === 1 ? 'note' : 'notes'} on this Mac`;
+/** The transform bar split into inline chips and an overflow ("⋯ More") group. */
+export interface TransformBar {
+  /** Always shown: Polish plus the first 3 user transforms (creation order). */
+  visible: TransformChip[];
+  /** Any remaining transforms, behind the "⋯ More" menu (creation order). */
+  overflow: TransformChip[];
+}
+
+/**
+ * Splits the full chip list for the single-note window's bottom bar: Polish and
+ * the first 3 transforms stay inline, the rest move into an overflow menu. The
+ * full list is kept elsewhere (version-history labels resolve every transform id
+ * from it), so this is a presentation-only split.
+ */
+export function splitTransformBar(chips: TransformChip[]): TransformBar {
+  const INLINE = 4;
+  return { visible: chips.slice(0, INLINE), overflow: chips.slice(INLINE) };
 }

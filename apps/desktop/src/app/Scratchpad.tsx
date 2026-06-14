@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type JSX } from 'react';
-import type { Note, NoteSummary, NoteVersion } from '@velata/core';
+import type { Note, NoteVersion } from '@velata/core';
 import { events, ipc, subscribe } from './ipc.js';
 import { useSettings } from './hooks.js';
 import { Toggle } from './components/Toggle.js';
 import {
-  noteTitle,
   relativeTime,
+  splitTransformBar,
   transformChips,
   versionLabel,
   type TransformChip,
@@ -21,10 +21,10 @@ function initialNoteId(): string | null {
 
 /**
  * The Scratchpad window: an opt-in, on-device notes surface in its own window.
- * Off, it shows only an enable card; on, a two-pane notes manager (list + rich
- * text editor) with versions before destructive edits and transforms that reuse
- * the one LLM client. All persistence is via IPC; nothing is stored until the
- * user turns the Scratchpad on.
+ * Off, it shows only an enable card; on, a single-note editor (the note list
+ * lives in the App window's Scratchpad tab) with versions before destructive
+ * edits and transforms that reuse the one LLM client. All persistence is via
+ * IPC; nothing is stored until the user turns the Scratchpad on.
  */
 export function Scratchpad(): JSX.Element | null {
   const api = useSettings();
@@ -59,144 +59,54 @@ export function Scratchpad(): JSX.Element | null {
   return <Workspace transformChipList={transformChips(api.settings)} />;
 }
 
-/** The enabled two-pane workspace. Split out so the gate stays a clean early return. */
+/**
+ * The enabled single-note window. It owns only the selected note id: it is
+ * seeded from the URL and re-pointed when an already-open window is asked to
+ * switch notes (`scratchpad-open-note`). The note list now lives in the App
+ * window's Scratchpad tab, so there is no list pane here.
+ *
+ * The `key={selectedId}` on `<Editor>` is load-bearing: switching notes
+ * unmounts the old editor, whose unmount effect flushes its pending debounced
+ * save before the new note loads — so a card-click switch never drops an edit.
+ */
 function Workspace({ transformChipList }: { transformChipList: TransformChip[] }): JSX.Element {
-  const [notes, setNotes] = useState<NoteSummary[]>([]);
-  const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(initialNoteId());
 
-  const refresh = useCallback((search: string): void => {
-    void ipc.listNotes(search.trim() === '' ? null : search.trim()).then(setNotes);
+  useEffect(() => {
+    return subscribe(
+      events.onScratchpadOpenNote((id) => {
+        setSelectedId(id);
+      }),
+    );
   }, []);
 
-  useEffect(() => {
-    refresh(query);
-  }, [query, refresh]);
-
-  // The list is the durable source of truth; refresh on any note mutation, and
-  // follow an external "open this note" request (from the tray/main window).
-  useEffect(() => {
-    const cleanups = [
-      subscribe(
-        events.onNotesChanged(() => {
-          refresh(query);
-        }),
-      ),
-      subscribe(
-        events.onScratchpadOpenNote((id) => {
-          setSelectedId(id);
-        }),
-      ),
-    ];
-    return () => {
-      cleanups.forEach((fn) => {
-        fn();
-      });
-    };
-  }, [query, refresh]);
-
+  // No note: either opened without one (General's "Open Scratchpad") or the
+  // current note was just deleted. Offer a way forward in-window.
   const createNote = (): void => {
     void ipc.createNote().then((note) => {
       setSelectedId(note.id);
     });
   };
 
-  // After a delete, land on the next note in the list (or the empty state).
-  const handleDeleted = (deletedId: string): void => {
-    const remaining = notes.filter((n) => n.id !== deletedId);
-    setSelectedId(remaining[0]?.id ?? null);
-  };
-
   return (
-    <div className="scratchpad">
-      <aside className="scratchpad-list">
-        <div className="scratchpad-list-head">
-          <input
-            type="text"
-            className="scratchpad-search"
-            placeholder="Search notes"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-            }}
-          />
-          <button type="button" className="btn btn-primary btn-sm" onClick={createNote}>
+    <div className="scratchpad scratchpad-single">
+      {selectedId ? (
+        <Editor
+          key={selectedId}
+          noteId={selectedId}
+          transformChipList={transformChipList}
+          onDeleted={() => {
+            setSelectedId(null);
+          }}
+        />
+      ) : (
+        <div className="scratchpad-empty">
+          <p>No note selected. Open one from the Scratchpad tab, or start a new one.</p>
+          <button type="button" className="btn btn-primary" onClick={createNote}>
             New note
           </button>
         </div>
-        <div className="scratchpad-rows">
-          {notes.length === 0 ? (
-            <p className="scratchpad-empty-list">
-              {query.trim() === '' ? 'No notes yet.' : 'No matching notes.'}
-            </p>
-          ) : (
-            notes.map((note) => (
-              <NoteRow
-                key={note.id}
-                note={note}
-                active={note.id === selectedId}
-                onSelect={() => {
-                  setSelectedId(note.id);
-                }}
-              />
-            ))
-          )}
-        </div>
-      </aside>
-      <section className="scratchpad-editor-pane">
-        {selectedId ? (
-          <Editor
-            key={selectedId}
-            noteId={selectedId}
-            transformChipList={transformChipList}
-            onDeleted={handleDeleted}
-          />
-        ) : (
-          <div className="scratchpad-empty">
-            <p>Select a note, or start a new one.</p>
-            <button type="button" className="btn btn-primary" onClick={createNote}>
-              New note
-            </button>
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-/**
- * One list row: two sibling buttons (open + pin) in a plain container — never a
- * control nested inside a control, so the pin is keyboard-reachable and both
- * get the global button focus ring. The pin mirrors the Toggle switch pattern.
- */
-function NoteRow({
-  note,
-  active,
-  onSelect,
-}: {
-  note: NoteSummary;
-  active: boolean;
-  onSelect: () => void;
-}): JSX.Element {
-  return (
-    <div className={`scratchpad-row ${active ? 'scratchpad-row-active' : ''}`}>
-      <button type="button" className="scratchpad-row-open" onClick={onSelect}>
-        <span className="scratchpad-row-title">{noteTitle(note.title)}</span>
-        {note.preview && <span className="scratchpad-row-preview">{note.preview}</span>}
-        <span className="scratchpad-row-date">{relativeTime(note.updatedAt, Date.now())}</span>
-      </button>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={note.pinned}
-        aria-label={note.pinned ? 'Unpin note' : 'Pin note'}
-        className={`scratchpad-pin ${note.pinned ? 'scratchpad-pin-on' : ''}`}
-        onClick={() => {
-          void ipc.setNotePinned(note.id, !note.pinned);
-        }}
-      >
-        {note.pinned ? '★' : '☆'}
-      </button>
+      )}
     </div>
   );
 }
@@ -247,19 +157,26 @@ function Editor({
   // Resolves once the pending edit (if any) has committed, so callers that are
   // about to read the note server-side (transform, restore, delete) can await
   // it and never operate on stale content. Save failures are surfaced here and
-  // the promise still resolves — ordering is what callers rely on.
-  const flush = useCallback((): Promise<void> => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    if (!dirtyRef.current) return Promise.resolve();
-    dirtyRef.current = false;
-    const content = bodyRef.current?.innerHTML ?? '';
-    return ipc.updateNote(noteId, title, content).catch((err: unknown) => {
-      setError(String(err));
-    });
-  }, [noteId, title]);
+  // the promise still resolves — ordering is what callers rely on. `node` lets
+  // the unmount path read a body captured at effect setup: React 19 detaches
+  // the object ref (bodyRef.current = null) during commit, before the passive
+  // cleanup runs, so reading the ref then would flush an empty body and wipe
+  // the note. A detached DOM node still retains its `.innerHTML`.
+  const flush = useCallback(
+    (node?: HTMLDivElement | null): Promise<void> => {
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (!dirtyRef.current) return Promise.resolve();
+      dirtyRef.current = false;
+      const content = (node ?? bodyRef.current)?.innerHTML ?? '';
+      return ipc.updateNote(noteId, title, content).catch((err: unknown) => {
+        setError(String(err));
+      });
+    },
+    [noteId, title],
+  );
 
   // Always reach the latest flush from the unmount effect without listing it as
   // a dependency — listing it would re-run (and prematurely flush) on every
@@ -268,10 +185,12 @@ function Editor({
   flushRef.current = flush;
 
   // Flush once on unmount — note switch (the parent re-keys by id) and window
-  // close both unmount the editor, so no pending edit is lost.
+  // close both unmount the editor, so no pending edit is lost. Capture the body
+  // node at setup and pass it: by cleanup time React 19 has nulled the ref.
   useEffect(() => {
+    const node = bodyRef.current;
     return () => {
-      void flushRef.current();
+      void flushRef.current(node);
     };
   }, []);
 
@@ -424,19 +343,11 @@ function Editor({
         </p>
       )}
       <div className="scratchpad-transforms">
-        {transformChipList.map((chip) => (
-          <button
-            key={chip.id ?? 'polish'}
-            type="button"
-            className="scratchpad-chip"
-            disabled={busyTransform !== null}
-            onClick={() => {
-              runTransform(chip.id);
-            }}
-          >
-            {busyTransform === (chip.id ?? 'polish') ? `${chip.label}…` : chip.label}
-          </button>
-        ))}
+        <TransformBar
+          chips={transformChipList}
+          busyTransform={busyTransform}
+          onRun={runTransform}
+        />
         <span className="scratchpad-actions-spacer" />
         <button type="button" className="btn btn-quiet btn-sm" onClick={copyNote}>
           Copy
@@ -470,6 +381,103 @@ function Editor({
         )}
       </div>
     </div>
+  );
+}
+
+/** A chip's busy key matches `runTransform`'s `transformId ?? 'polish'`. */
+function chipKey(chip: TransformChip): string {
+  return chip.id ?? 'polish';
+}
+
+function chipLabel(chip: TransformChip, busyTransform: string | null): string {
+  return busyTransform === chipKey(chip) ? `${chip.label}…` : chip.label;
+}
+
+/**
+ * The bottom transform bar: Polish and the first 3 transforms as inline chips,
+ * the rest behind a "⋯ More" menu. The menu closes on outside click or Escape;
+ * every item is disabled while a transform runs, like the inline chips.
+ */
+function TransformBar({
+  chips,
+  busyTransform,
+  onRun,
+}: {
+  chips: TransformChip[];
+  busyTransform: string | null;
+  onRun: (transformId: string | null) => void;
+}): JSX.Element {
+  const { visible, overflow } = splitTransformBar(chips);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent): void => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
+
+  return (
+    <>
+      {visible.map((chip) => (
+        <button
+          key={chipKey(chip)}
+          type="button"
+          className="scratchpad-chip"
+          disabled={busyTransform !== null}
+          onClick={() => {
+            onRun(chip.id);
+          }}
+        >
+          {chipLabel(chip, busyTransform)}
+        </button>
+      ))}
+      {overflow.length > 0 && (
+        <div className="scratchpad-more" ref={menuRef}>
+          <button
+            type="button"
+            className="scratchpad-chip"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            disabled={busyTransform !== null}
+            onClick={() => {
+              setMenuOpen((open) => !open);
+            }}
+          >
+            ⋯ More ▾
+          </button>
+          {menuOpen && (
+            <div className="scratchpad-more-menu" role="menu">
+              {overflow.map((chip) => (
+                <button
+                  key={chipKey(chip)}
+                  type="button"
+                  role="menuitem"
+                  className="scratchpad-more-item"
+                  disabled={busyTransform !== null}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onRun(chip.id);
+                  }}
+                >
+                  {chipLabel(chip, busyTransform)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
