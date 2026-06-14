@@ -15,13 +15,11 @@ function ellipsize(text: string, max = MAX_PREVIEW): string {
 export function hudLabel(state: HudState): string {
   switch (state.status) {
     case 'recording':
-      // Dictation names the active mode (07 §5).
-      return state.message ? `Listening — ${state.message}` : 'Listening…';
+      return 'Listening…';
     case 'transcribing':
       return 'Transcribing…';
     case 'polishing':
-      if (state.job === 'polishSelection') return 'Polishing selection…';
-      // Transforms carry their name in the message ("Concise…").
+      // A prompt transform carries its name in the message ("Polish…").
       if (state.job === 'transform') return state.message ? `${state.message}…` : 'Transforming…';
       return 'Polishing…';
     case 'inserting':

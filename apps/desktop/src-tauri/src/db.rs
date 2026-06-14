@@ -134,8 +134,10 @@ impl Db {
     /// All history rows, newest first.
     pub fn history_list(&self) -> AppResult<Vec<HistoryRow>> {
         let conn = self.conn.lock().expect("db lock poisoned");
+        // The `mode_id` column is vestigial (modes/prompts merge) — kept in the
+        // table for schema stability but no longer selected or read.
         let mut stmt = conn.prepare(
-            "SELECT id, at, text, raw_text, mode_id, app_name, duration_ms, word_count, used_ai \
+            "SELECT id, at, text, raw_text, app_name, duration_ms, word_count, used_ai \
              FROM history ORDER BY at DESC",
         )?;
         let rows = stmt
@@ -145,11 +147,10 @@ impl Db {
                     at: row.get(1)?,
                     text: row.get(2)?,
                     raw_text: row.get(3)?,
-                    mode_id: row.get(4)?,
-                    app_name: row.get(5)?,
-                    duration_ms: row.get(6)?,
-                    word_count: row.get(7)?,
-                    used_ai: row.get::<_, i64>(8)? != 0,
+                    app_name: row.get(4)?,
+                    duration_ms: row.get(5)?,
+                    word_count: row.get(6)?,
+                    used_ai: row.get::<_, i64>(7)? != 0,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -474,7 +475,6 @@ pub struct HistoryRow {
     pub at: i64,
     pub text: String,
     pub raw_text: String,
-    pub mode_id: String,
     pub app_name: Option<String>,
     pub duration_ms: Option<i64>,
     pub word_count: i64,

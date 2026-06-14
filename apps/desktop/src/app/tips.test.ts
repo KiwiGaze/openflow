@@ -1,46 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import type { Mode, Settings } from '@velata/core';
+import type { Settings } from '@velata/core';
 import { eligibleTip } from './tips.js';
 
-const standardMode: Mode = {
-  id: 'standard',
-  name: 'Standard',
-  builtIn: true,
-  usesLlm: true,
-  transforms: false,
-  prompt: '',
-  aiProfileId: null,
-  sttModelId: null,
-  language: null,
-  hotkey: null,
-};
-
 const base: Settings = {
-  version: 5,
+  version: 6,
   dictationHotkey: 'Alt+Space',
   dictationHotkeyBehavior: 'hold',
-  polishHotkey: 'Alt+Shift+P',
   changeOverlayHotkey: 'Alt+O',
-  polishAfterDictation: true,
   activeLlmProfileId: '',
-  activeModeId: 'standard',
-  modes: [standardMode],
   dictionary: [],
+  snippets: [],
+  prompts: [],
+  postDictationTransformId: null,
   sttModelId: 'base.en',
   language: 'auto',
   inputDeviceName: null,
-  insertMethod: 'paste',
-  restoreClipboard: true,
   launchAtLogin: false,
   appearance: 'system',
   historyEnabled: false,
   historyRetentionDays: 0,
-  appRules: [],
-  autoCleanupLevel: 'ai',
   confirmedSttProfiles: [],
-  snippets: [],
-  transforms: [],
-  polishRules: { concise: false, clarity: true, structure: false, tone: true },
   showInDock: false,
   scratchpadEnabled: false,
   tipsEnabled: true,

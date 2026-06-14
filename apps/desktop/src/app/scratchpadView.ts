@@ -1,4 +1,4 @@
-import type { Settings, Transform } from '@velata/core';
+import type { Prompt, Settings } from '@velata/core';
 
 /** A note's display title: the trimmed title, or "Untitled" when empty. */
 export function noteTitle(title: string): string {
@@ -25,49 +25,55 @@ export function relativeTime(ms: number, now: number): string {
   return new Date(ms).toLocaleDateString();
 }
 
-/** A human label for a version's `source` (with the transform name when known). */
+/** A human label for a version's `source` (with the prompt name when known). */
 export function versionLabel(
   source: string,
   transformId: string | null,
-  transforms: Transform[],
+  prompts: Prompt[],
 ): string {
   if (source === 'created') return 'Created';
   if (source === 'restore') return 'Before restore';
   if (source === 'transform') {
-    const name = transformId ? transforms.find((t) => t.id === transformId)?.name : undefined;
+    const name = transformId ? prompts.find((p) => p.id === transformId)?.name : undefined;
     return name ? `Before ${name}` : 'Before Polish';
   }
   return source;
 }
 
-/** One transform chip: the built-in Polish (null id) plus each settings transform. */
+/** One transform chip: the built-in Polish (null id) plus each custom prompt. */
 export interface TransformChip {
-  /** Null for Polish (server resolves the instruction from polish rules). */
+  /** Null for Polish (the server resolves the built-in Polish instruction). */
   id: string | null;
   label: string;
 }
 
-/** The chip row shown above the editor: Polish first, then transforms by name. */
+/**
+ * The chip row shown above the editor: Polish first (the synthetic null-id
+ * chip), then each custom prompt by name. The built-in Polish prompt is mapped
+ * to the null chip — never listed twice — so its null `transformId` keeps
+ * matching `transform_note_text`'s Polish branch and `versionLabel`'s "Before
+ * Polish".
+ */
 export function transformChips(settings: Settings): TransformChip[] {
   return [
     { id: null, label: 'Polish' },
-    ...settings.transforms.map((t) => ({ id: t.id, label: t.name })),
+    ...settings.prompts.filter((p) => !p.builtIn).map((p) => ({ id: p.id, label: p.name })),
   ];
 }
 
 /** The transform bar split into inline chips and an overflow ("⋯ More") group. */
 export interface TransformBar {
-  /** Always shown: Polish plus the first 3 user transforms (creation order). */
+  /** Always shown: Polish plus the first 3 custom prompts (creation order). */
   visible: TransformChip[];
-  /** Any remaining transforms, behind the "⋯ More" menu (creation order). */
+  /** Any remaining prompts, behind the "⋯ More" menu (creation order). */
   overflow: TransformChip[];
 }
 
 /**
  * Splits the full chip list for the single-note window's bottom bar: Polish and
- * the first 3 transforms stay inline, the rest move into an overflow menu. The
- * full list is kept elsewhere (version-history labels resolve every transform id
- * from it), so this is a presentation-only split.
+ * the first 3 prompts stay inline, the rest move into an overflow menu. The full
+ * list is kept elsewhere (version-history labels resolve every prompt id from
+ * it), so this is a presentation-only split.
  */
 export function splitTransformBar(chips: TransformChip[]): TransformBar {
   const INLINE = 4;

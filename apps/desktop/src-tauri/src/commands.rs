@@ -14,7 +14,7 @@ use crate::scratchpad::{self, NOTES_CHANGED_EVENT};
 use crate::settings::{Appearance, Settings, SETTINGS_CHANGED_EVENT};
 use crate::state::AppState;
 use crate::stt_profiles::{SttProfile, CLOUD_STT_PREFIX};
-use crate::{modes, shortcuts, text};
+use crate::{prompts, shortcuts};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,58 +40,28 @@ pub fn save_settings(
 ) -> AppResult<Settings> {
     let previous = state.settings.get();
 
-    // Cap per-mode hotkeys before persisting (07 §4); the optimistic UI reverts
-    // on the error.
-    let mode_hotkey_count = settings
-        .modes
-        .iter()
-        .filter(|m| m.hotkey.as_deref().is_some_and(|h| !h.is_empty()))
-        .count();
-    if mode_hotkey_count > 5 {
-        return Err(AppError::Settings(
-            "At most 5 modes can have their own hotkey. Remove one first.".into(),
-        ));
-    }
-
     let saved = state.settings.set(settings)?;
 
-    let mode_hotkeys = |s: &Settings| -> Vec<(String, String)> {
-        s.modes
-            .iter()
-            .filter_map(|m| m.hotkey.as_deref().map(|h| (m.id.clone(), h.to_string())))
-            .collect()
-    };
-    // Transforms carry hotkeys too, but the handler resolves the instruction by
-    // id at trigger time — so only a changed id↔hotkey binding needs a
-    // re-register, not an instruction or name edit (which save on every
-    // keystroke).
+    // Prompts carry shortcuts, but the handler resolves the instruction by id at
+    // trigger time — so only a changed id↔shortcut binding needs a re-register,
+    // not an instruction or name edit (which save on every keystroke).
     let bindings = |s: &Settings| -> Vec<(String, String)> {
-        s.transforms
+        s.prompts
             .iter()
-            .map(|t| (t.id.clone(), t.hotkey.clone()))
+            .map(|p| (p.id.clone(), p.shortcut.clone()))
             .collect()
     };
     let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
-        || previous.polish_hotkey != saved.polish_hotkey
         || previous.change_overlay_hotkey != saved.change_overlay_hotkey
-        || mode_hotkeys(&previous) != mode_hotkeys(&saved)
         || bindings(&previous) != bindings(&saved);
     if hotkeys_changed {
         if let Err(message) = shortcuts::apply(&app, &saved) {
-            // Roll every hotkey — the three globals AND each mode hotkey — back
-            // to the last working set as one atomic unit.
+            // Roll every hotkey — the dictation key, see-changes, and each prompt
+            // shortcut — back to the last working set as one atomic unit.
             let mut reverted = saved.clone();
             reverted.dictation_hotkey = previous.dictation_hotkey.clone();
-            reverted.polish_hotkey = previous.polish_hotkey.clone();
             reverted.change_overlay_hotkey = previous.change_overlay_hotkey.clone();
-            for mode in &mut reverted.modes {
-                mode.hotkey = previous
-                    .modes
-                    .iter()
-                    .find(|m| m.id == mode.id)
-                    .and_then(|m| m.hotkey.clone());
-            }
-            reverted.transforms = previous.transforms.clone();
+            reverted.prompts = previous.prompts.clone();
             let restored = state.settings.set(reverted)?;
             let _ = shortcuts::apply(&app, &restored);
             let _ = app.emit(SETTINGS_CHANGED_EVENT, &restored);
@@ -113,6 +83,22 @@ pub fn save_settings(
 
     let _ = app.emit(SETTINGS_CHANGED_EVENT, &saved);
     Ok(saved)
+}
+
+/// Sets (or clears, with null) the prompt that runs automatically on the
+/// transcript after dictation. A dangling id is dropped by `normalize`. Persists
+/// and emits `settings-changed` so the HUD circle and any open webview re-sync.
+#[tauri::command]
+pub fn set_post_dictation_transform(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: Option<String>,
+) -> AppResult<()> {
+    let mut settings = state.settings.get();
+    settings.post_dictation_transform_id = id;
+    let saved = state.settings.set(settings)?;
+    let _ = app.emit(SETTINGS_CHANGED_EVENT, &saved);
+    Ok(())
 }
 
 /// The App window (the Features half of the former single window).
@@ -222,10 +208,10 @@ pub fn get_pipeline_state(state: State<'_, AppState>) -> PipelineState {
     state.pipeline.state()
 }
 
-/// Starts recording a dictation in the active mode.
+/// Starts recording a dictation.
 #[tauri::command]
 pub fn start_dictation(state: State<'_, AppState>) -> AppResult<()> {
-    state.pipeline.start(Job::Dictation, None)
+    state.pipeline.start(Job::Dictation)
 }
 
 /// Stops recording and processes the take: transcribe → clean/polish → insert.
@@ -241,42 +227,11 @@ pub fn cancel_dictation(state: State<'_, AppState>) {
     state.pipeline.cancel();
 }
 
-/// Rewrites the current selection with the built-in fix-grammar instruction —
-/// no recording involved.
-#[tauri::command]
-pub async fn start_polish_selection(state: State<'_, AppState>) -> AppResult<()> {
-    // Sync commands run on the main thread, but polish blocks on selection
-    // capture, which round-trips keystrokes through the main thread — running
-    // it inline would deadlock. Errors surface as transient HUD states inside
-    // polish().
-    let pipeline = state.pipeline.clone();
-    tauri::async_runtime::spawn_blocking(move || pipeline.polish())
-        .await
-        .map_err(|e| AppError::State(format!("polish task failed: {e}")))
-}
-
 /// Returns the most recent result — backs tray “Copy Last Result” and the
 /// changes overlay.
 #[tauri::command]
 pub fn get_last_result(state: State<'_, AppState>) -> Option<TranscriptionResult> {
     state.pipeline.last_result()
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FrontmostApp {
-    pub bundle_id: String,
-    pub name: String,
-}
-
-/// The app Velata last dictated into — lets the App rules UI offer a one-click
-/// rule for it without the user hunting for a bundle id. None until first use.
-#[tauri::command]
-pub fn get_last_dictation_app(state: State<'_, AppState>) -> Option<FrontmostApp> {
-    state
-        .pipeline
-        .last_app()
-        .map(|(bundle_id, name)| FrontmostApp { bundle_id, name })
 }
 
 /// Returns the opt-in local dictation history (text only — never audio).
@@ -297,38 +252,6 @@ pub fn clear_history(state: State<'_, AppState>) -> AppResult<()> {
 pub fn delete_history_entry(state: State<'_, AppState>, id: String) -> AppResult<()> {
     state.history.delete(&id)?;
     Ok(())
-}
-
-/// Re-runs a stored transcript through a chosen mode, reusing the dictation
-/// resolution (the mode's prompt + active profile, or rules cleanup with no
-/// profile). Returns the new text for the user to copy — never auto-inserts.
-#[tauri::command]
-pub async fn reprocess_history(
-    state: State<'_, AppState>,
-    text: String,
-    mode_id: String,
-) -> Result<String, AppError> {
-    let settings = state.settings.get();
-    let mode = settings
-        .modes
-        .iter()
-        .find(|m| m.id == mode_id)
-        .cloned()
-        .ok_or_else(|| AppError::State("that mode no longer exists".into()))?;
-    if !mode.uses_llm {
-        return Ok(modes::no_ai_output(&mode.id, &text));
-    }
-    let system = modes::dictation_system_prompt(&mode, &settings.dictionary);
-    // Honor the mode's AI-profile override (07 §3), falling back to the active
-    // profile, so reprocess matches what real dictation in this mode produces.
-    let profile = state.profiles.resolve(
-        mode.ai_profile_id.as_deref(),
-        &settings.active_llm_profile_id,
-    );
-    match profile {
-        Some(profile) => state.llm.chat(&profile, &system, &text).await,
-        None => Ok(text::apply_rules_cleanup(&text)),
-    }
 }
 
 /// Copies text to the clipboard for the changes overlay's Copy button. Routed
@@ -414,31 +337,6 @@ pub async fn test_llm(
 #[tauri::command]
 pub fn list_llm_profiles(state: State<'_, AppState>) -> Vec<LlmProfile> {
     state.profiles.list()
-}
-
-/// Mode editor Preview (06 §6): builds the full system prompt exactly as the
-/// pipeline would, then polishes a sample through the active profile — or runs
-/// the same rules-based cleanup the pipeline uses when there is no profile, so
-/// the preview is the genuine path, never a mock.
-#[tauri::command]
-pub async fn test_mode(
-    state: State<'_, AppState>,
-    prompt: String,
-    sample: String,
-    transforms: bool,
-    ai_profile_id: Option<String>,
-) -> Result<String, AppError> {
-    let settings = state.settings.get();
-    let system = modes::preview_system_prompt(&prompt, transforms, &settings.dictionary);
-    // Preview the mode's effective AI profile (its override, else the active
-    // one) so the result matches real dictation — including unsaved edits.
-    let profile = state
-        .profiles
-        .resolve(ai_profile_id.as_deref(), &settings.active_llm_profile_id);
-    match profile {
-        Some(profile) => state.llm.chat(&profile, &system, &sample).await,
-        None => Ok(text::apply_rules_cleanup(&sample)),
-    }
 }
 
 /// Upserts a profile file (0600 — it can hold an API key); returns the fresh list.
@@ -554,39 +452,9 @@ pub fn reveal_llm_profiles(app: AppHandle, state: State<'_, AppState>) -> AppRes
         .map_err(|e| AppError::Settings(format!("could not open the profiles folder: {e}")))
 }
 
-/// Writes an exported mode JSON to `<app-data>/exported-modes/<filename>.json`
-/// and reveals the folder. A native save panel would need the dialog plugin;
-/// the reveal idiom matches "Show in Finder" for profiles and adds no dependency.
-#[tauri::command]
-pub fn export_mode(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    filename: String,
-    contents: String,
-) -> AppResult<()> {
-    // `filename` is a slug from the frontend; re-check it can't escape the dir.
-    if filename.is_empty()
-        || filename.len() > 80
-        || filename.contains(['/', '\\'])
-        || filename.contains("..")
-    {
-        return Err(AppError::Settings("invalid export filename".into()));
-    }
-    let dir = state
-        .profiles
-        .dir()
-        .parent()
-        .ok_or_else(|| AppError::Settings("no data directory".into()))?
-        .join("exported-modes");
-    std::fs::create_dir_all(&dir)?;
-    std::fs::write(dir.join(format!("{filename}.json")), contents)?;
-    tauri_plugin_opener::OpenerExt::opener(&app)
-        .open_path(dir.display().to_string(), None::<&str>)
-        .map_err(|e| AppError::Settings(format!("could not open the exported-modes folder: {e}")))
-}
-
 /// Writes the dictionary as CSV to `<app-data>/dictionary.csv` and reveals the
-/// folder — same no-dependency reveal idiom as `export_mode`.
+/// folder — a no-dependency "Show in Finder" idiom (a native save panel would
+/// need the dialog plugin).
 #[tauri::command]
 pub fn export_dictionary(
     app: AppHandle,
@@ -826,15 +694,21 @@ pub async fn transform_note_text(
     let settings = state.settings.get();
 
     // Resolve the instruction by id before touching the note, so an unknown id
-    // fails fast without snapshotting or calling the LLM.
+    // fails fast without snapshotting or calling the LLM. A null id means Polish:
+    // honor the user-edited Polish prompt, matching `run_prompt("polish")`.
     let instruction = match &transform_id {
-        None => modes::polish_instruction(&settings.polish_rules),
-        Some(id) => settings
-            .transforms
+        None => settings
+            .prompts
             .iter()
-            .find(|t| &t.id == id)
-            .map(|t| t.instruction.clone())
-            .ok_or_else(|| AppError::State("that transform no longer exists".into()))?,
+            .find(|p| p.id == prompts::POLISH_PROMPT_ID)
+            .map(|p| p.instruction.clone())
+            .unwrap_or_else(|| prompts::DEFAULT_POLISH_INSTRUCTION.to_string()),
+        Some(id) => settings
+            .prompts
+            .iter()
+            .find(|p| &p.id == id)
+            .map(|p| p.instruction.clone())
+            .ok_or_else(|| AppError::State("that prompt no longer exists".into()))?,
     };
 
     let note = state
@@ -860,8 +734,8 @@ pub async fn transform_note_text(
     // The LLM works on plain text and returns plain text; re-wrap as minimal
     // HTML for the editor. The selection-rewrite prompt treats the body as data.
     let plain = notes::strip_tags(&note.content);
-    let system = modes::selection_system_prompt();
-    let user = modes::selection_user_prompt(&plain, &instruction);
+    let system = prompts::selection_system_prompt();
+    let user = prompts::selection_user_prompt(&plain, &instruction);
     let rewritten = state.llm.chat(&profile, &system, &user).await?;
     let content = notes::text_to_html(&rewritten);
 

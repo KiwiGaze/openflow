@@ -12,12 +12,12 @@ mod history;
 mod hud;
 mod llm;
 mod models;
-mod modes;
 mod notes;
 mod output;
 mod permissions;
 mod pipeline;
 mod profiles;
+mod prompts;
 mod resample;
 mod scratchpad;
 mod settings;
@@ -181,20 +181,16 @@ fn main() {
             commands::start_dictation,
             commands::stop_dictation,
             commands::cancel_dictation,
-            commands::start_polish_selection,
             commands::get_last_result,
-            commands::get_last_dictation_app,
             commands::get_history,
             commands::clear_history,
             commands::delete_history_entry,
-            commands::reprocess_history,
             commands::get_insights,
             commands::list_dictionary_suggestions,
             commands::dismiss_dictionary_suggestion,
             commands::copy_text,
             commands::set_changes_interactive,
             commands::test_llm,
-            commands::test_mode,
             commands::list_llm_profiles,
             commands::save_llm_profile,
             commands::delete_llm_profile,
@@ -203,8 +199,8 @@ fn main() {
             commands::save_stt_profile,
             commands::delete_stt_profile,
             commands::reveal_stt_profiles,
-            commands::export_mode,
             commands::export_dictionary,
+            commands::set_post_dictation_transform,
             commands::list_ollama_models,
             commands::list_input_devices,
             commands::check_permissions,

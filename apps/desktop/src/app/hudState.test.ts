@@ -4,9 +4,6 @@ import { barScales, hudGlyph, hudLabel, hudVisible } from './hudState.js';
 describe('hudLabel', () => {
   it('describes each stage', () => {
     expect(hudLabel({ status: 'recording', job: 'dictation', message: null })).toBe('Listening…');
-    expect(hudLabel({ status: 'recording', job: 'dictation', message: 'Notes' })).toBe(
-      'Listening — Notes',
-    );
     expect(hudLabel({ status: 'transcribing', job: 'dictation', message: null })).toBe(
       'Transcribing…',
     );
@@ -15,14 +12,10 @@ describe('hudLabel', () => {
   });
 
   it('distinguishes the polishing flows', () => {
+    // The post-dictation transform shows a generic label.
     expect(hudLabel({ status: 'polishing', job: 'dictation', message: null })).toBe('Polishing…');
-    expect(hudLabel({ status: 'polishing', job: 'polishSelection', message: null })).toBe(
-      'Polishing selection…',
-    );
-    // Transforms show their name from the message, with a generic fallback.
-    expect(hudLabel({ status: 'polishing', job: 'transform', message: 'Concise' })).toBe(
-      'Concise…',
-    );
+    // A prompt transform shows its name from the message, with a fallback.
+    expect(hudLabel({ status: 'polishing', job: 'transform', message: 'Polish' })).toBe('Polish…');
     expect(hudLabel({ status: 'polishing', job: 'transform', message: null })).toBe(
       'Transforming…',
     );

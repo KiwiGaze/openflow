@@ -20,7 +20,6 @@ pub struct HistoryEntry {
     pub at: i64,
     pub text: String,
     pub raw_text: String,
-    pub mode_id: String,
     /// Frontmost app's display name at dictation time; null for legacy imports.
     pub app_name: Option<String>,
     /// Recording duration in milliseconds; null for legacy imports.
@@ -37,7 +36,6 @@ impl From<HistoryRow> for HistoryEntry {
             at: row.at,
             text: row.text,
             raw_text: row.raw_text,
-            mode_id: row.mode_id,
             app_name: row.app_name,
             duration_ms: row.duration_ms,
             word_count: row.word_count,
@@ -80,7 +78,6 @@ impl HistoryStore {
         &self,
         raw: String,
         text: String,
-        mode_id: String,
         app_name: Option<String>,
         duration_ms: Option<i64>,
         word_count: i64,
@@ -93,12 +90,15 @@ impl HistoryStore {
             .unwrap_or(0);
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let id = format!("{at}-{seq}");
+        // The DB `history` table keeps a `mode_id` column from before the
+        // modes/prompts merge; it is vestigial now, so write an empty string.
+        // The schema is left unchanged (no migration).
         if let Err(err) = self.db.history_append(
             &id,
             at,
             &text,
             &raw,
-            &mode_id,
+            "",
             app_name.as_deref(),
             duration_ms,
             word_count,

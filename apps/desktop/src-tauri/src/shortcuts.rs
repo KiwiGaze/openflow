@@ -14,10 +14,11 @@ use crate::pipeline::Job;
 use crate::settings::Settings;
 use crate::state::AppState;
 
-/// (Re-)registers every hotkey from settings — the fixed ones plus each bound
-/// transform. Returns a user-readable error when an accelerator cannot be
-/// parsed or registered (e.g. taken by another app) or two collide, leaving no
-/// partial registrations behind.
+/// (Re-)registers every hotkey from settings — the dictation key, the optional
+/// see-changes key, and each prompt with a bound shortcut (Polish included).
+/// Returns a user-readable error when an accelerator cannot be parsed or
+/// registered (e.g. taken by another app) or two collide, leaving no partial
+/// registrations behind.
 pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     let shortcuts = app.global_shortcut();
     shortcuts
@@ -26,17 +27,6 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
 
     let dictation = Shortcut::from_str(&settings.dictation_hotkey)
         .map_err(|e| format!("dictation hotkey “{}”: {e}", settings.dictation_hotkey))?;
-    let polish = Shortcut::from_str(&settings.polish_hotkey)
-        .map_err(|e| format!("polish hotkey “{}”: {e}", settings.polish_hotkey))?;
-    // Parse every non-null mode hotkey alongside the globals.
-    let mut mode_hotkeys: Vec<(String, Shortcut)> = Vec::new();
-    for mode in &settings.modes {
-        if let Some(hk) = mode.hotkey.as_deref().filter(|h| !h.is_empty()) {
-            let shortcut = Shortcut::from_str(hk)
-                .map_err(|e| format!("mode “{}” hotkey “{hk}”: {e}", mode.name))?;
-            mode_hotkeys.push((mode.id.clone(), shortcut));
-        }
-    }
 
     // The see-changes hotkey is optional: an empty string disables it.
     let changes = if settings.change_overlay_hotkey.trim().is_empty() {
@@ -52,25 +42,24 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         )
     };
 
-    // Transforms with a bound hotkey; unbound ones exist but never register.
-    let mut transforms: Vec<(String, Shortcut)> = Vec::new();
-    for t in &settings.transforms {
-        if t.hotkey.trim().is_empty() {
+    // Prompts with a bound shortcut; unbound ones exist but never register.
+    // Polish's default ⌥⇧P is included here automatically.
+    let mut prompts: Vec<(String, Shortcut)> = Vec::new();
+    for p in &settings.prompts {
+        if p.shortcut.trim().is_empty() {
             continue;
         }
-        let sc = Shortcut::from_str(&t.hotkey)
-            .map_err(|e| format!("transform “{}” hotkey “{}”: {e}", t.name, t.hotkey))?;
-        transforms.push((t.id.clone(), sc));
+        let sc = Shortcut::from_str(&p.shortcut)
+            .map_err(|e| format!("prompt “{}” shortcut “{}”: {e}", p.name, p.shortcut))?;
+        prompts.push((p.id.clone(), sc));
     }
 
-    // Every hotkey must be pairwise distinct — the fixed ones, the optional
-    // see-changes key, each bound transform, and every mode hotkey (07 §4).
-    // (Shortcut is Copy, so collecting them here leaves the originals usable
-    // for registration below.)
-    let mut all: Vec<Shortcut> = vec![dictation, polish];
+    // Every hotkey must be pairwise distinct — the dictation key, the optional
+    // see-changes key, and each bound prompt shortcut. (Shortcut is Copy, so
+    // collecting them here leaves the originals usable for registration below.)
+    let mut all: Vec<Shortcut> = vec![dictation];
     all.extend(changes.iter().copied());
-    all.extend(transforms.iter().map(|(_, sc)| *sc));
-    all.extend(mode_hotkeys.iter().map(|(_, sc)| *sc));
+    all.extend(prompts.iter().map(|(_, sc)| *sc));
     for i in 0..all.len() {
         for j in (i + 1)..all.len() {
             if all[i] == all[j] {
@@ -85,30 +74,19 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         })
         .map_err(|e| format!("dictation hotkey “{}”: {e}", settings.dictation_hotkey))?;
 
-    // Polish is a tap: only Pressed matters, Released is a no-op.
-    if let Err(e) = shortcuts.on_shortcut(polish, move |app, _shortcut, event| {
-        if event.state() == ShortcutState::Pressed {
-            let pipeline = app.state::<AppState>().pipeline.clone();
-            // Same offload as dispatch(): polish blocks on selection capture.
-            tauri::async_runtime::spawn_blocking(move || pipeline.polish());
-        }
-    }) {
-        let _ = shortcuts.unregister_all();
-        return Err(format!("polish hotkey “{}”: {e}", settings.polish_hotkey));
-    }
-
-    // Each transform is a tap like polish; the handler resolves the instruction
-    // by id at trigger time, so edits don't require re-binding.
-    for (id, sc) in transforms {
+    // Each prompt is a tap; the handler resolves the instruction by id at
+    // trigger time, so edits don't require re-binding.
+    for (id, sc) in prompts {
         if let Err(e) = shortcuts.on_shortcut(sc, move |app, _shortcut, event| {
             if event.state() == ShortcutState::Pressed {
                 let pipeline = app.state::<AppState>().pipeline.clone();
                 let id = id.clone();
-                tauri::async_runtime::spawn_blocking(move || pipeline.run_transform(&id));
+                // Offload: running a prompt blocks on selection capture.
+                tauri::async_runtime::spawn_blocking(move || pipeline.run_prompt(&id));
             }
         }) {
             let _ = shortcuts.unregister_all();
-            return Err(format!("a transform hotkey could not be registered: {e}"));
+            return Err(format!("a prompt shortcut could not be registered: {e}"));
         }
     }
 
@@ -128,27 +106,15 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         }
     }
 
-    // Per-mode hotkeys: one-shot dictation in that mode.
-    for (mode_id, shortcut) in mode_hotkeys {
-        if let Err(e) = shortcuts.on_shortcut(shortcut, move |app, _shortcut, event| {
-            dispatch_mode(app, mode_id.clone(), event.state());
-        }) {
-            let _ = shortcuts.unregister_all();
-            return Err(format!("could not register a mode hotkey: {e}"));
-        }
-    }
-
     log::info!(
-        "hotkeys registered: dictation={} polish={} see-changes={} transforms={} mode-hotkeys={}",
+        "hotkeys registered: dictation={} see-changes={} prompts={}",
         settings.dictation_hotkey,
-        settings.polish_hotkey,
         settings.change_overlay_hotkey,
         settings
-            .transforms
+            .prompts
             .iter()
-            .filter(|t| !t.hotkey.trim().is_empty())
+            .filter(|p| !p.shortcut.trim().is_empty())
             .count(),
-        settings.modes.iter().filter(|m| m.hotkey.is_some()).count()
     );
     Ok(())
 }
@@ -190,17 +156,7 @@ fn dispatch(app: &AppHandle, job: Job, state: ShortcutState) {
     // within that window — and sub-threshold taps already treat Released as a
     // no-op.
     tauri::async_runtime::spawn_blocking(move || match state {
-        ShortcutState::Pressed => pipeline.on_hotkey_pressed(job, None),
+        ShortcutState::Pressed => pipeline.on_hotkey_pressed(job),
         ShortcutState::Released => pipeline.on_hotkey_released(job),
-    });
-}
-
-/// A per-mode hotkey: dictates once in `mode_id` without changing the active
-/// mode (one-shot, 07 §4). Same record/finish flow as the plain dictation key.
-fn dispatch_mode(app: &AppHandle, mode_id: String, state: ShortcutState) {
-    let pipeline = app.state::<AppState>().pipeline.clone();
-    tauri::async_runtime::spawn_blocking(move || match state {
-        ShortcutState::Pressed => pipeline.on_hotkey_pressed(Job::Dictation, Some(mode_id)),
-        ShortcutState::Released => pipeline.on_hotkey_released(Job::Dictation),
     });
 }

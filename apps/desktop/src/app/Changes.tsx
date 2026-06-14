@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
-import { countChanges, diffWords, type InsertMethod } from '@velata/core';
+import { useEffect, useMemo, useReducer, type JSX } from 'react';
+import { countChanges, diffWords } from '@velata/core';
 import { events, ipc, subscribe } from './ipc.js';
 import { initialChangesState, nextChangesState } from './changesState.js';
 
@@ -11,12 +11,8 @@ import { initialChangesState, nextChangesState } from './changesState.js';
  */
 export function Changes(): JSX.Element | null {
   const [state, dispatch] = useReducer(nextChangesState, initialChangesState);
-  const [insertMethod, setInsertMethod] = useState<InsertMethod>('paste');
 
   useEffect(() => {
-    void ipc.getSettings().then((s) => {
-      setInsertMethod(s.insertMethod);
-    });
     const cleanups = [
       subscribe(
         events.onChangesToggle((result) => {
@@ -26,11 +22,6 @@ export function Changes(): JSX.Element | null {
       subscribe(
         events.onPipelineState((s) => {
           dispatch({ type: 'pipeline', status: s.status });
-        }),
-      ),
-      subscribe(
-        events.onSettingsChanged((s) => {
-          setInsertMethod(s.insertMethod);
         }),
       ),
     ];
@@ -75,7 +66,7 @@ export function Changes(): JSX.Element | null {
           <span className="changes-count">
             {changes === 0 ? 'No changes' : `${changes} ${changes === 1 ? 'Change' : 'Changes'}`}
           </span>
-          {insertMethod === 'paste' && <span className="changes-undo">← ⌘Z to undo</span>}
+          <span className="changes-undo">← ⌘Z to undo</span>
         </div>
         <div className="changes-diff">
           {runs.map((run, i) =>

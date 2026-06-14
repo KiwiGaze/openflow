@@ -1,8 +1,8 @@
 import { useRef, useState, type JSX } from 'react';
-import type { Transform } from '@velata/core';
+import type { Prompt } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
-import { filterTransforms } from '../transformView.js';
+import { filterPrompts } from '../transformView.js';
 
 /** Collapses whitespace and truncates a multi-line instruction for the card. */
 function preview(instruction: string): string {
@@ -15,8 +15,8 @@ function preview(instruction: string): string {
 const NEW_ID = 'new';
 
 /**
- * Transform page: one uniform card per prompt in `settings.transforms`, built-in
- * and custom alike, in creation order. Each prompt rewrites the current
+ * Transform page: one uniform card per prompt in `settings.prompts`, built-in
+ * Polish and custom alike, in creation order. Each prompt rewrites the current
  * selection through the active AI profile — no voice. The header's See-changes
  * recorder edits the same `changeOverlayHotkey` as Settings → Dictation, so the
  * two stay in sync through the settings subscription.
@@ -24,40 +24,40 @@ const NEW_ID = 'new';
 export function TransformsTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, update } = api;
   const [query, setQuery] = useState('');
-  // Which card is in its editor: a transform id, NEW_ID for the create card, or
+  // Which card is in its editor: a prompt id, NEW_ID for the create card, or
   // null when none is open.
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editInstruction, setEditInstruction] = useState('');
-  const [editHotkey, setEditHotkey] = useState('');
+  const [editShortcut, setEditShortcut] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
 
-  const matches = filterTransforms(settings.transforms, query);
-  const hasCustom = settings.transforms.some((t) => !t.builtIn);
+  const matches = filterPrompts(settings.prompts, query);
+  const hasCustom = settings.prompts.some((p) => !p.builtIn);
 
-  const patchTransform = (id: string, patch: Partial<Transform>): void => {
+  const patchPrompt = (id: string, patch: Partial<Prompt>): void => {
     void update({
-      transforms: settings.transforms.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+      prompts: settings.prompts.map((p) => (p.id === id ? { ...p, ...patch } : p)),
     });
   };
 
-  const removeTransform = (id: string): void => {
+  const removePrompt = (id: string): void => {
     if (editId === id) cancelEdit();
-    void update({ transforms: settings.transforms.filter((t) => t.id !== id) });
+    void update({ prompts: settings.prompts.filter((p) => p.id !== id) });
   };
 
-  const startEdit = (transform: Transform): void => {
-    setEditId(transform.id);
-    setEditName(transform.name);
-    setEditInstruction(transform.instruction);
-    setEditHotkey(transform.hotkey);
+  const startEdit = (prompt: Prompt): void => {
+    setEditId(prompt.id);
+    setEditName(prompt.name);
+    setEditInstruction(prompt.instruction);
+    setEditShortcut(prompt.shortcut);
   };
 
   const startCreate = (): void => {
     setEditId(NEW_ID);
     setEditName('');
     setEditInstruction('');
-    setEditHotkey('');
+    setEditShortcut('');
   };
 
   // Leaving the editor unmounts the focused control; parking focus on the list
@@ -71,24 +71,27 @@ export function TransformsTab({ api }: { api: SettingsApi }): JSX.Element {
     if (editId === null) return;
     const name = editName.trim();
     if (editId === NEW_ID) {
-      const transform: Transform = {
+      const prompt: Prompt = {
         id: crypto.randomUUID(),
         name: name === '' ? 'New prompt' : name,
         instruction: editInstruction,
-        hotkey: editHotkey,
+        shortcut: editShortcut,
         builtIn: false,
       };
-      void update({ transforms: [...settings.transforms, transform] });
+      void update({ prompts: [...settings.prompts, prompt] });
     } else {
-      const existing = settings.transforms.find((t) => t.id === editId);
+      const existing = settings.prompts.find((p) => p.id === editId);
       // The built-in keeps its fixed name; only custom prompts adopt the field.
       const nextName = existing?.builtIn ? existing.name : name === '' ? 'New prompt' : name;
-      patchTransform(editId, {
+      patchPrompt(editId, {
         name: nextName,
         instruction: editInstruction,
-        hotkey: editHotkey,
+        shortcut: editShortcut,
       });
     }
+    // Clear the search so a just-created or renamed prompt isn't hidden by an
+    // active filter that no longer matches it.
+    setQuery('');
     setEditId(null);
     listRef.current?.focus();
   };
@@ -112,7 +115,11 @@ export function TransformsTab({ api }: { api: SettingsApi }): JSX.Element {
       </label>
       <div className="transform-field">
         <span className="transform-field-label">Shortcut</span>
-        <HotkeyRecorder value={editHotkey} label={editName || 'Prompt'} onChange={setEditHotkey} />
+        <HotkeyRecorder
+          value={editShortcut}
+          label={editName || 'Prompt'}
+          onChange={setEditShortcut}
+        />
       </div>
       <label className="transform-field">
         <span className="transform-field-label">Prompt</span>
@@ -178,15 +185,15 @@ export function TransformsTab({ api }: { api: SettingsApi }): JSX.Element {
       </div>
 
       <div className="transform-list" ref={listRef} tabIndex={-1}>
-        {matches.map((t) =>
-          editId === t.id ? (
-            <div key={`edit-${t.id}`}>{renderEditor(t.builtIn)}</div>
+        {matches.map((p) =>
+          editId === p.id ? (
+            <div key={`edit-${p.id}`}>{renderEditor(p.builtIn)}</div>
           ) : (
-            <div key={t.id} className="transform-card">
+            <div key={p.id} className="transform-card">
               <div className="transform-card-main">
                 <div className="transform-card-head">
                   <span className="transform-card-name">
-                    {t.builtIn && (
+                    {p.builtIn && (
                       <span
                         className="transform-builtin"
                         role="img"
@@ -196,34 +203,34 @@ export function TransformsTab({ api }: { api: SettingsApi }): JSX.Element {
                         ✦
                       </span>
                     )}
-                    {t.name}
+                    {p.name}
                   </span>
                   <HotkeyRecorder
-                    value={t.hotkey}
-                    label={t.name}
+                    value={p.shortcut}
+                    label={p.name}
                     emptyLabel="+ Add shortcut"
-                    onChange={(hotkey) => {
-                      patchTransform(t.id, { hotkey });
+                    onChange={(shortcut) => {
+                      patchPrompt(p.id, { shortcut });
                     }}
                   />
                 </div>
-                <span className="transform-preview">{preview(t.instruction)}</span>
+                <span className="transform-preview">{preview(p.instruction)}</span>
               </div>
               <div className="transform-card-actions">
                 <button
                   className="btn btn-quiet"
                   onClick={() => {
-                    startEdit(t);
+                    startEdit(p);
                   }}
                 >
                   Edit
                 </button>
-                {!t.builtIn && (
+                {!p.builtIn && (
                   <button
                     className="btn btn-quiet"
-                    aria-label={`Delete ${t.name}`}
+                    aria-label={`Delete ${p.name}`}
                     onClick={() => {
-                      removeTransform(t.id);
+                      removePrompt(p.id);
                     }}
                   >
                     ×

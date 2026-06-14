@@ -8,7 +8,6 @@ function entry(at: number, id = String(at)): HistoryEntry {
     at,
     text: 'final',
     rawText: 'raw',
-    modeId: 'default',
     appName: null,
     durationMs: null,
     wordCount: 1,

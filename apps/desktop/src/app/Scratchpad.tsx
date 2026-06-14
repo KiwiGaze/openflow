@@ -496,11 +496,13 @@ function VersionPanel({
   onRestored: (note: Note) => void;
 }): JSX.Element {
   const [versions, setVersions] = useState<NoteVersion[]>([]);
-  // versionLabel needs the full transform list; rebuild it from the chips
-  // (Polish carries a null id, so it is dropped here). flatMap narrows the id to
-  // a string without a non-null assertion.
-  const transforms = transformChipList.flatMap((c) =>
-    c.id === null ? [] : [{ id: c.id, name: c.label, instruction: '', hotkey: '', builtIn: false }],
+  // versionLabel needs a prompt list to name "transform" versions; rebuild it
+  // from the chips (Polish carries a null id, so it is dropped here). flatMap
+  // narrows the id to a string without a non-null assertion.
+  const prompts = transformChipList.flatMap((c) =>
+    c.id === null
+      ? []
+      : [{ id: c.id, name: c.label, instruction: '', shortcut: '', builtIn: false }],
   );
 
   const refresh = useCallback((): void => {
@@ -528,7 +530,7 @@ function VersionPanel({
           <div key={v.id} className="scratchpad-version">
             <div className="scratchpad-version-meta">
               <span className="scratchpad-version-label">
-                {versionLabel(v.source, v.transformId, transforms)}
+                {versionLabel(v.source, v.transformId, prompts)}
               </span>
               <span className="scratchpad-version-time">
                 {relativeTime(v.createdAt, Date.now())}
