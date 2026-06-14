@@ -30,7 +30,7 @@ use crate::settings::{
     SETTINGS_CHANGED_EVENT,
 };
 use crate::shortcuts;
-use crate::stats::{local_day, word_count, Insights, Stats};
+use crate::stats::{local_day, word_count};
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
 use crate::stt_profiles::{SttProfileManager, CLOUD_STT_PREFIX};
 use crate::suggestions::{DictionarySuggestion, Suggestions};
@@ -43,6 +43,10 @@ pub const RESULT_EVENT: &str = "transcription-result";
 /// so views refresh from durable rows rather than racing the write. Mirrored as
 /// `EVENTS.historyChanged` in `@velata/core`.
 pub const HISTORY_CHANGED_EVENT: &str = "history-changed";
+/// Fired (no payload) once the `insights_daily` upsert has committed, so the
+/// Home header refetches from the durable row rather than racing the off-thread
+/// write. Mirrored as `EVENTS.insightsChanged` in `@velata/core`.
+pub const INSIGHTS_CHANGED_EVENT: &str = "insights-changed";
 
 /// Releases faster than this are treated as a tap, which switches the
 /// hold-to-talk gesture into hands-free mode instead of stopping.
@@ -141,9 +145,6 @@ pub struct Pipeline {
     tip_shown_session: AtomicBool,
     /// Consecutive empty dictations — drives the one-time accuracy tip (05 §2.3).
     empty_streak: AtomicU64,
-    /// Session-only usage aggregates for the Insights view (in-RAM, never
-    /// persisted or transmitted).
-    stats: Stats,
     /// Session-only candidate-term tally driving dictionary suggestions
     /// (in-RAM, never persisted or transmitted).
     suggestions: Suggestions,
@@ -189,7 +190,6 @@ impl Pipeline {
             last_app: Mutex::new(None),
             tip_shown_session: AtomicBool::new(false),
             empty_streak: AtomicU64::new(0),
-            stats: Stats::new(),
             suggestions: Suggestions::new(),
         })
     }
@@ -199,11 +199,6 @@ impl Pipeline {
             .lock()
             .expect("pipeline state poisoned")
             .clone()
-    }
-
-    /// Snapshot of this session's usage aggregates for the Insights view.
-    pub fn insights(&self) -> Insights {
-        self.stats.snapshot()
     }
 
     /// Top dictionary suggestions seen this session, excluding known terms.
@@ -955,16 +950,6 @@ impl Pipeline {
             polished,
             started,
         )?;
-        // Record the session aggregate only once the text actually reached the
-        // user (insert returns Ok even on the clipboard fallback).
-        self.stats.record_dictation(
-            words,
-            record_ms,
-            &mode.id,
-            polished,
-            app_name.as_deref(),
-            dict_fixes as u64,
-        );
         // Count this successful dictation — the only tip-system counter (05); a
         // count, never a log. Emit so an open settings webview re-evaluates tips.
         let mut counted = self.settings.get();
@@ -972,34 +957,34 @@ impl Pipeline {
         if let Ok(saved) = self.settings.set(counted) {
             let _ = self.app.emit(SETTINGS_CHANGED_EVENT, &saved);
         }
-        // Opt-in persistence at the success point, off the async executor
-        // (convention: file/DB I/O blocks). Two independent opt-ins:
-        //   • history (text, never audio) when `history_enabled`;
-        //   • `insights_daily` counts/dates (never words or audio) for the
-        //     LOCAL calendar day when `app_stats_enabled` — no row is ever
-        //     written while the flag is off.
-        // `history-changed` fires once the append attempt has finished, so views
-        // read after the write instead of racing it. `append` swallows DB errors
-        // internally, so the event can follow a failed write — benign: the
-        // refresh just finds nothing new.
+        // Persistence at the success point, off the async executor (convention:
+        // file/DB I/O blocks). Two writes, different policies:
+        //   • `insights_daily` is ALWAYS written (counts/dates only, never words
+        //     or audio) for the LOCAL calendar day — lifetime insights are
+        //     always kept, with no enable toggle and no reset;
+        //   • history (text, never audio) is written only when `history_enabled`.
+        // insights emits only after its upsert commits (the Ok arm); history
+        // emits after the append attempt (errors are swallowed inside `append`).
+        // Either way the event follows the write, so views refetch durable rows
+        // instead of racing the off-thread write.
         let app = self.app.clone();
         let history = Arc::clone(&self.history);
         let db = Arc::clone(&self.db);
         let raw = transcript.clone();
         let mode_id = mode.id.clone();
-        let insights_day = settings.app_stats_enabled.then(local_day);
         let retention_days = settings.history_retention_days;
         tauri::async_runtime::spawn_blocking(move || {
-            if let Some(day) = insights_day {
-                if let Err(err) = db.insights_upsert_daily(
-                    &day,
-                    words as i64,
-                    polished,
-                    dict_fixes as i64,
-                    record_ms as i64,
-                ) {
-                    log::warn!("could not persist insights: {err}");
+            match db.insights_upsert_daily(
+                &local_day(),
+                words as i64,
+                polished,
+                dict_fixes as i64,
+                record_ms as i64,
+            ) {
+                Ok(()) => {
+                    let _ = app.emit(INSIGHTS_CHANGED_EVENT, ());
                 }
+                Err(err) => log::warn!("could not persist insights: {err}"),
             }
             if let Some(text) = history_text {
                 history.append(

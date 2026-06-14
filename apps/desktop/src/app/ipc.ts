@@ -139,6 +139,11 @@ export const events = {
     listen(EVENTS.historyChanged, () => {
       cb();
     }),
+  /** Insights upsert committed to the DB; refetch the durable row (no payload). */
+  onInsightsChanged: (cb: () => void): Promise<UnlistenFn> =>
+    listen(EVENTS.insightsChanged, () => {
+      cb();
+    }),
   /** A note changed; refresh the list from durable rows (no payload). */
   onNotesChanged: (cb: () => void): Promise<UnlistenFn> =>
     listen(EVENTS.notesChanged, () => {

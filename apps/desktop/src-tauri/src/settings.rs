@@ -13,7 +13,7 @@ use crate::error::{AppError, AppResult};
 use crate::models::DEFAULT_STT_MODEL_ID;
 use crate::modes;
 
-pub const SETTINGS_VERSION: u32 = 5;
+pub const SETTINGS_VERSION: u32 = 6;
 pub const MAX_RECORDING_SECS: u64 = 300;
 
 /// Emitted (with the full `Settings` payload) after every backend-initiated
@@ -233,10 +233,6 @@ pub struct Settings {
     /// Days a history entry is kept before it is purged; 0 = keep forever.
     /// Enforced on every append and once at startup, on top of the row cap.
     pub history_retention_days: u32,
-    /// Opt-in (default off): persist all-time usage counts and dates (never
-    /// words or audio) to `insights_daily` for the Insights view's lifetime
-    /// totals and streaks. Off keeps insights session-only, in-RAM.
-    pub app_stats_enabled: bool,
     /// Per-app rules: dictate in a chosen mode when an app is frontmost (07 §9).
     pub app_rules: Vec<AppRule>,
     /// Global cleanup strength for dictation (Style page). An app rule with a
@@ -285,7 +281,6 @@ impl Default for Settings {
             last_tip_shown_at: String::new(),
             history_enabled: false,
             history_retention_days: 0,
-            app_stats_enabled: false,
             app_rules: Vec::new(),
             auto_cleanup_level: CleanupLevel::Ai,
             confirmed_stt_profiles: Vec::new(),
@@ -533,7 +528,6 @@ mod tests {
         assert!(json.contains("\"historyEnabled\":false"));
         assert!(json.contains("\"historyRetentionDays\":0"));
         assert!(json.contains("\"inputDeviceName\":null"));
-        assert!(json.contains("\"appStatsEnabled\":false"));
         assert!(json.contains("\"snippets\":[]"));
         assert!(json.contains("\"showInDock\":false"));
         assert!(json.contains("\"scratchpadEnabled\":false"));

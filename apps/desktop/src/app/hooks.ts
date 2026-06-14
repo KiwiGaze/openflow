@@ -184,15 +184,16 @@ export function useSttProfiles(): SttProfilesApi {
 
 export interface InsightsApi {
   insights: Insights | null;
-  /** Re-fetch on demand — e.g. after resetting all-time stats. */
+  /** Re-fetch on demand. */
   refresh: () => void;
 }
 
 /**
- * Usage aggregates; refetched after each completed dictation. Re-fetches on
- * `transcription-result`: the pipeline records stats moments AFTER emitting
- * that event, but the IPC round-trip masks the gap, so the re-fetch reads
- * fresh numbers without listening to `history-changed`.
+ * Lifetime usage aggregates from `insights_daily`. Refetches on
+ * `insights-changed`, which the pipeline emits only AFTER the upsert commits —
+ * so this reads the durable row instead of racing the off-thread write (the
+ * same pattern history uses with `history-changed`). `transcription-result`
+ * fires before that write, so subscribing to it would read one dictation behind.
  */
 export function useInsights(): InsightsApi {
   const [insights, setInsights] = useState<Insights | null>(null);
@@ -203,7 +204,7 @@ export function useInsights(): InsightsApi {
 
   useEffect(() => {
     refresh();
-    return subscribe(events.onResult(refresh));
+    return subscribe(events.onInsightsChanged(refresh));
   }, [refresh]);
 
   return { insights, refresh };

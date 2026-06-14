@@ -57,10 +57,10 @@ function HomeStats(): JSX.Element | null {
 
   return (
     <div className="home-stats">
-      <Stat value={insights.totalWords.toLocaleString()} label="words" />
-      <Stat value={String(insights.dictations)} label="dictations" />
-      <Stat value={String(insights.wordsPerMinute)} label="wpm" />
-      <Stat value={String(insights.streak?.current ?? 0)} label="day streak" />
+      <Stat value={insights.words.toLocaleString()} label="words" />
+      <Stat value={insights.dictations.toLocaleString()} label="dictations" />
+      <Stat value={insights.wordsPerMinute.toLocaleString()} label="wpm" />
+      <Stat value={insights.streak.toLocaleString()} label="day streak" />
     </div>
   );
 }

@@ -347,67 +347,43 @@ pub fn set_changes_interactive(app: AppHandle, interactive: bool) {
     }
 }
 
-/// Returns the Insights snapshot: always the session aggregates (in-memory,
-/// reset on quit), enriched with all-time totals, streaks, and an all-time
-/// per-app breakdown when their opt-in flags are on (`app_stats_enabled`,
-/// `history_enabled`). The DB reads are best-effort — a failure degrades to the
-/// session view rather than failing the whole command.
+/// Returns the lifetime Insights, always computed from `insights_daily` (which
+/// is written on every dictation): total words, total dictations, speaking pace,
+/// and the current day streak — counts and dates only, never words or audio.
+/// There is no enable toggle and no reset. Empty stores read as all-zero (the
+/// Home header hides the row at zero activity). The DB reads are best-effort: a
+/// failure logs and yields zeros rather than failing the whole command.
 #[tauri::command]
 pub fn get_insights(state: State<'_, AppState>) -> crate::stats::Insights {
-    use crate::stats::{local_day, AllTimeStats, AppWords, PerAppScope, PER_APP_LIMIT};
+    use crate::stats::{local_day, pace_wpm, streaks, Insights};
 
-    let mut insights = state.pipeline.insights();
-    let settings = state.settings.get();
-
-    // All-time per-app from history when the user keeps it; otherwise the
-    // snapshot's session tally stands.
-    if settings.history_enabled {
-        match state.db.history_per_app(PER_APP_LIMIT as i64) {
-            Ok(rows) => {
-                insights.per_app = rows
-                    .into_iter()
-                    .map(|(name, words)| AppWords { name, words })
-                    .collect();
-                insights.per_app_scope = PerAppScope::AllTime;
-            }
-            Err(err) => log::warn!("could not read per-app history: {err}"),
+    let (words, dictations, words_per_minute) = match state.db.insights_totals() {
+        // No day rows yet → zeros, so the header hides until the first dictation.
+        Ok(None) => (0, 0, 0),
+        Ok(Some(totals)) => (
+            totals.words,
+            totals.dictations,
+            pace_wpm(totals.words, totals.duration_ms),
+        ),
+        Err(err) => {
+            log::warn!("could not read insights totals: {err}");
+            (0, 0, 0)
         }
+    };
+    let streak = match state.db.insights_days() {
+        Ok(days) => streaks(&days, &local_day()),
+        Err(err) => {
+            log::warn!("could not read insights days: {err}");
+            0
+        }
+    };
+
+    Insights {
+        words,
+        dictations,
+        words_per_minute,
+        streak,
     }
-
-    if settings.app_stats_enabled {
-        match state.db.insights_totals() {
-            Ok(Some(totals)) => {
-                let ai_percent = if totals.dictations > 0 {
-                    (totals.ai_dictations as f64 / totals.dictations as f64 * 100.0).round() as u32
-                } else {
-                    0
-                };
-                insights.all_time = Some(AllTimeStats {
-                    words: totals.words,
-                    dictations: totals.dictations,
-                    ai_percent,
-                    fixes: totals.fixes,
-                    words_per_minute: crate::stats::pace_wpm(totals.words, totals.duration_ms),
-                });
-            }
-            // No day rows yet — not an error; all_time stays None.
-            Ok(None) => {}
-            Err(err) => log::warn!("could not read insights totals: {err}"),
-        }
-        match state.db.insights_days() {
-            Ok(days) => insights.streak = Some(crate::stats::streaks(&days, &local_day())),
-            Err(err) => log::warn!("could not read insights days: {err}"),
-        }
-    }
-
-    insights
-}
-
-/// Deletes every persisted `insights_daily` row (the "reset all-time stats"
-/// action). Session counters are untouched — they live in RAM.
-#[tauri::command]
-pub fn clear_insights(state: State<'_, AppState>) -> AppResult<()> {
-    state.db.insights_clear()
 }
 
 /// Returns session-only candidate terms for the dictionary, most-seen first.
