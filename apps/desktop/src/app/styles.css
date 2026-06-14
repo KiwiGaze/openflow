@@ -1406,15 +1406,19 @@ button:focus-visible,
 
 /* ---- HUD ---- */
 
+/* No overflow clipping: a later slice opens a dropdown above the pill. */
 .hud-body {
   background: transparent;
-  overflow: hidden;
 }
 
+/* Bottom-anchored so its on-screen position survives a later window-height
+ * enlargement (the dropdown grows the window upward, not the pill). */
 .hud-pill {
   position: fixed;
-  inset: 0;
-  margin: 8px auto;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  margin: 0 auto;
   width: fit-content;
   max-width: 92%;
   height: 40px;
@@ -1441,6 +1445,28 @@ button:focus-visible,
 .hud-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* Persistent transform affordance, pinned bottom-right. Never gets
+ * `.hud-visible`, so it stays at full opacity even when the pill fades at
+ * idle; a later slice anchors a Rust hit-test to this fixed corner. */
+.hud-circle {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  box-shadow: var(--shadow-hud);
+  font-size: 15px;
+  line-height: 1;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .hud-error {

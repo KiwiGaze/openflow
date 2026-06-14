@@ -35,29 +35,39 @@ export function Hud(): JSX.Element {
   const glyph = hudGlyph(state);
 
   return (
-    <div className={`hud-pill ${visible ? 'hud-visible' : ''} hud-${state.status}`}>
-      {recording && (
-        <div className="hud-bars" aria-hidden>
-          {barScales(level).map((scale, i) => (
-            <span key={i} style={{ transform: `scaleY(${scale})` }} />
-          ))}
-        </div>
-      )}
-      {busy && <span className="hud-spinner" aria-hidden />}
-      {glyph && (
-        <span
-          className={`hud-glyph ${state.status === 'inserted' ? 'hud-glyph-ok' : ''}`}
-          aria-hidden
-        >
-          {glyph}
+    <div className="hud-root">
+      <div className={`hud-pill ${visible ? 'hud-visible' : ''} hud-${state.status}`}>
+        {recording && (
+          <div className="hud-bars" aria-hidden>
+            {barScales(level).map((scale, i) => (
+              <span key={i} style={{ transform: `scaleY(${scale})` }} />
+            ))}
+          </div>
+        )}
+        {busy && <span className="hud-spinner" aria-hidden />}
+        {glyph && (
+          <span
+            className={`hud-glyph ${state.status === 'inserted' ? 'hud-glyph-ok' : ''}`}
+            aria-hidden
+          >
+            {glyph}
+          </span>
+        )}
+        <span className="hud-textcol">
+          <span className="hud-label" aria-live="polite" aria-atomic="true">
+            {hudLabel(state)}
+          </span>
+          {state.hudTip && <span className="hud-tip">{state.hudTip}</span>}
         </span>
-      )}
-      <span className="hud-textcol">
-        <span className="hud-label" aria-live="polite" aria-atomic="true">
-          {hudLabel(state)}
-        </span>
-        {state.hudTip && <span className="hud-tip">{state.hudTip}</span>}
-      </span>
+      </div>
+      {/*
+       * Post-dictation transform affordance. A sibling of the pill, not a child,
+       * so it stays visible at idle when the pill fades out. Pinned bottom-right
+       * because a later slice's Rust hit-test assumes that fixed corner.
+       */}
+      <div className="hud-circle" aria-hidden>
+        ◉
+      </div>
     </div>
   );
 }
