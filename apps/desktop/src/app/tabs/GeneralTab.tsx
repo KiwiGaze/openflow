@@ -1,7 +1,7 @@
-import { useEffect, useState, type JSX, type ReactNode } from 'react';
-import { type Appearance, formatAcceleratorMac } from '@velata/core';
+import { useState, type JSX, type ReactNode } from 'react';
+import { type Appearance } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
-import { events, ipc, subscribe } from '../ipc.js';
+import { ipc } from '../ipc.js';
 import { Row } from '../components/Row.js';
 import { Toggle } from '../components/Toggle.js';
 
@@ -29,33 +29,10 @@ function LocalRow({
   );
 }
 
-/** History, stats, and notes: three local opt-ins, each with its own controls. */
-function DataPrivacyCard({ api }: { api: SettingsApi }): JSX.Element {
+/** History and notes: local opt-ins, each with its own controls. */
+function DataCard({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, update } = api;
-  const [noteCount, setNoteCount] = useState<number | null>(null);
   const [clearError, setClearError] = useState<string | null>(null);
-
-  // Only read notes when the Scratchpad is on — the command refuses while off,
-  // and counting is the only reason to touch it here. notes-changed keeps the
-  // count fresh while the Scratchpad window edits notes.
-  useEffect(() => {
-    if (!settings.scratchpadEnabled) {
-      setNoteCount(null);
-      return;
-    }
-    const refresh = (): void => {
-      void ipc
-        .listNotes(null)
-        .then((notes) => {
-          setNoteCount(notes.length);
-        })
-        .catch((err: unknown) => {
-          console.error('Failed to count notes:', err);
-        });
-    };
-    refresh();
-    return subscribe(events.onNotesChanged(refresh));
-  }, [settings.scratchpadEnabled]);
 
   const clearHistory = (): void => {
     setClearError(null);
@@ -66,19 +43,10 @@ function DataPrivacyCard({ api }: { api: SettingsApi }): JSX.Element {
     });
   };
 
-  const resetStats = (): void => {
-    void ipc.clearInsights().catch((err: unknown) => {
-      console.error('Failed to reset stats:', err);
-    });
-  };
-
   return (
     <section className="card">
-      <h2>Data &amp; privacy</h2>
-      <p className="row-hint">
-        By default Velata stores nothing. History, stats, and notes are separate opt-ins, kept only
-        on this Mac.
-      </p>
+      <h2>Data</h2>
+      <p className="row-hint">Stored only on this Mac.</p>
 
       <LocalRow
         title="Save history"
@@ -102,29 +70,11 @@ function DataPrivacyCard({ api }: { api: SettingsApi }): JSX.Element {
             <option value={1}>1 day</option>
           </select>
           <button className="btn btn-quiet btn-danger" onClick={clearHistory}>
-            Clear history
+            Clear
           </button>
         </div>
       )}
       {clearError && <p className="row-hint row-hint-warn">{clearError}</p>}
-
-      <LocalRow
-        title="Keep all-time stats"
-        hint="Persist lifetime usage counts and dates — never your words or audio."
-      >
-        <Toggle
-          checked={settings.appStatsEnabled}
-          onChange={(checked) => void update({ appStatsEnabled: checked })}
-          label="Keep all-time stats"
-        />
-      </LocalRow>
-      {settings.appStatsEnabled && (
-        <div className="row-actions">
-          <button className="btn btn-quiet btn-danger" onClick={resetStats}>
-            Reset stats
-          </button>
-        </div>
-      )}
 
       <LocalRow
         title="Scratchpad"
@@ -136,18 +86,10 @@ function DataPrivacyCard({ api }: { api: SettingsApi }): JSX.Element {
           label="Scratchpad"
         />
       </LocalRow>
-      {settings.scratchpadEnabled && (
-        <div className="row-actions">
-          {noteCount !== null && (
-            <span className="row-hint">
-              {noteCount} {noteCount === 1 ? 'note' : 'notes'} on this Mac
-            </span>
-          )}
-          <button className="btn btn-quiet" onClick={() => void ipc.openScratchpadWindow(null)}>
-            Open Scratchpad
-          </button>
-        </div>
-      )}
+
+      <p className="row-hint">
+        Insights are always kept — counts &amp; dates only, never your words or audio.
+      </p>
     </section>
   );
 }
@@ -176,29 +118,6 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
             <option value="dark">Dark</option>
           </select>
         </Row>
-        <Row title="Welcome tour" hint="Replay the first-run setup guide.">
-          <button className="btn" onClick={() => void update({ onboardingCompleted: false })}>
-            Show again
-          </button>
-        </Row>
-        <Row
-          title="Show tips"
-          hint="One-time hints about features you haven't tried. Never repeats, never interrupts dictation."
-        >
-          <Toggle
-            checked={settings.tipsEnabled}
-            onChange={(checked) => void update({ tipsEnabled: checked })}
-            label="Show tips"
-          />
-        </Row>
-        <div className="row-actions">
-          <button
-            className="btn btn-quiet"
-            onClick={() => void update({ tipsSeen: [], lastTipShownAt: '' })}
-          >
-            Reset tips
-          </button>
-        </div>
         <Row title="Show in Dock" hint="Keep a Dock icon. Off keeps Velata in the menu bar only.">
           <Toggle
             checked={settings.showInDock}
@@ -208,37 +127,7 @@ export function GeneralTab({ api }: { api: SettingsApi }): JSX.Element {
         </Row>
       </section>
 
-      <DataPrivacyCard api={api} />
-
-      <section className="card">
-        <h2>Keyboard shortcuts</h2>
-        <dl className="about-list">
-          <dt>Dictate</dt>
-          <dd>
-            Hold {formatAcceleratorMac(settings.dictationHotkey)} (or tap to latch hands-free; tap
-            again to stop)
-          </dd>
-          <dt>See changes</dt>
-          <dd>
-            {settings.changeOverlayHotkey
-              ? `Tap ${formatAcceleratorMac(settings.changeOverlayHotkey)} to see what cleanup changed`
-              : 'Off — set a hotkey on the Dictation page'}
-          </dd>
-          <dt>Polish selection</dt>
-          <dd>
-            {settings.polishHotkey ? `Tap ${formatAcceleratorMac(settings.polishHotkey)}` : 'Off'}{' '}
-            (configured on the Transforms page)
-          </dd>
-          <dt>Run a mode</dt>
-          <dd>Each mode can carry its own hotkey, set per mode on the Modes page</dd>
-          <dt>Run a transform</dt>
-          <dd>Each transform can carry its own hotkey, set per transform on the Transforms page</dd>
-          <dt>Cancel or close</dt>
-          <dd>Esc stops recording, or closes this window. Cmd+W also closes this window</dd>
-          <dt>Copy last result</dt>
-          <dd>From the menu bar, “Copy last dictation”</dd>
-        </dl>
-      </section>
+      <DataCard api={api} />
     </div>
   );
 }

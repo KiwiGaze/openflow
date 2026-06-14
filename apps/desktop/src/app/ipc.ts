@@ -47,7 +47,6 @@ export const ipc = {
   reprocessHistory: (text: string, modeId: string): Promise<string> =>
     invoke(COMMANDS.reprocessHistory, { text, modeId }),
   getInsights: (): Promise<Insights> => invoke(COMMANDS.getInsights),
-  clearInsights: (): Promise<void> => invoke(COMMANDS.clearInsights),
   listDictionarySuggestions: (): Promise<DictionarySuggestion[]> =>
     invoke(COMMANDS.listDictionarySuggestions),
   dismissDictionarySuggestion: (term: string): Promise<void> =>

@@ -2,8 +2,6 @@ import type { JSX } from 'react';
 import type { AppWords } from '@velata/core';
 import { useInsights } from '../hooks.js';
 import type { SettingsApi } from '../hooks.js';
-import { ipc } from '../ipc.js';
-import { Toggle } from '../components/Toggle.js';
 
 function Stat({ value, label }: { value: string; label: string }): JSX.Element {
   return (
@@ -31,7 +29,7 @@ function AppBar({ row, max }: { row: AppWords; max: number }): JSX.Element {
 }
 
 export function InsightsTab({ api }: { api: SettingsApi }): JSX.Element {
-  const { insights, refresh } = useInsights();
+  const { insights } = useInsights();
   const modeName = (id: string): string => api.settings.modes.find((m) => m.id === id)?.name ?? id;
 
   // Prefer all-time figures when the user persists them; otherwise this session.
@@ -46,15 +44,6 @@ export function InsightsTab({ api }: { api: SettingsApi }): JSX.Element {
   const perApp = insights?.perApp ?? [];
   const maxAppWords = perApp.reduce((m, row) => Math.max(m, row.words), 0);
   const perAppScopeLabel = insights?.perAppScope === 'allTime' ? 'All time' : 'This session';
-
-  const resetStats = (): void => {
-    void ipc
-      .clearInsights()
-      .then(refresh)
-      .catch((err: unknown) => {
-        console.error('Failed to reset insights:', err);
-      });
-  };
 
   const hasActivity = dictations > 0 || words > 0;
 
@@ -125,32 +114,6 @@ export function InsightsTab({ api }: { api: SettingsApi }): JSX.Element {
                 <span className="dict-from">{m.count}</span>
               </div>
             ))}
-          </div>
-        </section>
-      )}
-
-      {!api.settings.appStatsEnabled ? (
-        <section className="card">
-          <h2>All-time stats</h2>
-          <p className="row-hint">
-            Stores counts and dates — never your words or audio — only on this Mac.
-          </p>
-          <div className="row-actions">
-            <Toggle
-              checked={api.settings.appStatsEnabled}
-              onChange={(checked) => void api.update({ appStatsEnabled: checked })}
-              label="Keep all-time stats"
-            />
-          </div>
-        </section>
-      ) : (
-        <section className="card">
-          <h2>All-time stats</h2>
-          <p className="row-hint">Lifetime totals and streaks are on for this Mac.</p>
-          <div className="row-actions">
-            <button className="btn btn-sm btn-danger" onClick={resetStats}>
-              Reset all-time stats
-            </button>
           </div>
         </section>
       )}
