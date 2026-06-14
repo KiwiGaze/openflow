@@ -52,6 +52,20 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
   "NSWindow",
   "NSPanel",
 ] }
+# The `fn` (🌐) key is a modifier observable only via a listen-only CGEventTap on
+# flagsChanged (see fn_gesture.rs). `CGEventTypes` gates the tap-create API; the
+# CoreFoundation features cover the run-loop attach (CGEvent pulls in CFMachPort
+# but not CFRunLoop). NO HTTP — must not trip the check:privacy tripwire.
+objc2-core-graphics = { version = "0.3", default-features = false, features = [
+  "std",
+  "CGEvent",
+  "CGEventTypes",
+] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = [
+  "std",
+  "CFMachPort",
+  "CFRunLoop",
+] }
 block2 = "0.6"
 
 [dev-dependencies]

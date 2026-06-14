@@ -333,9 +333,21 @@ export interface Insights {
 
 export type MicrophonePermission = 'granted' | 'denied' | 'undetermined' | 'unknown';
 
+/**
+ * Input Monitoring status. `CGPreflightListenEventAccess` is a bool, so there is
+ * no `undetermined`; `unknown` is the non-macOS stub.
+ */
+export type InputMonitoringPermission = 'granted' | 'denied' | 'unknown';
+
 export interface PermissionsState {
   microphone: MicrophonePermission;
   accessibility: boolean;
+  /**
+   * Required only for the `fn`-key push-to-talk/hands-free gestures (a
+   * listen-only event tap). When not `granted`, dictation still works via the
+   * accelerator fallback — this permission is additive.
+   */
+  inputMonitoring: InputMonitoringPermission;
 }
 
 export interface LlmTestResult {
@@ -409,6 +421,7 @@ export const COMMANDS = {
   promptAccessibilityPermission: 'prompt_accessibility_permission',
   openAccessibilitySettings: 'open_accessibility_settings',
   openMicrophoneSettings: 'open_microphone_settings',
+  requestInputMonitoring: 'request_input_monitoring',
   getAppInfo: 'get_app_info',
   listNotes: 'list_notes',
   getNote: 'get_note',

@@ -76,6 +76,7 @@ export const ipc = {
     invoke(COMMANDS.promptAccessibilityPermission),
   openAccessibilitySettings: (): Promise<void> => invoke(COMMANDS.openAccessibilitySettings),
   openMicrophoneSettings: (): Promise<void> => invoke(COMMANDS.openMicrophoneSettings),
+  requestInputMonitoring: (): Promise<void> => invoke(COMMANDS.requestInputMonitoring),
   getAppInfo: (): Promise<AppInfo> => invoke(COMMANDS.getAppInfo),
   listNotes: (search: string | null): Promise<NoteSummary[]> =>
     invoke(COMMANDS.listNotes, { search }),

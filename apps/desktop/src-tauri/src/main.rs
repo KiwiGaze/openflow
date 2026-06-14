@@ -8,6 +8,7 @@ mod cloud_stt;
 mod commands;
 mod db;
 mod error;
+mod fn_gesture;
 mod history;
 mod hud;
 mod llm;
@@ -209,6 +210,7 @@ fn main() {
             commands::prompt_accessibility_permission,
             commands::open_accessibility_settings,
             commands::open_microphone_settings,
+            commands::request_input_monitoring,
             commands::get_app_info,
             commands::list_notes,
             commands::get_note,

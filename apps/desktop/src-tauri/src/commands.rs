@@ -541,6 +541,22 @@ pub fn open_microphone_settings(app: AppHandle) {
     }
 }
 
+/// Prompts for Input Monitoring (adding Velata to the list) and opens the
+/// Input Monitoring settings pane. The grant usually takes effect only on the
+/// NEXT launch, so the pane is opened too and the accelerator fallback stays
+/// active for this session. Input Monitoring is needed only for the `fn`-key
+/// gestures; dictation works without it.
+#[tauri::command]
+pub fn request_input_monitoring(app: AppHandle) {
+    crate::fn_gesture::request_input_monitoring();
+    if let Err(err) = tauri_plugin_opener::OpenerExt::opener(&app).open_url(
+        crate::fn_gesture::INPUT_MONITORING_SETTINGS_URL,
+        None::<&str>,
+    ) {
+        log::warn!("could not open input monitoring settings: {err}");
+    }
+}
+
 /// Returns the app version and data paths shown in the About tab.
 #[tauri::command]
 pub fn get_app_info(app: AppHandle, state: State<'_, AppState>) -> AppInfo {

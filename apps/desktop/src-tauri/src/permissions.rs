@@ -9,12 +9,18 @@ use serde::Serialize;
 pub struct PermissionsState {
     pub microphone: &'static str,
     pub accessibility: bool,
+    /// Input Monitoring: required only for the `fn`-key push-to-talk/hands-free
+    /// gestures (a listen-only CGEventTap). `granted`/`denied`; `unknown` off
+    /// macOS. When not granted, dictation still works via the accelerator
+    /// fallback, so this is additive.
+    pub input_monitoring: &'static str,
 }
 
 pub fn check() -> PermissionsState {
     PermissionsState {
         microphone: microphone_status(),
         accessibility: accessibility_trusted(false),
+        input_monitoring: crate::fn_gesture::input_monitoring_status(),
     }
 }
 

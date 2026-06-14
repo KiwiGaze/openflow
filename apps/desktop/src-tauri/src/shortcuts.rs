@@ -10,6 +10,7 @@ use std::str::FromStr;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
 
+use crate::fn_gesture;
 use crate::pipeline::Job;
 use crate::settings::{Hotkey, HotkeyKind, Settings};
 use crate::state::AppState;
@@ -21,10 +22,19 @@ use crate::state::AppState;
 const PUSH_TO_TALK_FALLBACK: &str = "Alt+Space";
 const HANDS_FREE_FALLBACK: &str = "Alt+Shift+Space";
 
+/// Whether a hotkey is the observable `fn`-key gesture: a `Hold`/`DoubleTap`
+/// whose key is `fn`. When the `fn` monitor is live, such a trigger is driven by
+/// the [`crate::fn_gesture`] CGEventTap, not by an accelerator fallback. A
+/// `Hold`/`DoubleTap` with any other key is not a thing the UI can produce, but
+/// would still fall back rather than feed the tap.
+pub fn is_fn_gesture(hotkey: &Hotkey) -> bool {
+    matches!(hotkey.kind, HotkeyKind::Hold | HotkeyKind::DoubleTap) && hotkey.key == "fn"
+}
+
 /// Resolves a gesture trigger to the accelerator string to actually register, or
 /// `None` to register nothing. An `Accelerator` hotkey uses its own `key` (an
-/// empty `key` disables the trigger); a `Hold`/`DoubleTap` gesture — not
-/// observable until Phase 3 — falls back to `fallback`.
+/// empty `key` disables the trigger); a `Hold`/`DoubleTap` gesture — used when the
+/// `fn` monitor is not live — falls back to `fallback`.
 fn resolve(hotkey: &Hotkey, fallback: &str) -> Option<String> {
     match hotkey.kind {
         HotkeyKind::Accelerator => {
@@ -50,14 +60,31 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         .unregister_all()
         .map_err(|e| format!("could not reset hotkeys: {e}"))?;
 
-    // Resolve each gesture trigger to the accelerator we can register today. An
-    // empty accelerator disables that trigger (None).
-    let push_to_talk = resolve(&settings.push_to_talk_hotkey, PUSH_TO_TALK_FALLBACK)
-        .map(|a| Shortcut::from_str(&a).map_err(|e| format!("push-to-talk hotkey “{a}”: {e}")))
-        .transpose()?;
-    let hands_free = resolve(&settings.hands_free_hotkey, HANDS_FREE_FALLBACK)
-        .map(|a| Shortcut::from_str(&a).map_err(|e| format!("hands-free hotkey “{a}”: {e}")))
-        .transpose()?;
+    // Start the `fn` CGEventTap once if a trigger is an `fn` gesture and Input
+    // Monitoring is granted. When it is live it OWNS the `fn` gesture triggers,
+    // so their accelerator fallback must NOT also register (or both would fire);
+    // when it is not (ungranted/unavailable, or the trigger is an accelerator)
+    // the fallback registers as before. Idempotent across saves — the monitor is
+    // started once and routes by live settings (`fn_gesture::route_gesture`).
+    let fn_active = fn_gesture::ensure_monitor(app);
+
+    // Resolve each gesture trigger to the accelerator to register. An `fn`
+    // gesture driven by the live tap registers nothing here; otherwise it falls
+    // back so dictation stays usable. An empty accelerator disables it (None).
+    let push_to_talk = if fn_active && is_fn_gesture(&settings.push_to_talk_hotkey) {
+        None
+    } else {
+        resolve(&settings.push_to_talk_hotkey, PUSH_TO_TALK_FALLBACK)
+            .map(|a| Shortcut::from_str(&a).map_err(|e| format!("push-to-talk hotkey “{a}”: {e}")))
+            .transpose()?
+    };
+    let hands_free = if fn_active && is_fn_gesture(&settings.hands_free_hotkey) {
+        None
+    } else {
+        resolve(&settings.hands_free_hotkey, HANDS_FREE_FALLBACK)
+            .map(|a| Shortcut::from_str(&a).map_err(|e| format!("hands-free hotkey “{a}”: {e}")))
+            .transpose()?
+    };
     // See-changes is an accelerator trigger; a stray gesture here falls back to
     // the historical default rather than disabling it.
     let changes = resolve(&settings.see_changes_hotkey, "Alt+O")
@@ -238,7 +265,9 @@ mod tests {
     }
 
     #[test]
-    fn gesture_kinds_fall_back_until_fn_observation_lands() {
+    fn gesture_kinds_resolve_to_their_fallback() {
+        // `resolve` always yields the fallback for a gesture; `apply` decides
+        // whether to register it (skipped when the `fn` tap is live).
         assert_eq!(
             resolve(&hk(HotkeyKind::Hold, "fn"), PUSH_TO_TALK_FALLBACK),
             Some(PUSH_TO_TALK_FALLBACK.to_string())
@@ -252,7 +281,22 @@ mod tests {
     #[test]
     fn default_gestures_resolve_to_distinct_fallbacks() {
         // The push-to-talk and hands-free defaults must not collide, so both
-        // register under the gesture defaults until Phase 3.
+        // register under the gesture defaults when the `fn` tap is not live.
         assert_ne!(PUSH_TO_TALK_FALLBACK, HANDS_FREE_FALLBACK);
+    }
+
+    #[test]
+    fn fn_gestures_are_recognized() {
+        assert!(is_fn_gesture(&hk(HotkeyKind::Hold, "fn")));
+        assert!(is_fn_gesture(&hk(HotkeyKind::DoubleTap, "fn")));
+    }
+
+    #[test]
+    fn accelerators_and_non_fn_keys_are_not_fn_gestures() {
+        // An accelerator is never the `fn` tap's job, and a gesture on any other
+        // key is not the observable `fn` modifier.
+        assert!(!is_fn_gesture(&hk(HotkeyKind::Accelerator, "Alt+Space")));
+        assert!(!is_fn_gesture(&hk(HotkeyKind::Accelerator, "fn")));
+        assert!(!is_fn_gesture(&hk(HotkeyKind::Hold, "F13")));
     }
 }
