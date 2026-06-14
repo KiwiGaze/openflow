@@ -50,11 +50,11 @@ export function AboutTab(): JSX.Element {
       <section className="card">
         <h2>Privacy</h2>
         <ul className="privacy-list">
-          <li>Audio is recorded only while you hold the hotkey and never written to disk.</li>
-          <li>Transcription runs entirely on this Mac (whisper.cpp with Metal).</li>
-          <li>No telemetry, no accounts, no cloud — unless you configure an AI provider.</li>
+          <li>Dictation runs on this Mac. Audio never leaves your device and is never saved.</li>
+          <li>AI Transforms send only text to your AI provider.</li>
           <li>
-            With a cloud provider configured, only the transcribed text is sent to it, never audio.
+            Cloud speech (only if you enable it) uploads audio to that provider — and tells you
+            first.
           </li>
         </ul>
       </section>
