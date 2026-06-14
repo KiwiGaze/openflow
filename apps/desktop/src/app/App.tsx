@@ -1,11 +1,9 @@
-import { useEffect, useState, type JSX } from 'react';
-import { todayIso } from '@velata/core';
+import { useState, type JSX } from 'react';
 import { useModels, useSettings } from './hooks.js';
 import { ipc } from './ipc.js';
 import { useWindowClose } from './useWindowClose.js';
+import { useThemeSync } from './useThemeSync.js';
 import { Onboarding } from './Onboarding.js';
-import { eligibleTip } from './tips.js';
-import { Callout } from './components/Callout.js';
 import { Shell } from './Shell.js';
 import { APP_SECTIONS, APP_TAB_IDS, type TabId } from './sidebarTabs.js';
 import { DictionaryTab } from './tabs/DictionaryTab.js';
@@ -23,12 +21,7 @@ export function App(): JSX.Element {
   const modelsApi = useModels();
   const [tab, setTab] = useState<TabId>('home');
 
-  // Apply the theme override before content paints; `system` defers to the
-  // OS via the CSS media query, so the dataset attribute is a no-op there.
-  useEffect(() => {
-    document.documentElement.dataset.theme = api?.settings.appearance ?? 'system';
-  }, [api?.settings.appearance]);
-
+  useThemeSync(api?.settings.appearance);
   useWindowClose();
 
   if (!api) {
@@ -39,20 +32,14 @@ export function App(): JSX.Element {
     return <Onboarding api={api} modelsApi={modelsApi} />;
   }
 
-  // Deep links from Home/tips may target a Settings-section tab, which this
-  // window does not render; route those to the Settings window instead.
+  // Deep links from Home may target a Settings-section tab, which this window
+  // does not render; open the Settings window on that tab instead.
   const navigate = (next: TabId): void => {
     if (APP_TAB_IDS.includes(next)) {
       setTab(next);
     } else {
-      void ipc.openSettingsWindow();
+      void ipc.openSettingsWindow(next);
     }
-  };
-
-  const today = todayIso();
-  const tip = eligibleTip(tab, api.settings, today);
-  const dismissTip = (id: string): void => {
-    void api.update({ tipsSeen: [...api.settings.tipsSeen, id], lastTipShownAt: today });
   };
 
   return (
@@ -70,23 +57,6 @@ export function App(): JSX.Element {
             Dismiss
           </button>
         </div>
-      )}
-      {tip && (
-        <Callout
-          variant="info"
-          action={{
-            label: tip.actionLabel,
-            onClick: () => {
-              navigate(tip.actionTab);
-              dismissTip(tip.id);
-            },
-          }}
-          onDismiss={() => {
-            dismissTip(tip.id);
-          }}
-        >
-          {tip.copy}
-        </Callout>
       )}
       {tab === 'home' && <HomeTab api={api} modelsApi={modelsApi} onNavigate={navigate} />}
       {tab === 'insights' && <InsightsTab api={api} />}

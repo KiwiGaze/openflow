@@ -23,6 +23,7 @@ import {
   type SttProfile,
   type TranscriptionResult,
 } from '@velata/core';
+import type { TabId } from './sidebarTabs.js';
 
 export const ipc = {
   getSettings: (): Promise<Settings> => invoke(COMMANDS.getSettings),
@@ -105,7 +106,8 @@ export const ipc = {
   openScratchpadWindow: (noteId: string | null): Promise<void> =>
     invoke(COMMANDS.openScratchpadWindow, { noteId }),
   openMainWindow: (): Promise<void> => invoke(COMMANDS.openMainWindow),
-  openSettingsWindow: (): Promise<void> => invoke(COMMANDS.openSettingsWindow),
+  openSettingsWindow: (tab?: TabId): Promise<void> =>
+    invoke(COMMANDS.openSettingsWindow, { tab: tab ?? null }),
 };
 
 export const events = {
@@ -146,6 +148,11 @@ export const events = {
   /** An open Scratchpad is asked to switch to a note; payload is the note id. */
   onScratchpadOpenNote: (cb: (noteId: string) => void): Promise<UnlistenFn> =>
     listen<string>(EVENTS.scratchpadOpenNote, (e) => {
+      cb(e.payload);
+    }),
+  /** The open Settings window is asked to switch to a tab; payload is the tab id. */
+  onSettingsNavigate: (cb: (tab: string) => void): Promise<UnlistenFn> =>
+    listen<string>(EVENTS.settingsNavigate, (e) => {
       cb(e.payload);
     }),
 };

@@ -472,6 +472,8 @@ export const EVENTS = {
   notesChanged: 'notes-changed',
   /** Ask an open Scratchpad to switch to a note; payload is the note id. */
   scratchpadOpenNote: 'scratchpad-open-note',
+  /** Ask the open Settings window to switch to a tab; payload is the tab id. */
+  settingsNavigate: 'settings-navigate',
 } as const;
 
 /** Tauri command names callable via `invoke`. */

@@ -123,6 +123,12 @@ pub const MAIN_WINDOW_LABEL: &str = "main";
 /// The Settings window (the configuration half).
 pub const SETTINGS_WINDOW_LABEL: &str = "settings";
 
+/// Asks the (already-open, hide-on-close) Settings window to switch to a tab.
+/// Payload: the tab id string. Mirrored as `EVENTS.settingsNavigate` in
+/// `@velata/core`. Lets a deep link from the App window land on a specific
+/// Settings tab instead of the window's default.
+pub const SETTINGS_NAVIGATE_EVENT: &str = "settings-navigate";
+
 /// Shows, unminimizes, and focuses a window, bringing the app out of Accessory
 /// mode so it appears in the Dock and can take focus while open. Shared by the
 /// `open_main_window`/`open_settings_window` commands, the tray, and startup —
@@ -913,8 +919,12 @@ pub fn open_main_window(app: AppHandle) {
 }
 
 /// Shows and focuses the Settings window — the "⚙ Settings" action in the App
-/// window's sidebar.
+/// window's sidebar. When `tab` is given, asks the already-open window to switch
+/// to that tab so a deep link from the App window lands where it meant to.
 #[tauri::command]
-pub fn open_settings_window(app: AppHandle) {
+pub fn open_settings_window(app: AppHandle, tab: Option<String>) {
     show_window(&app, SETTINGS_WINDOW_LABEL);
+    if let Some(tab) = tab {
+        let _ = app.emit(SETTINGS_NAVIGATE_EVENT, tab);
+    }
 }
