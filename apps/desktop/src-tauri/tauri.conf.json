@@ -24,6 +24,17 @@
         "visible": false
       },
       {
+        "label": "settings",
+        "title": "Settings",
+        "url": "settings.html",
+        "width": 840,
+        "height": 620,
+        "minWidth": 760,
+        "minHeight": 540,
+        "center": true,
+        "visible": false
+      },
+      {
         "label": "hud",
         "title": "Velata HUD",
         "url": "hud.html",

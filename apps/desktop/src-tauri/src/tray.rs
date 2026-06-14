@@ -4,6 +4,7 @@ use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager};
 
+use crate::commands;
 use crate::settings::{InsertMethod, SETTINGS_CHANGED_EVENT};
 use crate::state::AppState;
 use crate::stt_profiles::CLOUD_STT_PREFIX;
@@ -172,14 +173,8 @@ fn set_active_mode(app: &AppHandle, mode_id: &str) {
     }
 }
 
-/// Shows the settings window, bringing the app out of Accessory mode so it
-/// appears in the Dock and can take focus while open.
+/// Shows the App window from the tray and startup paths, bringing the app out
+/// of Accessory mode so it appears in the Dock and can take focus while open.
 pub fn show_settings_window(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-    }
+    commands::show_window(app, commands::MAIN_WINDOW_LABEL);
 }

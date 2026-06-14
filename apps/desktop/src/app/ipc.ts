@@ -104,6 +104,8 @@ export const ipc = {
     invoke(COMMANDS.transformNoteText, { noteId, transformId }),
   openScratchpadWindow: (noteId: string | null): Promise<void> =>
     invoke(COMMANDS.openScratchpadWindow, { noteId }),
+  openMainWindow: (): Promise<void> => invoke(COMMANDS.openMainWindow),
+  openSettingsWindow: (): Promise<void> => invoke(COMMANDS.openSettingsWindow),
 };
 
 export const events = {

@@ -118,6 +118,25 @@ pub fn save_settings(
     Ok(saved)
 }
 
+/// The App window (the Features half of the former single window).
+pub const MAIN_WINDOW_LABEL: &str = "main";
+/// The Settings window (the configuration half).
+pub const SETTINGS_WINDOW_LABEL: &str = "settings";
+
+/// Shows, unminimizes, and focuses a window, bringing the app out of Accessory
+/// mode so it appears in the Dock and can take focus while open. Shared by the
+/// `open_main_window`/`open_settings_window` commands, the tray, and startup —
+/// best-effort, like all window show paths. No-op if the label is unknown.
+pub fn show_window(app: &AppHandle, label: &str) {
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+    if let Some(window) = app.get_webview_window(label) {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
 /// Regular keeps a Dock icon; Accessory is menu-bar-only. No-op off macOS.
 /// Not an IPC command — called from `main.rs` and `save_settings`.
 pub fn apply_dock_policy(app: &AppHandle, show_in_dock: bool) {
@@ -884,4 +903,18 @@ pub async fn transform_note_text(
 pub fn open_scratchpad_window(app: AppHandle, note_id: Option<String>) -> AppResult<()> {
     scratchpad::open(&app, note_id)
         .map_err(|e| AppError::State(format!("could not open the Scratchpad: {e}")))
+}
+
+/// Shows and focuses the App window — the "‹ Velata" action in the Settings
+/// window's sidebar.
+#[tauri::command]
+pub fn open_main_window(app: AppHandle) {
+    show_window(&app, MAIN_WINDOW_LABEL);
+}
+
+/// Shows and focuses the Settings window — the "⚙ Settings" action in the App
+/// window's sidebar.
+#[tauri::command]
+pub fn open_settings_window(app: AppHandle) {
+    show_window(&app, SETTINGS_WINDOW_LABEL);
 }

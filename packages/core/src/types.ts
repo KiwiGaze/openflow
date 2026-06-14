@@ -529,4 +529,6 @@ export const COMMANDS = {
   restoreNoteVersion: 'restore_note_version',
   transformNoteText: 'transform_note_text',
   openScratchpadWindow: 'open_scratchpad_window',
+  openMainWindow: 'open_main_window',
+  openSettingsWindow: 'open_settings_window',
 } as const;

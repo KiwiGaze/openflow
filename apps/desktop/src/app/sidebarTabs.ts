@@ -1,7 +1,9 @@
 /**
- * Sidebar information architecture: two labeled sections rendered as separate
- * tablists, but one continuous keyboard ring across both (Arrow keys wrap and
- * cross the section boundary; Home/End jump to the first/last tab overall).
+ * Sidebar information architecture. The app is split into two windows, each
+ * with its own sidebar: the App window shows the Features tabs, the Settings
+ * window shows the Settings tabs. Each window's tabs form one self-contained
+ * keyboard ring — Arrow keys wrap within that window and never cross into the
+ * other window's tabs; Home/End jump to the first/last tab of that window.
  */
 
 export type TabId =
@@ -29,7 +31,8 @@ export interface SidebarSection {
   tabs: readonly SidebarTab[];
 }
 
-export const SIDEBAR_SECTIONS: readonly SidebarSection[] = [
+/** Sections shown in the App window (the Features tabs). */
+export const APP_SECTIONS: readonly SidebarSection[] = [
   {
     label: 'Features',
     tabs: [
@@ -42,6 +45,10 @@ export const SIDEBAR_SECTIONS: readonly SidebarSection[] = [
       { id: 'scratchpad', label: 'Scratchpad' },
     ],
   },
+];
+
+/** Sections shown in the Settings window (the Settings tabs). */
+export const SETTINGS_SECTIONS: readonly SidebarSection[] = [
   {
     label: 'Settings',
     tabs: [
@@ -55,20 +62,23 @@ export const SIDEBAR_SECTIONS: readonly SidebarSection[] = [
   },
 ];
 
-/** The flat, ordered ring of tab ids — both sections, in display order. */
-export const SIDEBAR_TAB_IDS: readonly TabId[] = SIDEBAR_SECTIONS.flatMap((s) =>
-  s.tabs.map((t) => t.id),
-);
+const flatIds = (sections: readonly SidebarSection[]): readonly TabId[] =>
+  sections.flatMap((s) => s.tabs.map((t) => t.id));
+
+/** The App window's keyboard ring, in display order. */
+export const APP_TAB_IDS: readonly TabId[] = flatIds(APP_SECTIONS);
+
+/** The Settings window's keyboard ring, in display order. */
+export const SETTINGS_TAB_IDS: readonly TabId[] = flatIds(SETTINGS_SECTIONS);
 
 /**
- * Given the current tab id and a navigation key, return the id to move to, or
- * null if the key is not a navigation key. ArrowDown/ArrowRight advance (wrap
- * past the last tab to the first); ArrowUp/ArrowLeft retreat (wrap past the
- * first to the last); Home/End jump to the ends. Section boundaries are
- * invisible to the ring — the order is purely SIDEBAR_TAB_IDS.
+ * Given a window's tab ring, the current tab id, and a navigation key, return
+ * the id to move to, or null if the key is not a navigation key or `current` is
+ * not in this ring. ArrowDown/ArrowRight advance (wrap past the last tab to the
+ * first); ArrowUp/ArrowLeft retreat (wrap past the first to the last); Home/End
+ * jump to the ends. The ring is closed: navigation never leaves it.
  */
-export function nextTabId(current: TabId, key: string): TabId | null {
-  const ids = SIDEBAR_TAB_IDS;
+export function nextTabId(ids: readonly TabId[], current: TabId, key: string): TabId | null {
   const idx = ids.indexOf(current);
   if (idx === -1) return null;
   if (key === 'ArrowDown' || key === 'ArrowRight') return ids[(idx + 1) % ids.length] ?? null;

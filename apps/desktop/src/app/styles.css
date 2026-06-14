@@ -263,6 +263,17 @@ button:focus-visible,
   color: var(--accent-text);
 }
 
+/* Pin the window-switch action to the bottom of the column sidebar. */
+.sidebar-bottom {
+  margin-top: auto;
+}
+
+.sidebar-bottom-glyph {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
 .content {
   flex: 1;
   overflow-y: auto;

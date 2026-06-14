@@ -142,16 +142,31 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Closing the settings window hides it; the app lives in the
-            // menu bar until quit from the tray.
-            if window.label() == "main" {
+            // Closing either the App or Settings window hides it; the app lives
+            // in the menu bar until quit from the tray.
+            let label = window.label();
+            let other = match label {
+                commands::MAIN_WINDOW_LABEL => Some(commands::SETTINGS_WINDOW_LABEL),
+                commands::SETTINGS_WINDOW_LABEL => Some(commands::MAIN_WINDOW_LABEL),
+                _ => None,
+            };
+            if let Some(other) = other {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
-                    // Drop the Dock icon on close — unless the user pinned it.
                     let app = window.app_handle();
-                    let show_in_dock = app.state::<AppState>().settings.get().show_in_dock;
-                    commands::apply_dock_policy(app, show_in_dock);
+                    // Keep the Dock icon while the other window is still open;
+                    // only drop to Accessory once neither is visible (and the
+                    // user has not pinned the Dock icon). Never upgrade to
+                    // Regular here, so there is no Accessory→Regular flicker.
+                    let other_visible = app
+                        .get_webview_window(other)
+                        .and_then(|w| w.is_visible().ok())
+                        .unwrap_or(false);
+                    if !other_visible {
+                        let show_in_dock = app.state::<AppState>().settings.get().show_in_dock;
+                        commands::apply_dock_policy(app, show_in_dock);
+                    }
                 }
             }
         })
@@ -209,6 +224,8 @@ fn main() {
             commands::restore_note_version,
             commands::transform_note_text,
             commands::open_scratchpad_window,
+            commands::open_main_window,
+            commands::open_settings_window,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Velata")
