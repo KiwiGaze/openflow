@@ -270,6 +270,14 @@ pub fn set_changes_interactive(app: AppHandle, interactive: bool) {
     }
 }
 
+/// Reports whether the HUD's post-dictation dropdown is open. While open, the
+/// HUD's cursor poll forces the whole (never-shown) window interactive so a
+/// radio click anywhere in the frame lands; otherwise only the circle is.
+#[tauri::command]
+pub fn set_hud_menu_open(open: bool) {
+    crate::hud::set_menu_open(open);
+}
+
 /// Returns the lifetime Insights, always computed from `insights_daily` (which
 /// is written on every dictation): total words, total dictations, speaking pace,
 /// and the current day streak — counts and dates only, never words or audio.

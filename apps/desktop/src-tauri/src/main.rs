@@ -190,6 +190,7 @@ fn main() {
             commands::dismiss_dictionary_suggestion,
             commands::copy_text,
             commands::set_changes_interactive,
+            commands::set_hud_menu_open,
             commands::test_llm,
             commands::list_llm_profiles,
             commands::save_llm_profile,

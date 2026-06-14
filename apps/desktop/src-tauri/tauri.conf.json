@@ -39,7 +39,7 @@
         "title": "Velata HUD",
         "url": "hud.html",
         "width": 600,
-        "height": 72,
+        "height": 280,
         "visible": false,
         "decorations": false,
         "transparent": true,

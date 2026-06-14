@@ -1406,13 +1406,24 @@ button:focus-visible,
 
 /* ---- HUD ---- */
 
-/* No overflow clipping: a later slice opens a dropdown above the pill. */
+/* No overflow clipping: the circle's dropdown opens above the pill. */
 .hud-body {
   background: transparent;
 }
 
-/* Bottom-anchored so its on-screen position survives a later window-height
- * enlargement (the dropdown grows the window upward, not the pill). */
+/* Spans the whole frame so a click on empty HUD space lands on the root and
+ * dismisses an open menu. Its children are all `position: fixed` (out of flow),
+ * so without this the block collapses to zero height and the click-away never
+ * fires. Keep default pointer-events: the OS-level `ignore_cursor_events` makes
+ * the frame click-through while the menu is closed, so the root only receives
+ * clicks when the menu is open — exactly when click-away should fire. */
+.hud-root {
+  position: fixed;
+  inset: 0;
+}
+
+/* Bottom-anchored so its on-screen position survives the taller window
+ * (the dropdown grows the window upward, not the pill). */
 .hud-pill {
   position: fixed;
   left: 0;
@@ -1447,9 +1458,10 @@ button:focus-visible,
   transform: translateY(0);
 }
 
-/* Persistent transform affordance, pinned bottom-right. Never gets
- * `.hud-visible`, so it stays at full opacity even when the pill fades at
- * idle; a later slice anchors a Rust hit-test to this fixed corner. */
+/* Persistent transform control, pinned bottom-right. Never gets
+ * `.hud-visible`, so it stays at full opacity even when the pill fades at idle;
+ * the Rust cursor poll anchors its hit-test to this fixed corner. Button chrome
+ * is reset so it reads as the circle, not an OS button. */
 .hud-circle {
   position: fixed;
   right: 12px;
@@ -1459,14 +1471,72 @@ button:focus-visible,
   display: flex;
   align-items: center;
   justify-content: center;
+  border: none;
   border-radius: 50%;
   background: var(--hud-bg);
   color: var(--hud-text);
   box-shadow: var(--shadow-hud);
+  font: inherit;
   font-size: 15px;
   line-height: 1;
+  padding: 0;
   opacity: 1;
+  cursor: pointer;
   pointer-events: auto;
+}
+
+/* The post-dictation radio menu. Opens upward from just above the circle —
+ * the window was enlarged (height 280) so this transparent space exists above
+ * the bottom-anchored pill. Bottom-anchored to the same corner as the circle. */
+.hud-menu {
+  position: fixed;
+  right: 12px;
+  bottom: 48px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 200px;
+  max-width: 88%;
+  max-height: 220px;
+  overflow-y: auto;
+  border-radius: var(--radius-md);
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  box-shadow: var(--shadow-hud);
+  pointer-events: auto;
+}
+
+.hud-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.hud-menu-item:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+/* Leading radio dot, drawn with ::before so the label text stays the a11y name. */
+.hud-menu-item::before {
+  content: '○';
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.hud-menu-checked::before {
+  content: '●';
+  opacity: 1;
 }
 
 .hud-error {

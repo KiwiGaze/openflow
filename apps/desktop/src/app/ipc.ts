@@ -51,6 +51,7 @@ export const ipc = {
   copyText: (text: string): Promise<void> => invoke(COMMANDS.copyText, { text }),
   setChangesInteractive: (interactive: boolean): Promise<void> =>
     invoke(COMMANDS.setChangesInteractive, { interactive }),
+  setHudMenuOpen: (open: boolean): Promise<void> => invoke(COMMANDS.setHudMenuOpen, { open }),
   testLlm: (profile: LlmProfile): Promise<LlmTestResult> => invoke(COMMANDS.testLlm, { profile }),
   listLlmProfiles: (): Promise<LlmProfile[]> => invoke(COMMANDS.listLlmProfiles),
   saveLlmProfile: (profile: LlmProfile): Promise<LlmProfile[]> =>

@@ -375,6 +375,7 @@ export const COMMANDS = {
   dismissDictionarySuggestion: 'dismiss_dictionary_suggestion',
   copyText: 'copy_text',
   setChangesInteractive: 'set_changes_interactive',
+  setHudMenuOpen: 'set_hud_menu_open',
   testLlm: 'test_llm',
   listLlmProfiles: 'list_llm_profiles',
   saveLlmProfile: 'save_llm_profile',
