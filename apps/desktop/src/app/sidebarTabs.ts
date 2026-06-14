@@ -14,9 +14,6 @@ export type TabId =
   | 'dictation'
   | 'speech'
   | 'ai'
-  | 'modes'
-  | 'models'
-  | 'output'
   | 'general'
   | 'about';
 
@@ -26,14 +23,21 @@ export interface SidebarTab {
 }
 
 export interface SidebarSection {
-  label: string;
+  /**
+   * Optional visible group heading above the tabs. When a window has a single
+   * section the heading is redundant, so it is omitted; the tablist still needs
+   * a name for screen readers, which `ariaLabel` always supplies.
+   */
+  label?: string;
+  /** Accessible name for the tablist, announced even when `label` is absent. */
+  ariaLabel: string;
   tabs: readonly SidebarTab[];
 }
 
 /** Sections shown in the App window (the Features tabs). */
 export const APP_SECTIONS: readonly SidebarSection[] = [
   {
-    label: 'Features',
+    ariaLabel: 'Features',
     tabs: [
       { id: 'home', label: 'Home' },
       { id: 'library', label: 'Library' },
@@ -46,7 +50,7 @@ export const APP_SECTIONS: readonly SidebarSection[] = [
 /** Sections shown in the Settings window (the Settings tabs). */
 export const SETTINGS_SECTIONS: readonly SidebarSection[] = [
   {
-    label: 'Settings',
+    ariaLabel: 'Settings',
     tabs: [
       { id: 'dictation', label: 'Dictation' },
       { id: 'speech', label: 'Speech' },

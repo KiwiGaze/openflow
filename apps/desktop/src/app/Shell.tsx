@@ -48,14 +48,16 @@ export function Shell({
       <nav className="sidebar">
         <div className="sidebar-brand">Velata</div>
         {sections.map((section) => (
-          <div key={section.label}>
-            <div className="sidebar-section-label" aria-hidden>
-              {section.label}
-            </div>
+          <div key={section.ariaLabel}>
+            {section.label && (
+              <div className="sidebar-section-label" aria-hidden>
+                {section.label}
+              </div>
+            )}
             <div
               role="tablist"
               aria-orientation="vertical"
-              aria-label={section.label}
+              aria-label={section.ariaLabel}
               className="sidebar-tabs"
               onKeyDown={onTabsKeyDown}
             >

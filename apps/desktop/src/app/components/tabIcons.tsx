@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import type { TabId } from '../sidebarTabs.js';
 
 /**
  * One inline SVG per sidebar page (09 §5.7). Decorative (aria-hidden); the
@@ -22,7 +23,7 @@ function Icon({ children }: { children: JSX.Element }): JSX.Element {
   );
 }
 
-export const TAB_ICONS: Record<string, JSX.Element> = {
+export const TAB_ICONS: Record<TabId, JSX.Element> = {
   // house
   home: (
     <Icon>
@@ -30,15 +31,6 @@ export const TAB_ICONS: Record<string, JSX.Element> = {
         <path d="M2.5 7.5 8 3l5.5 4.5" />
         <path d="M3.5 6.8V13a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5V6.8" />
         <path d="M6.5 13.5V9.5h3v4" />
-      </>
-    </Icon>
-  ),
-  // paintbrush
-  style: (
-    <Icon>
-      <>
-        <path d="M13 3 7 9" />
-        <path d="M6.5 8.5a2 2 0 0 1 2 2c0 1.4-1.3 2.5-3 2.5-.6 0-1.2-.2-1.7-.5.6-.2 1-.8 1-1.5a1.5 1.5 0 0 1 1.7-2.5z" />
       </>
     </Icon>
   ),
@@ -84,35 +76,6 @@ export const TAB_ICONS: Record<string, JSX.Element> = {
       </>
     </Icon>
   ),
-  // sliders
-  modes: (
-    <Icon>
-      <>
-        <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
-        <circle cx="5.5" cy="4.5" r="1.4" fill="currentColor" stroke="none" />
-        <circle cx="10.5" cy="8" r="1.4" fill="currentColor" stroke="none" />
-        <circle cx="6.5" cy="11.5" r="1.4" fill="currentColor" stroke="none" />
-      </>
-    </Icon>
-  ),
-  // chip
-  models: (
-    <Icon>
-      <>
-        <rect x="4.5" y="4.5" width="7" height="7" rx="1" />
-        <path d="M6.5 2.5v2M9.5 2.5v2M6.5 11.5v2M9.5 11.5v2M2.5 6.5h2M2.5 9.5h2M11.5 6.5h2M11.5 9.5h2" />
-      </>
-    </Icon>
-  ),
-  // arrow leaving a box
-  output: (
-    <Icon>
-      <>
-        <path d="M8.5 3.5H4.5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V7.5" />
-        <path d="M8 8l5-5M9.5 3H13v3.5" />
-      </>
-    </Icon>
-  ),
   // stacked cards
   library: (
     <Icon>
@@ -120,27 +83,6 @@ export const TAB_ICONS: Record<string, JSX.Element> = {
         <rect x="2.5" y="5.5" width="11" height="8" rx="1" />
         <path d="M4 3.5h8M5.5 1.5h5" />
       </>
-    </Icon>
-  ),
-  // book
-  dictionary: (
-    <Icon>
-      <>
-        <path d="M3.5 3a1 1 0 0 1 1-1H12a.5.5 0 0 1 .5.5v10a.5.5 0 0 1-.5.5H4.5a1 1 0 0 1-1-1z" />
-        <path d="M3.5 11.5a1 1 0 0 1 1-1h8" />
-      </>
-    </Icon>
-  ),
-  // lightning (expansion)
-  snippets: (
-    <Icon>
-      <path d="M8.5 1.5 3.5 9h3.5l-1 5.5 5.5-7.5H8z" />
-    </Icon>
-  ),
-  // bar chart
-  insights: (
-    <Icon>
-      <path d="M3 13.5V9M7 13.5V5.5M11 13.5V7.5M14 13.5H2" />
     </Icon>
   ),
   // gear

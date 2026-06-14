@@ -35,7 +35,7 @@ export function Settings(): JSX.Element {
   useThemeSync(api?.settings.appearance);
   useWindowClose();
 
-  // Follow a deep link from the App window (e.g. Home's Setup card → "models").
+  // Follow a deep link from the App window (e.g. Scratchpad's gate → "general").
   useEffect(() => {
     return subscribe(
       events.onSettingsNavigate((id) => {

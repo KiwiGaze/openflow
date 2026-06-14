@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { APP_TAB_IDS, nextTabId, SETTINGS_TAB_IDS, type TabId } from './sidebarTabs.js';
+import {
+  APP_SECTIONS,
+  APP_TAB_IDS,
+  nextTabId,
+  SETTINGS_SECTIONS,
+  SETTINGS_TAB_IDS,
+  type TabId,
+} from './sidebarTabs.js';
 
 describe('tab rings', () => {
   it('lists the App (Features) tabs in order', () => {
@@ -8,6 +15,17 @@ describe('tab rings', () => {
 
   it('lists the Settings tabs in order', () => {
     expect([...SETTINGS_TAB_IDS]).toEqual(['dictation', 'speech', 'ai', 'general', 'about']);
+  });
+});
+
+describe('sidebar sections', () => {
+  it('name the tablist for screen readers without a visible group heading', () => {
+    // Each window has a single section, so the visible label is dropped; the
+    // tablist must still carry an accessible name via ariaLabel.
+    for (const section of [...APP_SECTIONS, ...SETTINGS_SECTIONS]) {
+      expect(section.label).toBeUndefined();
+      expect(section.ariaLabel).toBeTruthy();
+    }
   });
 });
 
