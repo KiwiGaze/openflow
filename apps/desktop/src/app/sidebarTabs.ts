@@ -12,6 +12,8 @@ export type TabId =
   | 'transforms'
   | 'scratchpad'
   | 'dictation'
+  | 'speech'
+  | 'ai'
   | 'modes'
   | 'models'
   | 'output'
@@ -47,9 +49,8 @@ export const SETTINGS_SECTIONS: readonly SidebarSection[] = [
     label: 'Settings',
     tabs: [
       { id: 'dictation', label: 'Dictation' },
-      { id: 'modes', label: 'Modes' },
-      { id: 'models', label: 'Models' },
-      { id: 'output', label: 'Output' },
+      { id: 'speech', label: 'Speech' },
+      { id: 'ai', label: 'AI' },
       { id: 'general', label: 'General' },
       { id: 'about', label: 'About' },
     ],

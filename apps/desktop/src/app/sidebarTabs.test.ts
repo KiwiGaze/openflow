@@ -7,14 +7,7 @@ describe('tab rings', () => {
   });
 
   it('lists the Settings tabs in order', () => {
-    expect([...SETTINGS_TAB_IDS]).toEqual([
-      'dictation',
-      'modes',
-      'models',
-      'output',
-      'general',
-      'about',
-    ]);
+    expect([...SETTINGS_TAB_IDS]).toEqual(['dictation', 'speech', 'ai', 'general', 'about']);
   });
 });
 
@@ -41,8 +34,8 @@ describe('nextTabId', () => {
   it('jumps to the first/last tab of the given ring on Home/End', () => {
     expect(nextTabId(APP_TAB_IDS, 'library', 'Home')).toBe('home');
     expect(nextTabId(APP_TAB_IDS, 'library', 'End')).toBe('scratchpad');
-    expect(nextTabId(SETTINGS_TAB_IDS, 'models', 'Home')).toBe('dictation');
-    expect(nextTabId(SETTINGS_TAB_IDS, 'models', 'End')).toBe('about');
+    expect(nextTabId(SETTINGS_TAB_IDS, 'speech', 'Home')).toBe('dictation');
+    expect(nextTabId(SETTINGS_TAB_IDS, 'speech', 'End')).toBe('about');
   });
 
   it('returns null for non-navigation keys and ids outside the given ring', () => {

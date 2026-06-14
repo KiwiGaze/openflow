@@ -69,6 +69,21 @@ export const TAB_ICONS: Record<string, JSX.Element> = {
       </>
     </Icon>
   ),
+  // sound waveform
+  speech: (
+    <Icon>
+      <path d="M2 8h1.5M5 5v6M7.5 2.5v11M10 5v6M12.5 8H14" />
+    </Icon>
+  ),
+  // sparkle
+  ai: (
+    <Icon>
+      <>
+        <path d="M8 2.5c.4 2.4 1.1 3.1 3.5 3.5-2.4.4-3.1 1.1-3.5 3.5-.4-2.4-1.1-3.1-3.5-3.5C6.9 5.6 7.6 4.9 8 2.5z" />
+        <path d="M12.5 9.5c.2 1.1.5 1.4 1.6 1.6-1.1.2-1.4.5-1.6 1.6-.2-1.1-.5-1.4-1.6-1.6 1.1-.2 1.4-.5 1.6-1.6z" />
+      </>
+    </Icon>
+  ),
   // sliders
   modes: (
     <Icon>

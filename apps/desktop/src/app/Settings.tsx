@@ -9,11 +9,10 @@ import { Callout } from './components/Callout.js';
 import { Shell } from './Shell.js';
 import { SETTINGS_SECTIONS, SETTINGS_TAB_IDS, type TabId } from './sidebarTabs.js';
 import { AboutTab } from './tabs/AboutTab.js';
+import { AITab } from './tabs/AITab.js';
 import { DictationTab } from './tabs/DictationTab.js';
 import { GeneralTab } from './tabs/GeneralTab.js';
-import { ModelsTab } from './tabs/ModelsTab.js';
-import { ModesTab } from './tabs/ModesTab.js';
-import { OutputTab } from './tabs/OutputTab.js';
+import { SpeechTab } from './tabs/SpeechTab.js';
 
 /** Narrows a wire string to a Settings-window tab id, ignoring anything else. */
 function isSettingsTab(id: string): id is TabId {
@@ -89,9 +88,8 @@ export function Settings(): JSX.Element {
         </Callout>
       )}
       {tab === 'dictation' && <DictationTab api={api} modelsApi={modelsApi} />}
-      {tab === 'modes' && <ModesTab api={api} modelsApi={modelsApi} />}
-      {tab === 'models' && <ModelsTab api={api} modelsApi={modelsApi} />}
-      {tab === 'output' && <OutputTab api={api} />}
+      {tab === 'speech' && <SpeechTab api={api} modelsApi={modelsApi} />}
+      {tab === 'ai' && <AITab api={api} />}
       {tab === 'general' && <GeneralTab api={api} />}
       {tab === 'about' && <AboutTab />}
     </Shell>

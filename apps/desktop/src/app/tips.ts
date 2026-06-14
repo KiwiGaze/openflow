@@ -18,19 +18,11 @@ export interface Tip {
  */
 const TIPS: Tip[] = [
   {
-    id: 'tip.modes',
-    page: 'dictation',
-    copy: 'Modes change how your words come out — Email, Notes, code, or your own. Pick one in the menu bar, or make your own.',
-    actionLabel: 'Open Modes',
-    actionTab: 'modes',
-    predicate: (s) => s.dictationCount >= 3 && s.modes.every((m) => m.builtIn),
-  },
-  {
     id: 'tip.ai',
     page: 'dictation',
     copy: 'Want sharper cleanup? Add a local Ollama model or your own API key and Velata will polish transcripts with AI.',
     actionLabel: 'Set up AI',
-    actionTab: 'models',
+    actionTab: 'ai',
     predicate: (s) =>
       s.dictationCount >= 4 && s.activeLlmProfileId === '' && s.polishAfterDictation,
   },

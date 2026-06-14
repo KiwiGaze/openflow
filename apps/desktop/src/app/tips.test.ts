@@ -52,26 +52,19 @@ const base: Settings = {
 };
 
 describe('eligibleTip', () => {
-  it('shows tip.modes after 3 dictations with only built-in modes', () => {
-    expect(eligibleTip('dictation', { ...base, dictationCount: 3 }, '2026-06-11')?.id).toBe(
-      'tip.modes',
-    );
-  });
-
   it('shows nothing on a non-dictation page', () => {
-    expect(eligibleTip('models', { ...base, dictationCount: 4 }, '2026-06-11')).toBeNull();
+    expect(eligibleTip('ai', { ...base, dictationCount: 4 }, '2026-06-11')).toBeNull();
   });
 
   it('respects tipsEnabled, the daily cap, and tipsSeen', () => {
-    const s = { ...base, dictationCount: 3 };
+    const s = { ...base, dictationCount: 4 };
     expect(eligibleTip('dictation', { ...s, tipsEnabled: false }, 'd')).toBeNull();
     expect(eligibleTip('dictation', { ...s, lastTipShownAt: 'd' }, 'd')).toBeNull();
-    expect(eligibleTip('dictation', { ...s, tipsSeen: ['tip.modes'] }, 'd')).toBeNull();
+    expect(eligibleTip('dictation', { ...s, tipsSeen: ['tip.ai'] }, 'd')).toBeNull();
   });
 
-  it('shows tip.ai once a custom mode exists but no AI profile is set', () => {
-    const custom: Mode = { ...standardMode, id: 'custom', builtIn: false };
-    const s = { ...base, dictationCount: 4, modes: [standardMode, custom] };
+  it('shows tip.ai after 4 dictations when no AI profile is set', () => {
+    const s = { ...base, dictationCount: 4 };
     expect(eligibleTip('dictation', s, 'd')?.id).toBe('tip.ai');
   });
 });

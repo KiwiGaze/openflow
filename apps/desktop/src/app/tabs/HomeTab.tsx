@@ -287,22 +287,15 @@ function SetupCard({
   onNavigate: (tab: TabId) => void;
 }): JSX.Element | null {
   const [permissions, setPermissions] = useState<PermissionsState | null>(null);
-  // Fetched directly (not via useLlmProfiles) so the optional AI hint can wait
-  // for a real answer instead of flashing during the empty initial load.
-  const [aiMissing, setAiMissing] = useState<boolean | null>(null);
 
   useEffect(() => {
     void ipc.checkPermissions().then(setPermissions);
-    void ipc.listLlmProfiles().then((profiles) => {
-      setAiMissing(profiles.length === 0);
-    });
   }, []);
 
   const micMissing = permissions !== null && permissions.microphone !== 'granted';
-  const accessibilityMissing = permissions !== null && !permissions.accessibility;
   const modelMissing = !modelsApi.models.some((m) => m.installed);
 
-  if (!micMissing && !accessibilityMissing && !modelMissing && aiMissing !== true) {
+  if (!micMissing && !modelMissing) {
     return null;
   }
 
@@ -318,30 +311,12 @@ function SetupCard({
           }}
         />
       )}
-      {accessibilityMissing && (
-        <SetupRow
-          label="Allow accessibility for paste"
-          actionLabel="Output"
-          onClick={() => {
-            onNavigate('output');
-          }}
-        />
-      )}
       {modelMissing && (
         <SetupRow
           label="Download a speech model"
-          actionLabel="Models"
+          actionLabel="Speech"
           onClick={() => {
-            onNavigate('models');
-          }}
-        />
-      )}
-      {aiMissing === true && (
-        <SetupRow
-          label="Add an AI provider (optional)"
-          actionLabel="Models"
-          onClick={() => {
-            onNavigate('models');
+            onNavigate('speech');
           }}
         />
       )}
