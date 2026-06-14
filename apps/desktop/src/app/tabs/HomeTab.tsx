@@ -14,8 +14,6 @@ const dateFormat = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
 });
 
-type ModeName = (modeId: string) => string;
-
 export function HomeTab({
   api,
   modelsApi,
@@ -27,8 +25,6 @@ export function HomeTab({
 }): JSX.Element {
   const now = new Date();
   const greeting = greetingForHour(now.getHours());
-  const modeName: ModeName = (modeId) =>
-    api.settings.modes.find((m) => m.id === modeId)?.name ?? modeId;
 
   return (
     <div className="tab-body">
@@ -37,16 +33,13 @@ export function HomeTab({
         <p className="row-hint">{dateFormat.format(now)}</p>
       </header>
 
+      <HomeStats />
+
       <div className="home-grid">
         <div className="home-main">
-          {api.settings.historyEnabled ? (
-            <HistorySection modeName={modeName} api={api} />
-          ) : (
-            <HistoryOffCard api={api} />
-          )}
+          {api.settings.historyEnabled ? <HistorySection /> : <HistoryOffCard api={api} />}
         </div>
         <aside className="home-aside">
-          <UsageCard />
           <SetupCard modelsApi={modelsApi} onNavigate={onNavigate} />
         </aside>
       </div>
@@ -54,7 +47,34 @@ export function HomeTab({
   );
 }
 
-function HistorySection({ modeName, api }: { modeName: ModeName; api: SettingsApi }): JSX.Element {
+/** Four-up activity summary; hidden until at least one dictation is recorded. */
+function HomeStats(): JSX.Element | null {
+  const { insights } = useInsights();
+
+  if (!insights || insights.dictations === 0) {
+    return null;
+  }
+
+  return (
+    <div className="home-stats">
+      <Stat value={insights.totalWords.toLocaleString()} label="words" />
+      <Stat value={String(insights.dictations)} label="dictations" />
+      <Stat value={String(insights.wordsPerMinute)} label="wpm" />
+      <Stat value={String(insights.streak?.current ?? 0)} label="day streak" />
+    </div>
+  );
+}
+
+function Stat({ value, label }: { value: string; label: string }): JSX.Element {
+  return (
+    <div className="home-stat">
+      <div className="home-stat-number">{value}</div>
+      <div className="home-stat-label">{label}</div>
+    </div>
+  );
+}
+
+function HistorySection(): JSX.Element {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
 
   const refresh = useCallback(() => {
@@ -85,14 +105,7 @@ function HistorySection({ modeName, api }: { modeName: ModeName; api: SettingsAp
           <div key={group.key} className="home-day">
             <div className="home-day-label">{group.label}</div>
             {group.entries.map((entry) => (
-              <HistoryRow
-                key={entry.id}
-                entry={entry}
-                modeName={modeName}
-                modes={api.settings.modes}
-                activeModeId={api.settings.activeModeId}
-                onChanged={refresh}
-              />
+              <HistoryRow key={entry.id} entry={entry} onChanged={refresh} />
             ))}
           </div>
         ))
@@ -103,42 +116,15 @@ function HistorySection({ modeName, api }: { modeName: ModeName; api: SettingsAp
 
 function HistoryRow({
   entry,
-  modeName,
-  modes,
-  activeModeId,
   onChanged,
 }: {
   entry: HistoryEntry;
-  modeName: ModeName;
-  modes: SettingsApi['settings']['modes'];
-  activeModeId: string;
   onChanged: () => void;
 }): JSX.Element {
-  const [open, setOpen] = useState(false);
-  const [reprocessMode, setReprocessMode] = useState(activeModeId);
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const copy = (text: string): void => {
-    void ipc.copyText(text).catch((err: unknown) => {
+  const copy = (): void => {
+    void ipc.copyText(entry.text).catch((err: unknown) => {
       console.error('Copy failed:', err);
     });
-  };
-
-  const rerun = (): void => {
-    setRunning(true);
-    setError(null);
-    setResult(null);
-    void ipc
-      .reprocessHistory(entry.text, reprocessMode)
-      .then(setResult)
-      .catch((err: unknown) => {
-        setError(String(err));
-      })
-      .finally(() => {
-        setRunning(false);
-      });
   };
 
   const remove = (): void => {
@@ -146,81 +132,22 @@ function HistoryRow({
       .deleteHistoryEntry(entry.id)
       .then(onChanged)
       .catch((err: unknown) => {
-        setError(`Couldn't delete this entry. ${String(err)}`);
+        console.error('Delete failed:', err);
       });
   };
 
   return (
     <div className="home-entry">
-      <button
-        type="button"
-        className="home-entry-head"
-        aria-expanded={open}
-        onClick={() => {
-          setOpen(!open);
-        }}
-      >
-        <span className="home-entry-preview">{entry.text}</span>
-        <span className="home-entry-meta">
-          <span className="home-entry-time">{timeFormat.format(entry.at)}</span>
-          {entry.appName && <span className="home-entry-app">{entry.appName}</span>}
-          <span className="badge">{modeName(entry.modeId)}</span>
-        </span>
-      </button>
-
-      {open && (
-        <div className="home-entry-detail">
-          <div className="row-title">Raw transcript</div>
-          <p className="result-text">{entry.rawText}</p>
-
-          <div className="row-actions">
-            <button
-              className="btn btn-sm"
-              onClick={() => {
-                copy(entry.text);
-              }}
-            >
-              Copy
-            </button>
-            <select
-              aria-label="Re-run through mode"
-              value={reprocessMode}
-              onChange={(e) => {
-                setReprocessMode(e.target.value);
-              }}
-            >
-              {modes.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            <button className="btn btn-sm" disabled={running} onClick={rerun}>
-              {running ? 'Running…' : 'Run'}
-            </button>
-            <button className="btn btn-sm btn-danger" onClick={remove}>
-              Delete
-            </button>
-          </div>
-
-          {error && <p className="row-hint row-hint-warn">{error}</p>}
-          {result !== null && (
-            <div className="home-entry-result">
-              <p className="result-text">{result}</p>
-              <div className="row-actions">
-                <button
-                  className="btn btn-sm"
-                  onClick={() => {
-                    copy(result);
-                  }}
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <span className="home-entry-preview">{entry.text}</span>
+      <span className="home-entry-meta">
+        <span className="home-entry-time">{timeFormat.format(entry.at)}</span>
+        <button className="btn btn-sm" onClick={copy}>
+          Copy
+        </button>
+        <button className="btn btn-sm btn-danger" onClick={remove}>
+          Delete
+        </button>
+      </span>
     </div>
   );
 }
@@ -240,41 +167,6 @@ function HistoryOffCard({ api }: { api: SettingsApi }): JSX.Element {
           label="Save history"
         />
       </div>
-    </section>
-  );
-}
-
-function UsageCard(): JSX.Element {
-  const { insights } = useInsights();
-
-  return (
-    <section className="card">
-      <h2>Usage</h2>
-      {!insights || insights.dictations === 0 ? (
-        <p className="row-hint">No dictations yet this session.</p>
-      ) : (
-        <>
-          <div className="home-stat-row">
-            <span>Words</span>
-            <span className="home-stat-value">{insights.totalWords.toLocaleString()}</span>
-          </div>
-          <div className="home-stat-row">
-            <span>Words / min</span>
-            <span className="home-stat-value">{insights.wordsPerMinute}</span>
-          </div>
-          <div className="home-stat-row">
-            <span>Dictations</span>
-            <span className="home-stat-value">{insights.dictations}</span>
-          </div>
-          {insights.polishedPercent > 0 && (
-            <div className="home-stat-row">
-              <span>AI-polished</span>
-              <span className="home-stat-value">{insights.polishedPercent}%</span>
-            </div>
-          )}
-          <p className="row-hint">This session</p>
-        </>
-      )}
     </section>
   );
 }

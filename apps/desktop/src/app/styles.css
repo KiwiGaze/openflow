@@ -1056,6 +1056,39 @@ button:focus-visible,
   margin-top: var(--space-2);
 }
 
+/* Full-width activity summary above the grid; collapses to two-up on narrow windows. */
+.home-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-5);
+  margin: var(--space-7) 0;
+}
+
+@media (max-width: 620px) {
+  .home-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.home-stat {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-7);
+  text-align: center;
+}
+
+.home-stat-number {
+  font-size: 28px;
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+}
+
+.home-stat-label {
+  margin-top: var(--space-2);
+  font-size: var(--text-hint);
+  color: var(--text-dim);
+}
+
 /* Single column by default; a wide window splits into history + a fixed aside. */
 .home-grid {
   display: grid;
@@ -1089,24 +1122,15 @@ button:focus-visible,
 }
 
 .home-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) 0;
   border-top: 1px solid var(--border);
 }
 
 .home-entry:first-of-type {
   border-top: none;
-}
-
-.home-entry-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  padding: var(--space-4) 0;
-  cursor: pointer;
 }
 
 .home-entry-preview {
@@ -1122,29 +1146,11 @@ button:focus-visible,
   display: flex;
   align-items: center;
   gap: var(--space-3);
+}
+
+.home-entry-time {
   color: var(--text-faint);
   font-size: var(--text-hint);
-}
-
-.home-entry-app {
-  max-width: 140px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.home-entry-detail {
-  padding: 0 0 var(--space-5);
-}
-
-.home-entry-detail .row-title {
-  font-size: var(--text-hint);
-  color: var(--text-dim);
-  margin-bottom: var(--space-1);
-}
-
-.home-entry-result {
-  margin-top: var(--space-2);
 }
 
 .home-stat-row {
