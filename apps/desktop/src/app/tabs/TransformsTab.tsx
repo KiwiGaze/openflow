@@ -1,52 +1,39 @@
-import type { JSX } from 'react';
-import type { PolishRules, Transform } from '@velata/core';
+import { useRef, useState, type JSX } from 'react';
+import type { Transform } from '@velata/core';
 import type { SettingsApi } from '../hooks.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
-import { Row } from '../components/Row.js';
-import { Toggle } from '../components/Toggle.js';
+import { filterTransforms } from '../transformView.js';
 
-/** One-click starting points; the user assigns a hotkey afterwards. */
-const TRANSFORM_TEMPLATES: { name: string; instruction: string }[] = [
-  {
-    name: 'Concise',
-    instruction:
-      'Tighten the wording so it is as concise as possible. Keep the meaning, tone, and language. Do not add new information.',
-  },
-  {
-    name: 'Bullet points',
-    instruction:
-      'Restructure the text into short, scannable bullet points. Keep the meaning and language; do not invent details.',
-  },
-  {
-    name: 'Friendlier',
-    instruction:
-      'Rewrite in a warmer, friendlier tone. Keep the meaning and language; do not add new facts.',
-  },
-  {
-    name: 'Formal',
-    instruction:
-      'Rewrite in a polished, professional tone. Keep the meaning and language; do not add new information.',
-  },
-];
+/** Collapses whitespace and truncates a multi-line instruction for the card. */
+function preview(instruction: string): string {
+  const oneLine = instruction.replace(/\s+/g, ' ').trim();
+  if (oneLine === '') return 'Acts like Polish — fix grammar and spelling.';
+  return oneLine.length > 90 ? `${oneLine.slice(0, 90)}…` : oneLine;
+}
 
-/** The four Polish rule toggles, in the order they read on the card. */
-const POLISH_RULES: { key: keyof PolishRules; label: string }[] = [
-  { key: 'concise', label: 'Make it more concise' },
-  { key: 'clarity', label: 'Reword for clarity' },
-  { key: 'structure', label: 'Add structure for readability' },
-  { key: 'tone', label: 'Keep your tone' },
-];
+/** Identifies the create card while open, so it never collides with a real id. */
+const NEW_ID = 'new';
 
 /**
- * Transforms page: the selection-rewrite tools. The built-in Polish (its
- * hotkey + rule toggles), the built-in Prompt Engineer, and the user's own
- * transforms. Every one applies to the current selection via the active AI
- * profile — no voice.
+ * Transform page: one uniform card per prompt in `settings.transforms`, built-in
+ * and custom alike, in creation order. Each prompt rewrites the current
+ * selection through the active AI profile — no voice. The header's See-changes
+ * recorder edits the same `changeOverlayHotkey` as Settings → Dictation, so the
+ * two stay in sync through the settings subscription.
  */
 export function TransformsTab({ api }: { api: SettingsApi }): JSX.Element {
   const { settings, update } = api;
-  const builtIns = settings.transforms.filter((t) => t.builtIn);
-  const customs = settings.transforms.filter((t) => !t.builtIn);
+  const [query, setQuery] = useState('');
+  // Which card is in its editor: a transform id, NEW_ID for the create card, or
+  // null when none is open.
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editInstruction, setEditInstruction] = useState('');
+  const [editHotkey, setEditHotkey] = useState('');
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const matches = filterTransforms(settings.transforms, query);
+  const hasCustom = settings.transforms.some((t) => !t.builtIn);
 
   const patchTransform = (id: string, patch: Partial<Transform>): void => {
     void update({
@@ -54,164 +41,218 @@ export function TransformsTab({ api }: { api: SettingsApi }): JSX.Element {
     });
   };
 
-  const addTransform = (seed: { name: string; instruction: string }): void => {
-    const transform: Transform = {
-      id: crypto.randomUUID(),
-      name: seed.name,
-      instruction: seed.instruction,
-      hotkey: '',
-      builtIn: false,
-    };
-    void update({ transforms: [...settings.transforms, transform] });
-  };
-
   const removeTransform = (id: string): void => {
+    if (editId === id) cancelEdit();
     void update({ transforms: settings.transforms.filter((t) => t.id !== id) });
   };
 
-  const setRule = (key: keyof PolishRules, value: boolean): void => {
-    void update({ polishRules: { ...settings.polishRules, [key]: value } });
+  const startEdit = (transform: Transform): void => {
+    setEditId(transform.id);
+    setEditName(transform.name);
+    setEditInstruction(transform.instruction);
+    setEditHotkey(transform.hotkey);
   };
+
+  const startCreate = (): void => {
+    setEditId(NEW_ID);
+    setEditName('');
+    setEditInstruction('');
+    setEditHotkey('');
+  };
+
+  // Leaving the editor unmounts the focused control; parking focus on the list
+  // container keeps keyboard users in the list instead of dropping to <body>.
+  const cancelEdit = (): void => {
+    setEditId(null);
+    listRef.current?.focus();
+  };
+
+  const saveEdit = (): void => {
+    if (editId === null) return;
+    const name = editName.trim();
+    if (editId === NEW_ID) {
+      const transform: Transform = {
+        id: crypto.randomUUID(),
+        name: name === '' ? 'New prompt' : name,
+        instruction: editInstruction,
+        hotkey: editHotkey,
+        builtIn: false,
+      };
+      void update({ transforms: [...settings.transforms, transform] });
+    } else {
+      const existing = settings.transforms.find((t) => t.id === editId);
+      // The built-in keeps its fixed name; only custom prompts adopt the field.
+      const nextName = existing?.builtIn ? existing.name : name === '' ? 'New prompt' : name;
+      patchTransform(editId, {
+        name: nextName,
+        instruction: editInstruction,
+        hotkey: editHotkey,
+      });
+    }
+    setEditId(null);
+    listRef.current?.focus();
+  };
+
+  const renderEditor = (builtIn: boolean): JSX.Element => (
+    <div className="transform-card transform-card-editing">
+      <label className="transform-field">
+        <span className="transform-field-label">Name</span>
+        <input
+          type="text"
+          autoFocus={!builtIn}
+          maxLength={40}
+          value={editName}
+          disabled={builtIn}
+          placeholder="Name"
+          aria-label="Prompt name"
+          onChange={(e) => {
+            setEditName(e.target.value);
+          }}
+        />
+      </label>
+      <div className="transform-field">
+        <span className="transform-field-label">Shortcut</span>
+        <HotkeyRecorder value={editHotkey} label={editName || 'Prompt'} onChange={setEditHotkey} />
+      </div>
+      <label className="transform-field">
+        <span className="transform-field-label">Prompt</span>
+        <textarea
+          className="transform-instruction"
+          rows={3}
+          maxLength={2000}
+          value={editInstruction}
+          // The built-in's name is read-only, so focus the first editable field.
+          autoFocus={builtIn}
+          placeholder="How should this rewrite the selection? (leave empty to act like Polish)"
+          aria-label="Prompt instruction"
+          onChange={(e) => {
+            setEditInstruction(e.target.value);
+          }}
+        />
+      </label>
+      <div className="transform-card-actions">
+        <button className="btn btn-primary" onClick={saveEdit}>
+          Save
+        </button>
+        <button className="btn btn-quiet" onClick={cancelEdit}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="tab-body">
-      <section className="card">
-        <h2>Polish</h2>
-        <p className="row-hint">
-          Rewrites the selected text. Fix grammar and spelling, plus the rules you enable. Needs an
-          AI profile.
-        </p>
-        <Row title="Polish shortcut" hint="Select text in any app, then press it to rewrite.">
-          <HotkeyRecorder
-            value={settings.polishHotkey}
-            label="Polish"
-            onChange={(accelerator) => void update({ polishHotkey: accelerator })}
-          />
-        </Row>
-        {POLISH_RULES.map((rule) => (
-          <Row key={rule.key} title={rule.label}>
-            <Toggle
-              checked={settings.polishRules[rule.key]}
-              onChange={(checked) => {
-                setRule(rule.key, checked);
-              }}
-              label={rule.label}
-            />
-          </Row>
-        ))}
-      </section>
-
-      {builtIns.map((t) => (
-        <section key={t.id} className="card">
-          <h2>
-            {t.name} <span className="badge badge-muted">Built in</span>
-          </h2>
+      <header className="transform-header">
+        <div className="transform-header-text">
+          <h1 className="transform-title">Transform</h1>
           <p className="row-hint">
-            Rewrites the selected text as a clear prompt for an AI model. Edit the instruction or
-            change its shortcut; it can&apos;t be deleted.
+            Rewrite text with a shortcut, or run one automatically after you dictate (set on the HUD
+            circle).
           </p>
-          <Row title="Shortcut" hint="Select text in any app, then press it.">
-            <HotkeyRecorder
-              value={t.hotkey}
-              label={t.name}
-              onChange={(hotkey) => {
-                patchTransform(t.id, { hotkey });
-              }}
-            />
-          </Row>
-          <textarea
-            className="transform-instruction"
-            rows={3}
-            maxLength={2000}
-            value={t.instruction}
-            aria-label={`${t.name} instruction`}
-            onChange={(e) => {
-              patchTransform(t.id, { instruction: e.target.value });
-            }}
+        </div>
+        <label className="transform-see-changes">
+          <span className="row-hint">See changes</span>
+          <HotkeyRecorder
+            value={settings.changeOverlayHotkey}
+            label="See changes"
+            onChange={(accelerator) => void update({ changeOverlayHotkey: accelerator })}
           />
-        </section>
-      ))}
+        </label>
+      </header>
 
-      <section className="card">
-        <h2>Your transforms</h2>
-        <p className="row-hint">
-          Saved rewrite prompts, each mapped to its own shortcut. Leave the instruction empty to act
-          like Polish.
-        </p>
+      <div className="transform-toolbar">
+        <input
+          type="search"
+          className="transform-search"
+          placeholder="Search prompts"
+          aria-label="Search prompts"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+          }}
+        />
+        <button className="btn btn-primary" onClick={startCreate}>
+          + New
+        </button>
+      </div>
 
-        {customs.length > 0 && (
-          <div className="transform-list">
-            {customs.map((t) => (
-              <div key={t.id} className="transform-card">
-                <div className="transform-head">
-                  <input
-                    type="text"
-                    className="transform-name"
-                    value={t.name}
-                    maxLength={40}
-                    placeholder="Name"
-                    aria-label="Transform name"
-                    onChange={(e) => {
-                      patchTransform(t.id, { name: e.target.value });
-                    }}
-                  />
+      <div className="transform-list" ref={listRef} tabIndex={-1}>
+        {matches.map((t) =>
+          editId === t.id ? (
+            <div key={`edit-${t.id}`}>{renderEditor(t.builtIn)}</div>
+          ) : (
+            <div key={t.id} className="transform-card">
+              <div className="transform-card-main">
+                <div className="transform-card-head">
+                  <span className="transform-card-name">
+                    {t.builtIn && (
+                      <span
+                        className="transform-builtin"
+                        role="img"
+                        aria-label="Built-in"
+                        title="Built-in"
+                      >
+                        ✦
+                      </span>
+                    )}
+                    {t.name}
+                  </span>
                   <HotkeyRecorder
                     value={t.hotkey}
-                    label={t.name || 'Transform'}
+                    label={t.name}
+                    emptyLabel="+ Add shortcut"
                     onChange={(hotkey) => {
                       patchTransform(t.id, { hotkey });
                     }}
                   />
+                </div>
+                <span className="transform-preview">{preview(t.instruction)}</span>
+              </div>
+              <div className="transform-card-actions">
+                <button
+                  className="btn btn-quiet"
+                  onClick={() => {
+                    startEdit(t);
+                  }}
+                >
+                  Edit
+                </button>
+                {!t.builtIn && (
                   <button
                     className="btn btn-quiet"
+                    aria-label={`Delete ${t.name}`}
                     onClick={() => {
                       removeTransform(t.id);
                     }}
                   >
-                    Remove
+                    ×
                   </button>
-                </div>
-                <textarea
-                  className="transform-instruction"
-                  rows={2}
-                  maxLength={2000}
-                  value={t.instruction}
-                  placeholder="How should this rewrite the selection? (leave empty to act like Polish)"
-                  aria-label="Transform instruction"
-                  onChange={(e) => {
-                    patchTransform(t.id, { instruction: e.target.value });
-                  }}
-                />
-                {t.hotkey.trim() === '' && (
-                  <p className="row-hint">Assign a shortcut to use this prompt.</p>
                 )}
               </div>
-            ))}
-          </div>
+            </div>
+          ),
         )}
 
-        <div className="row-actions transform-templates">
-          {TRANSFORM_TEMPLATES.map((tpl) => (
-            <button
-              key={tpl.name}
-              className="btn btn-quiet"
-              onClick={() => {
-                addTransform(tpl);
-              }}
-            >
-              + {tpl.name}
-            </button>
+        {editId === NEW_ID && <div key="edit-new">{renderEditor(false)}</div>}
+
+        {matches.length === 0 &&
+          editId !== NEW_ID &&
+          (query.trim() === '' ? (
+            <p className="row-hint">No prompts yet.</p>
+          ) : (
+            <p className="row-hint">No matches.</p>
           ))}
-          <button
-            className="btn"
-            onClick={() => {
-              addTransform({ name: 'New transform', instruction: '' });
-            }}
-          >
-            Add transform
+      </div>
+
+      {!hasCustom && editId !== NEW_ID && query.trim() === '' && (
+        <div className="transform-empty">
+          <button className="btn" onClick={startCreate}>
+            + Create your prompt
           </button>
+          <p className="row-hint">Saved prompts each get their own shortcut.</p>
         </div>
-      </section>
+      )}
     </div>
   );
 }

@@ -925,42 +925,123 @@ button:focus-visible,
 
 /* ---- Transforms ---- */
 
+.transform-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.transform-header-text {
+  min-width: 0;
+}
+
+.transform-title {
+  margin: 0;
+  font-size: var(--text-h1);
+  font-weight: var(--weight-semibold);
+}
+
+.transform-see-changes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+}
+
+.transform-toolbar {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.transform-search {
+  flex: 1;
+  min-width: 0;
+}
+
 .transform-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 10px 0;
+  gap: var(--space-5);
 }
 
 .transform-card {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.transform-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6) var(--space-7);
 }
 
-.transform-name {
+.transform-card-main {
   flex: 1;
   min-width: 0;
-  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.transform-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.transform-card-name {
+  font-weight: var(--weight-semibold);
+}
+
+.transform-builtin {
+  color: var(--accent);
+  margin-right: var(--space-2);
+}
+
+.transform-preview {
+  color: var(--text-dim);
+  font-size: var(--text-hint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transform-card-actions {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.transform-card-editing {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.transform-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.transform-field-label {
+  color: var(--text-dim);
+  font-size: var(--text-hint);
 }
 
 .transform-instruction {
   resize: vertical;
   min-height: 48px;
-  font-size: 13px;
+  font-size: var(--text-body);
 }
 
-.transform-templates {
-  flex-wrap: wrap;
+.transform-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) 0;
+  text-align: center;
 }
 
 /* ---- Insights ---- */
