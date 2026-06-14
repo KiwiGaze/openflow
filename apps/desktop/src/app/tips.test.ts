@@ -4,9 +4,9 @@ import { eligibleTip } from './tips.js';
 
 const base: Settings = {
   version: 6,
-  dictationHotkey: 'Alt+Space',
-  dictationHotkeyBehavior: 'hold',
-  changeOverlayHotkey: 'Alt+O',
+  pushToTalkHotkey: { kind: 'hold', key: 'fn' },
+  handsFreeHotkey: { kind: 'doubleTap', key: 'fn' },
+  seeChangesHotkey: { kind: 'accelerator', key: 'Alt+O' },
   activeLlmProfileId: '',
   dictionary: [],
   snippets: [],

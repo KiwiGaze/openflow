@@ -1,5 +1,11 @@
 import { useState, type JSX } from 'react';
-import { formatAcceleratorMac, formatBytes, formatProgress } from '@velata/core';
+import {
+  effectiveAccelerator,
+  formatAcceleratorMac,
+  formatBytes,
+  formatProgress,
+  PUSH_TO_TALK_FALLBACK,
+} from '@velata/core';
 import type { ModelsApi, SettingsApi } from './hooks.js';
 import { usePermissions, usePipeline } from './hooks.js';
 import { ipc } from './ipc.js';
@@ -28,7 +34,12 @@ export function Onboarding({
 
   const starterModels = models.filter((m) => STARTER_MODELS.includes(m.id));
   const baseModel = models.find((m) => m.id === DEFAULT_MODEL);
-  const hotkey = formatAcceleratorMac(settings.dictationHotkey);
+  // Show the shortcut push-to-talk effectively fires under today: the fn gesture
+  // default can't be observed yet, so onboarding teaches the fallback accelerator
+  // that actually works (Phase 3 adds real fn observation).
+  const hotkey = formatAcceleratorMac(
+    effectiveAccelerator(settings.pushToTalkHotkey, PUSH_TO_TALK_FALLBACK) ?? PUSH_TO_TALK_FALLBACK,
+  );
 
   const micGranted = permissions?.microphone === 'granted';
   const micDenied = permissions?.microphone === 'denied';

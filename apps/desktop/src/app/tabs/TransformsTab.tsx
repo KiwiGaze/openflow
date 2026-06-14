@@ -18,7 +18,7 @@ const NEW_ID = 'new';
  * Transform page: one uniform card per prompt in `settings.prompts`, built-in
  * Polish and custom alike, in creation order. Each prompt rewrites the current
  * selection through the active AI profile — no voice. The header's See-changes
- * recorder edits the same `changeOverlayHotkey` as Settings → Dictation, so the
+ * recorder edits the same `seeChangesHotkey` as Settings → Dictation, so the
  * two stay in sync through the settings subscription.
  */
 export function TransformsTab({ api }: { api: SettingsApi }): JSX.Element {
@@ -161,9 +161,11 @@ export function TransformsTab({ api }: { api: SettingsApi }): JSX.Element {
         <label className="transform-see-changes">
           <span className="row-hint">See changes</span>
           <HotkeyRecorder
-            value={settings.changeOverlayHotkey}
+            value={settings.seeChangesHotkey.key}
             label="See changes"
-            onChange={(accelerator) => void update({ changeOverlayHotkey: accelerator })}
+            onChange={(accelerator) =>
+              void update({ seeChangesHotkey: { kind: 'accelerator', key: accelerator } })
+            }
           />
         </label>
       </header>

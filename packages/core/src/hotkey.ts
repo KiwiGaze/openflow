@@ -3,6 +3,8 @@
  * `Modifier+...+Key`, e.g. `Alt+Space`, `Cmd+Shift+R`, `F5`.
  */
 
+import type { Hotkey } from './types.js';
+
 export const MODIFIER_TOKENS = [
   'Cmd',
   'Command',
@@ -163,4 +165,42 @@ export function acceleratorFromKeyboardEvent(ev: KeyboardEventLike): string | nu
 
   const accel = [...mods, key].join('+');
   return isValidAccelerator(accel) ? accel : null;
+}
+
+/**
+ * Accelerator stand-ins the Rust side registers while the `fn`-key gesture
+ * defaults cannot yet be observed (Input Monitoring + Phase 3). Mirrors
+ * `PUSH_TO_TALK_FALLBACK` / `HANDS_FREE_FALLBACK` in `shortcuts.rs` — update both
+ * together. The UI uses these to show the *effective* shortcut for a gesture
+ * trigger (e.g. onboarding's "hold ⌥ Space").
+ */
+export const PUSH_TO_TALK_FALLBACK = 'Alt+Space';
+export const HANDS_FREE_FALLBACK = 'Alt+Shift+Space';
+
+/**
+ * The accelerator a hotkey effectively fires under today: its own `key` when
+ * `accelerator` (empty `key` → null, the trigger is disabled), otherwise the
+ * gesture's fallback. Use for display where the working shortcut matters.
+ */
+export function effectiveAccelerator(hotkey: Hotkey, fallback: string): string | null {
+  if (hotkey.kind === 'accelerator') {
+    const key = hotkey.key.trim();
+    return key === '' ? null : key;
+  }
+  return fallback;
+}
+
+/**
+ * A human label for a hotkey trigger: "Hold fn" / "Double-tap fn" for the
+ * gesture defaults, or the macOS-glyph accelerator (empty → "Not set").
+ */
+export function formatHotkey(hotkey: Hotkey): string {
+  switch (hotkey.kind) {
+    case 'hold':
+      return `Hold ${hotkey.key}`;
+    case 'doubleTap':
+      return `Double-tap ${hotkey.key}`;
+    case 'accelerator':
+      return hotkey.key.trim() === '' ? 'Not set' : formatAcceleratorMac(hotkey.key);
+  }
 }

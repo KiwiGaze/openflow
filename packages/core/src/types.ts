@@ -29,8 +29,22 @@ export interface PipelineState {
   hudTip: string | null;
 }
 
-/** Hold the hotkey to talk, or tap once to start and again to stop. */
-export type HotkeyBehavior = 'hold' | 'toggle';
+/**
+ * How a hotkey is triggered. `hold`/`doubleTap` describe an `fn`-key gesture
+ * (observation lands in Phase 3; until then the Rust side falls them back to an
+ * accelerator); `accelerator` is a literal combo like `Alt+O`.
+ */
+export type HotkeyKind = 'hold' | 'doubleTap' | 'accelerator';
+
+/**
+ * A gesture trigger: a `kind` plus its `key`. `key` is `'fn'` for the gesture
+ * defaults, or an accelerator string (e.g. `'Alt+O'`) when `kind` is
+ * `'accelerator'`. Mirrors `Hotkey` in `settings.rs`.
+ */
+export interface Hotkey {
+  kind: HotkeyKind;
+  key: string;
+}
 
 /** Window theme. `system` follows macOS; `light`/`dark` force it for Velata. */
 export type Appearance = 'system' | 'light' | 'dark';
@@ -155,10 +169,12 @@ export interface Prompt {
 export interface Settings {
   /** Schema version for forward migrations. */
   version: number;
-  dictationHotkey: string;
-  dictationHotkeyBehavior: HotkeyBehavior;
-  /** Reveals the word-level diff of the last result. Empty disables it. */
-  changeOverlayHotkey: string;
+  /** Hold-to-talk trigger: press starts, release inserts (default `fn` hold). */
+  pushToTalkHotkey: Hotkey;
+  /** Hands-free trigger: one press starts, the next stops (default `fn` double-tap). */
+  handsFreeHotkey: Hotkey;
+  /** Reveals the word-level diff of the last result. Empty `key` disables it. */
+  seeChangesHotkey: Hotkey;
   /** Active profile id (a file under `<app-data>/profiles/`); "" = no AI. */
   activeLlmProfileId: string;
   dictionary: DictionaryEntry[];

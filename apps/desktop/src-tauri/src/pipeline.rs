@@ -25,8 +25,7 @@ use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
 use crate::prompts;
 use crate::settings::{
-    HotkeyBehavior, InsertMethod, Prompt, Settings, SettingsManager, MAX_RECORDING_SECS,
-    SETTINGS_CHANGED_EVENT,
+    InsertMethod, Prompt, Settings, SettingsManager, MAX_RECORDING_SECS, SETTINGS_CHANGED_EVENT,
 };
 use crate::shortcuts;
 use crate::stats::{local_day, word_count};
@@ -275,7 +274,10 @@ impl Pipeline {
         if !s.tips_enabled || s.tips_seen.iter().any(|t| t == "tip.latch") {
             return None;
         }
-        if s.dictation_hotkey_behavior != HotkeyBehavior::Hold || s.dictation_count != 3 {
+        // The push-to-talk fallback is still hold-with-tap-latch, so the
+        // hands-free tip stays meaningful regardless of how the trigger is bound;
+        // gate on the dictation count only.
+        if s.dictation_count != 3 {
             return None;
         }
         self.mark_tip_shown("tip.latch", s);
@@ -344,11 +346,12 @@ impl Pipeline {
     }
 
     pub fn on_hotkey_released(self: &Arc<Self>, job: Job) {
-        // Prompt transforms are taps; only dictation records.
+        // Prompt transforms are taps; only dictation records. Release is wired up
+        // only for the push-to-talk (hold) trigger — the hands-free trigger is
+        // registered press-only — so this is always the hold path: release
+        // finishes unless the press was a sub-threshold tap (which latches
+        // hands-free instead).
         if job != Job::Dictation {
-            return;
-        }
-        if self.settings.get().dictation_hotkey_behavior == HotkeyBehavior::Toggle {
             return;
         }
         let held_for = {

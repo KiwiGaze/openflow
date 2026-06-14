@@ -11,13 +11,38 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::pipeline::Job;
-use crate::settings::Settings;
+use crate::settings::{Hotkey, HotkeyKind, Settings};
 use crate::state::AppState;
 
-/// (Re-)registers every hotkey from settings — the dictation key, the optional
-/// see-changes key, and each prompt with a bound shortcut (Polish included).
-/// Returns a user-readable error when an accelerator cannot be parsed or
-/// registered (e.g. taken by another app) or two collide, leaving no partial
+/// Accelerator stand-ins used while the `fn`-key gesture defaults cannot yet be
+/// observed (Input Monitoring + Phase 3). A `Hold`/`DoubleTap` push-to-talk or
+/// hands-free trigger resolves to its fallback so dictation stays usable; once
+/// `fn` observation lands these are bypassed for the real gesture.
+const PUSH_TO_TALK_FALLBACK: &str = "Alt+Space";
+const HANDS_FREE_FALLBACK: &str = "Alt+Shift+Space";
+
+/// Resolves a gesture trigger to the accelerator string to actually register, or
+/// `None` to register nothing. An `Accelerator` hotkey uses its own `key` (an
+/// empty `key` disables the trigger); a `Hold`/`DoubleTap` gesture — not
+/// observable until Phase 3 — falls back to `fallback`.
+fn resolve(hotkey: &Hotkey, fallback: &str) -> Option<String> {
+    match hotkey.kind {
+        HotkeyKind::Accelerator => {
+            let key = hotkey.key.trim();
+            if key.is_empty() {
+                None
+            } else {
+                Some(key.to_string())
+            }
+        }
+        HotkeyKind::Hold | HotkeyKind::DoubleTap => Some(fallback.to_string()),
+    }
+}
+
+/// (Re-)registers every hotkey from settings — push-to-talk, hands-free, the
+/// optional see-changes key, and each prompt with a bound shortcut (Polish
+/// included). Returns a user-readable error when an accelerator cannot be parsed
+/// or registered (e.g. taken by another app) or two collide, leaving no partial
 /// registrations behind.
 pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     let shortcuts = app.global_shortcut();
@@ -25,22 +50,19 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         .unregister_all()
         .map_err(|e| format!("could not reset hotkeys: {e}"))?;
 
-    let dictation = Shortcut::from_str(&settings.dictation_hotkey)
-        .map_err(|e| format!("dictation hotkey “{}”: {e}", settings.dictation_hotkey))?;
-
-    // The see-changes hotkey is optional: an empty string disables it.
-    let changes = if settings.change_overlay_hotkey.trim().is_empty() {
-        None
-    } else {
-        Some(
-            Shortcut::from_str(&settings.change_overlay_hotkey).map_err(|e| {
-                format!(
-                    "see-changes hotkey “{}”: {e}",
-                    settings.change_overlay_hotkey
-                )
-            })?,
-        )
-    };
+    // Resolve each gesture trigger to the accelerator we can register today. An
+    // empty accelerator disables that trigger (None).
+    let push_to_talk = resolve(&settings.push_to_talk_hotkey, PUSH_TO_TALK_FALLBACK)
+        .map(|a| Shortcut::from_str(&a).map_err(|e| format!("push-to-talk hotkey “{a}”: {e}")))
+        .transpose()?;
+    let hands_free = resolve(&settings.hands_free_hotkey, HANDS_FREE_FALLBACK)
+        .map(|a| Shortcut::from_str(&a).map_err(|e| format!("hands-free hotkey “{a}”: {e}")))
+        .transpose()?;
+    // See-changes is an accelerator trigger; a stray gesture here falls back to
+    // the historical default rather than disabling it.
+    let changes = resolve(&settings.see_changes_hotkey, "Alt+O")
+        .map(|a| Shortcut::from_str(&a).map_err(|e| format!("see-changes hotkey “{a}”: {e}")))
+        .transpose()?;
 
     // Prompts with a bound shortcut; unbound ones exist but never register.
     // Polish's default ⌥⇧P is included here automatically.
@@ -54,10 +76,14 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         prompts.push((p.id.clone(), sc));
     }
 
-    // Every hotkey must be pairwise distinct — the dictation key, the optional
-    // see-changes key, and each bound prompt shortcut. (Shortcut is Copy, so
-    // collecting them here leaves the originals usable for registration below.)
-    let mut all: Vec<Shortcut> = vec![dictation];
+    // Every registered hotkey must be pairwise distinct — push-to-talk,
+    // hands-free, see-changes, and each bound prompt shortcut. (Shortcut is Copy,
+    // so collecting them here leaves the originals usable for registration
+    // below.) With the gesture defaults, push-to-talk and hands-free resolve to
+    // the two distinct fallbacks, so both register.
+    let mut all: Vec<Shortcut> = Vec::new();
+    all.extend(push_to_talk.iter().copied());
+    all.extend(hands_free.iter().copied());
     all.extend(changes.iter().copied());
     all.extend(prompts.iter().map(|(_, sc)| *sc));
     for i in 0..all.len() {
@@ -68,11 +94,32 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
         }
     }
 
-    shortcuts
-        .on_shortcut(dictation, move |app, _shortcut, event| {
-            dispatch(app, Job::Dictation, event.state());
-        })
-        .map_err(|e| format!("dictation hotkey “{}”: {e}", settings.dictation_hotkey))?;
+    // Push-to-talk is the hold path: press starts, release stops (a sub-threshold
+    // tap latches hands-free instead — see `pipeline::on_hotkey_released`).
+    if let Some(push_to_talk) = push_to_talk {
+        shortcuts
+            .on_shortcut(push_to_talk, move |app, _shortcut, event| {
+                dispatch(app, Job::Dictation, event.state());
+            })
+            .map_err(|e| format!("push-to-talk hotkey: {e}"))?;
+    }
+
+    // Hands-free toggles via press only: a press starts, the next press finishes
+    // (the existing "press while recording → finish" path). Release is ignored.
+    // Offloaded like the prompt handler — start/finish block on worker replies.
+    if let Some(hands_free) = hands_free {
+        if let Err(e) = shortcuts.on_shortcut(hands_free, move |app, _shortcut, event| {
+            if event.state() == ShortcutState::Pressed {
+                let pipeline = app.state::<AppState>().pipeline.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    pipeline.on_hotkey_pressed(Job::Dictation)
+                });
+            }
+        }) {
+            let _ = shortcuts.unregister_all();
+            return Err(format!("hands-free hotkey could not be registered: {e}"));
+        }
+    }
 
     // Each prompt is a tap; the handler resolves the instruction by id at
     // trigger time, so edits don't require re-binding.
@@ -99,17 +146,15 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
             }
         }) {
             let _ = shortcuts.unregister_all();
-            return Err(format!(
-                "see-changes hotkey “{}”: {e}",
-                settings.change_overlay_hotkey
-            ));
+            return Err(format!("see-changes hotkey could not be registered: {e}"));
         }
     }
 
     log::info!(
-        "hotkeys registered: dictation={} see-changes={} prompts={}",
-        settings.dictation_hotkey,
-        settings.change_overlay_hotkey,
+        "hotkeys registered: push-to-talk={} hands-free={} see-changes={} prompts={}",
+        push_to_talk.is_some(),
+        hands_free.is_some(),
+        changes.is_some(),
         settings
             .prompts
             .iter()
@@ -159,4 +204,55 @@ fn dispatch(app: &AppHandle, job: Job, state: ShortcutState) {
         ShortcutState::Pressed => pipeline.on_hotkey_pressed(job),
         ShortcutState::Released => pipeline.on_hotkey_released(job),
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hk(kind: HotkeyKind, key: &str) -> Hotkey {
+        Hotkey {
+            kind,
+            key: key.into(),
+        }
+    }
+
+    #[test]
+    fn accelerator_kind_uses_its_own_key() {
+        assert_eq!(
+            resolve(&hk(HotkeyKind::Accelerator, "Alt+O"), PUSH_TO_TALK_FALLBACK),
+            Some("Alt+O".to_string())
+        );
+    }
+
+    #[test]
+    fn empty_accelerator_disables_the_trigger() {
+        assert_eq!(
+            resolve(&hk(HotkeyKind::Accelerator, ""), PUSH_TO_TALK_FALLBACK),
+            None
+        );
+        assert_eq!(
+            resolve(&hk(HotkeyKind::Accelerator, "   "), HANDS_FREE_FALLBACK),
+            None
+        );
+    }
+
+    #[test]
+    fn gesture_kinds_fall_back_until_fn_observation_lands() {
+        assert_eq!(
+            resolve(&hk(HotkeyKind::Hold, "fn"), PUSH_TO_TALK_FALLBACK),
+            Some(PUSH_TO_TALK_FALLBACK.to_string())
+        );
+        assert_eq!(
+            resolve(&hk(HotkeyKind::DoubleTap, "fn"), HANDS_FREE_FALLBACK),
+            Some(HANDS_FREE_FALLBACK.to_string())
+        );
+    }
+
+    #[test]
+    fn default_gestures_resolve_to_distinct_fallbacks() {
+        // The push-to-talk and hands-free defaults must not collide, so both
+        // register under the gesture defaults until Phase 3.
+        assert_ne!(PUSH_TO_TALK_FALLBACK, HANDS_FREE_FALLBACK);
+    }
 }

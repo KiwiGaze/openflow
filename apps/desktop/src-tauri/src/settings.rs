@@ -21,11 +21,26 @@ pub const MAX_RECORDING_SECS: u64 = 300;
 /// `EVENTS.settingsChanged` in `@velata/core`.
 pub const SETTINGS_CHANGED_EVENT: &str = "settings-changed";
 
+/// How a hotkey is triggered. `Hold`/`DoubleTap` describe an `fn`-key gesture
+/// whose observation lands in Phase 3; until then `shortcuts.rs` falls them back
+/// to an accelerator so dictation stays usable. `Accelerator` is a literal combo
+/// like `Alt+O`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum HotkeyBehavior {
+pub enum HotkeyKind {
     Hold,
-    Toggle,
+    DoubleTap,
+    Accelerator,
+}
+
+/// A gesture trigger: a `kind` plus its `key`. `key` is `"fn"` for the gesture
+/// defaults, or an accelerator string (e.g. `"Alt+O"`) when `kind` is
+/// `Accelerator`. Mirrored as `Hotkey` in `@velata/core`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Hotkey {
+    pub kind: HotkeyKind,
+    pub key: String,
 }
 
 /// Window theme. `System` follows macOS; `Light`/`Dark` force it for Velata.
@@ -112,10 +127,14 @@ pub struct Prompt {
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub version: u32,
-    pub dictation_hotkey: String,
-    pub dictation_hotkey_behavior: HotkeyBehavior,
-    /// Reveals the word-level diff of the last result. "" disables it.
-    pub change_overlay_hotkey: String,
+    /// Hold-to-talk trigger: press starts, release inserts. Default is the `fn`
+    /// hold gesture; until Phase 3 observes `fn`, it resolves to an accelerator.
+    pub push_to_talk_hotkey: Hotkey,
+    /// Hands-free trigger: one press starts, the next stops. Default is the `fn`
+    /// double-tap gesture, resolved to an accelerator until Phase 3.
+    pub hands_free_hotkey: Hotkey,
+    /// Reveals the word-level diff of the last result. Empty `key` disables it.
+    pub see_changes_hotkey: Hotkey,
     /// Active profile id (a file under `<app-data>/profiles/`); "" = no AI.
     pub active_llm_profile_id: String,
     pub dictionary: Vec<DictionaryEntry>,
@@ -171,9 +190,18 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             version: SETTINGS_VERSION,
-            dictation_hotkey: "Alt+Space".into(),
-            dictation_hotkey_behavior: HotkeyBehavior::Hold,
-            change_overlay_hotkey: "Alt+O".into(),
+            push_to_talk_hotkey: Hotkey {
+                kind: HotkeyKind::Hold,
+                key: "fn".into(),
+            },
+            hands_free_hotkey: Hotkey {
+                kind: HotkeyKind::DoubleTap,
+                key: "fn".into(),
+            },
+            see_changes_hotkey: Hotkey {
+                kind: HotkeyKind::Accelerator,
+                key: "Alt+O".into(),
+            },
             active_llm_profile_id: String::new(),
             dictionary: Vec::new(),
             snippets: Vec::new(),
@@ -325,7 +353,13 @@ mod tests {
         let manager = SettingsManager::load(&dir);
         assert!(manager.path().exists());
         let s = manager.get();
-        assert_eq!(s.dictation_hotkey, "Alt+Space");
+        assert_eq!(
+            s.push_to_talk_hotkey,
+            Hotkey {
+                kind: HotkeyKind::Hold,
+                key: "fn".into()
+            }
+        );
         assert!(s.prompts.iter().any(|p| p.id == prompts::POLISH_PROMPT_ID));
         assert_eq!(s.post_dictation_transform_id, None);
     }
@@ -335,7 +369,10 @@ mod tests {
         let dir = temp_dir("roundtrip");
         let manager = SettingsManager::load(&dir);
         let mut s = manager.get();
-        s.dictation_hotkey = "F5".into();
+        s.push_to_talk_hotkey = Hotkey {
+            kind: HotkeyKind::Accelerator,
+            key: "F5".into(),
+        };
         s.dictionary.push(DictionaryEntry {
             from: "open flow".into(),
             to: "Velata".into(),
@@ -343,7 +380,13 @@ mod tests {
         manager.set(s).unwrap();
 
         let reloaded = SettingsManager::load(&dir).get();
-        assert_eq!(reloaded.dictation_hotkey, "F5");
+        assert_eq!(
+            reloaded.push_to_talk_hotkey,
+            Hotkey {
+                kind: HotkeyKind::Accelerator,
+                key: "F5".into()
+            }
+        );
         assert_eq!(reloaded.dictionary.len(), 1);
     }
 
@@ -359,8 +402,9 @@ mod tests {
     #[test]
     fn unknown_fields_are_tolerated_and_missing_fields_defaulted() {
         // Old settings carried mode/cleanup/polish fields this version no longer
-        // knows; serde tolerates the unknown keys, and the missing new ones
-        // (prompts, postDictationTransformId) default rather than fail the load.
+        // knows; serde tolerates the unknown keys (now including the retired
+        // `dictationHotkey`), and the missing new ones (the gesture hotkeys,
+        // prompts, postDictationTransformId) default rather than fail the load.
         let dir = temp_dir("forward-compat");
         fs::write(
             dir.join("settings.json"),
@@ -369,7 +413,13 @@ mod tests {
         )
         .unwrap();
         let s = SettingsManager::load(&dir).get();
-        assert_eq!(s.dictation_hotkey, "F6");
+        assert_eq!(
+            s.push_to_talk_hotkey,
+            Hotkey {
+                kind: HotkeyKind::Hold,
+                key: "fn".into()
+            }
+        );
         assert!(s.prompts.iter().any(|p| p.id == prompts::POLISH_PROMPT_ID));
         assert_eq!(s.post_dictation_transform_id, None);
     }
@@ -377,8 +427,9 @@ mod tests {
     #[test]
     fn serializes_with_camel_case_contract() {
         let json = serde_json::to_string(&Settings::default()).unwrap();
-        assert!(json.contains("\"dictationHotkey\""));
-        assert!(json.contains("\"changeOverlayHotkey\":\"Alt+O\""));
+        assert!(json.contains("\"pushToTalkHotkey\":{\"kind\":\"hold\",\"key\":\"fn\"}"));
+        assert!(json.contains("\"handsFreeHotkey\":{\"kind\":\"doubleTap\",\"key\":\"fn\"}"));
+        assert!(json.contains("\"seeChangesHotkey\":{\"kind\":\"accelerator\",\"key\":\"Alt+O\"}"));
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"appearance\":\"system\""));
         assert!(json.contains("\"tipsEnabled\":true"));
@@ -397,6 +448,9 @@ mod tests {
         assert!(json.contains("\"shortcut\":\"Alt+Shift+P\""));
         assert!(json.contains("\"builtIn\":true"));
         // Removed keys must not reappear.
+        assert!(!json.contains("\"dictationHotkey\""));
+        assert!(!json.contains("\"dictationHotkeyBehavior\""));
+        assert!(!json.contains("\"changeOverlayHotkey\""));
         assert!(!json.contains("\"activeModeId\""));
         assert!(!json.contains("\"polishHotkey\""));
         assert!(!json.contains("\"polishAfterDictation\""));

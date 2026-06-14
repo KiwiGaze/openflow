@@ -51,16 +51,18 @@ pub fn save_settings(
             .map(|p| (p.id.clone(), p.shortcut.clone()))
             .collect()
     };
-    let hotkeys_changed = previous.dictation_hotkey != saved.dictation_hotkey
-        || previous.change_overlay_hotkey != saved.change_overlay_hotkey
+    let hotkeys_changed = previous.push_to_talk_hotkey != saved.push_to_talk_hotkey
+        || previous.hands_free_hotkey != saved.hands_free_hotkey
+        || previous.see_changes_hotkey != saved.see_changes_hotkey
         || bindings(&previous) != bindings(&saved);
     if hotkeys_changed {
         if let Err(message) = shortcuts::apply(&app, &saved) {
-            // Roll every hotkey — the dictation key, see-changes, and each prompt
-            // shortcut — back to the last working set as one atomic unit.
+            // Roll every hotkey — push-to-talk, hands-free, see-changes, and each
+            // prompt shortcut — back to the last working set as one atomic unit.
             let mut reverted = saved.clone();
-            reverted.dictation_hotkey = previous.dictation_hotkey.clone();
-            reverted.change_overlay_hotkey = previous.change_overlay_hotkey.clone();
+            reverted.push_to_talk_hotkey = previous.push_to_talk_hotkey.clone();
+            reverted.hands_free_hotkey = previous.hands_free_hotkey.clone();
+            reverted.see_changes_hotkey = previous.see_changes_hotkey.clone();
             reverted.prompts = previous.prompts.clone();
             let restored = state.settings.set(reverted)?;
             let _ = shortcuts::apply(&app, &restored);
