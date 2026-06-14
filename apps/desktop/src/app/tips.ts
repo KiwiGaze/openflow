@@ -23,8 +23,7 @@ const TIPS: Tip[] = [
     copy: 'Want sharper cleanup? Add a local Ollama model or your own API key and Velata will polish transcripts with AI.',
     actionLabel: 'Set up AI',
     actionTab: 'ai',
-    predicate: (s) =>
-      s.dictationCount >= 4 && s.activeLlmProfileId === '' && s.polishAfterDictation,
+    predicate: (s) => s.dictationCount >= 4 && s.activeLlmProfileId === '',
   },
 ];
 

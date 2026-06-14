@@ -1,10 +1,9 @@
 import { useEffect, useState, type JSX } from 'react';
-import { type HotkeyBehavior, LANGUAGES } from '@velata/core';
+import { LANGUAGES } from '@velata/core';
 import type { ModelsApi, SettingsApi } from '../hooks.js';
 import { ipc } from '../ipc.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
-import { Toggle } from '../components/Toggle.js';
 
 export function DictationTab({
   api,
@@ -35,32 +34,18 @@ export function DictationTab({
       <section className="card">
         <h2>Hotkeys</h2>
         <Row
-          title="Dictation"
+          title="Push to talk"
           hint="Hold to talk; release to insert. Tip: a quick tap keeps recording hands-free until you tap again."
         >
           <HotkeyRecorder
             value={settings.dictationHotkey}
-            label="Dictation"
+            label="Push to talk"
             onChange={(accelerator) => void update({ dictationHotkey: accelerator })}
           />
         </Row>
         <Row
-          title="When I press the hotkey"
-          hint="Hold to talk, or tap once to start and again to stop."
-        >
-          <select
-            value={settings.dictationHotkeyBehavior}
-            onChange={(e) =>
-              void update({ dictationHotkeyBehavior: e.target.value as HotkeyBehavior })
-            }
-          >
-            <option value="hold">Hold to talk</option>
-            <option value="toggle">Tap to start, tap to stop</option>
-          </select>
-        </Row>
-        <Row
           title="See changes"
-          hint="Reveal a word-level diff of the last cleanup or polish. Empty disables it."
+          hint="Reveal a word-level diff of the last cleanup or polish. Empty disables it. Also editable on the Transform page."
         >
           <HotkeyRecorder
             value={settings.changeOverlayHotkey}
@@ -72,7 +57,7 @@ export function DictationTab({
       </section>
 
       <section className="card">
-        <h2>Speech</h2>
+        <h2>Speech input</h2>
         <Row
           title="Microphone"
           hint="The input device to record from. System default follows your Mac's choice."
@@ -114,20 +99,6 @@ export function DictationTab({
               </option>
             ))}
           </select>
-        </Row>
-      </section>
-
-      <section className="card">
-        <h2>After transcribing</h2>
-        <Row
-          title="Polish with AI"
-          hint="Polish transcripts with your active mode and AI profile. Off = fast rules-based cleanup, no network."
-        >
-          <Toggle
-            checked={settings.polishAfterDictation}
-            onChange={(checked) => void update({ polishAfterDictation: checked })}
-            label="Polish with AI"
-          />
         </Row>
       </section>
     </div>

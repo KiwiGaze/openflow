@@ -29,7 +29,6 @@ export function Onboarding({
   const starterModels = models.filter((m) => STARTER_MODELS.includes(m.id));
   const baseModel = models.find((m) => m.id === DEFAULT_MODEL);
   const hotkey = formatAcceleratorMac(settings.dictationHotkey);
-  const polishHotkey = formatAcceleratorMac(settings.polishHotkey);
 
   const micGranted = permissions?.microphone === 'granted';
   const micDenied = permissions?.microphone === 'denied';
@@ -316,10 +315,6 @@ export function Onboarding({
           <ul className="privacy-list">
             <li>
               Tap <strong>{hotkey}</strong> (don’t hold) to keep recording hands-free.
-            </li>
-            <li>
-              Select text and tap <strong>{polishHotkey}</strong> to fix grammar in place — no
-              voice.
             </li>
             <li>Switch the writing style anytime from the menu-bar Mode list.</li>
           </ul>
