@@ -14,7 +14,7 @@ use crate::scratchpad::{self, NOTES_CHANGED_EVENT};
 use crate::settings::{Appearance, Settings, SETTINGS_CHANGED_EVENT};
 use crate::state::AppState;
 use crate::stt_profiles::{SttProfile, CLOUD_STT_PREFIX};
-use crate::{modes, shortcuts, text, tray};
+use crate::{modes, shortcuts, text};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,9 +111,6 @@ pub fn save_settings(
         apply_appearance(&app, saved.appearance);
     }
 
-    if let Err(err) = tray::rebuild_menu(&app) {
-        log::warn!("tray rebuild failed: {err}");
-    }
     let _ = app.emit(SETTINGS_CHANGED_EVENT, &saved);
     Ok(saved)
 }

@@ -40,7 +40,7 @@ fn main() {
     tauri::Builder::default()
         // Must be first: a second launch focuses the existing instance.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            tray::show_settings_window(app);
+            tray::show_main_window(app);
         }))
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -137,7 +137,7 @@ fn main() {
             commands::apply_appearance(&handle, settings.get().appearance);
 
             if !settings.get().onboarding_completed {
-                tray::show_settings_window(&handle);
+                tray::show_main_window(&handle);
             }
             Ok(())
         })

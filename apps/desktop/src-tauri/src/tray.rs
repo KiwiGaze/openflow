@@ -1,13 +1,12 @@
 //! Menu-bar (tray) icon and menu.
 
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager};
 
 use crate::commands;
-use crate::settings::{InsertMethod, SETTINGS_CHANGED_EVENT};
+use crate::settings::InsertMethod;
 use crate::state::AppState;
-use crate::stt_profiles::CLOUD_STT_PREFIX;
 
 pub const TRAY_ID: &str = "velata-tray";
 
@@ -32,74 +31,19 @@ pub fn set_recording(app: &AppHandle, recording: bool) {
     }
 }
 
-/// Rebuilds the menu after settings changes (modes added/renamed/activated).
-pub fn rebuild_menu(app: &AppHandle) -> tauri::Result<()> {
-    if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        tray.set_menu(Some(build_menu(app)?))?;
-    }
-    Ok(())
-}
-
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let state = app.state::<AppState>();
-    let settings = state.settings.get();
-
     let menu = Menu::new(app)?;
-    let header = MenuItem::with_id(app, "header", "Writing style", false, None::<&str>)?;
-    menu.append(&header)?;
-    for mode in &settings.modes {
-        let item = CheckMenuItem::with_id(
-            app,
-            format!("mode:{}", mode.id),
-            &mode.name,
-            true,
-            mode.id == settings.active_mode_id,
-            None::<&str>,
-        )?;
-        menu.append(&item)?;
-    }
-    // Always-visible speech locality (08 §3.3): on-device by default, or the
-    // active cloud engine with a warning glyph. Disabled — a status, not a control.
-    let speech_label = match settings.stt_model_id.strip_prefix(CLOUD_STT_PREFIX) {
-        Some(pid) => {
-            let name = state
-                .stt_profiles
-                .get(pid)
-                .map(|p| p.name)
-                .unwrap_or_else(|| "cloud".into());
-            format!("Speech: cloud — {name} ⚠")
-        }
-        None => "Speech: on-device".to_string(),
-    };
     menu.append(&MenuItem::with_id(
         app,
-        "speech-status",
-        &speech_label,
-        false,
-        None::<&str>,
-    )?)?;
-    menu.append(&PredefinedMenuItem::separator(app)?)?;
-    menu.append(&CheckMenuItem::with_id(
-        app,
-        "polish-dictation",
-        "Polish Dictation with AI",
+        "open",
+        "Open Velata",
         true,
-        settings.polish_after_dictation,
         None::<&str>,
     )?)?;
-    menu.append(&PredefinedMenuItem::separator(app)?)?;
     menu.append(&MenuItem::with_id(
         app,
         "copy-last",
         "Copy last dictation",
-        true,
-        None::<&str>,
-    )?)?;
-    menu.append(&PredefinedMenuItem::separator(app)?)?;
-    menu.append(&MenuItem::with_id(
-        app,
-        "settings",
-        "Settings…",
         true,
         None::<&str>,
     )?)?;
@@ -115,11 +59,9 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 }
 
 fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
-    let id = event.id().as_ref();
-    match id {
+    match event.id().as_ref() {
+        "open" => show_main_window(app),
         "quit" => app.exit(0),
-        "settings" => show_settings_window(app),
-        "polish-dictation" => toggle_polish_after_dictation(app),
         "copy-last" => {
             let state = app.state::<AppState>();
             match state.pipeline.last_result() {
@@ -135,46 +77,12 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                 None => state.pipeline.flash_notice("No dictation yet.".into()),
             }
         }
-        other => {
-            if let Some(mode_id) = other.strip_prefix("mode:") {
-                set_active_mode(app, mode_id);
-            }
-        }
-    }
-}
-
-fn toggle_polish_after_dictation(app: &AppHandle) {
-    let state = app.state::<AppState>();
-    let mut settings = state.settings.get();
-    settings.polish_after_dictation = !settings.polish_after_dictation;
-    match state.settings.set(settings) {
-        Ok(saved) => {
-            let _ = tauri::Emitter::emit(app, SETTINGS_CHANGED_EVENT, &saved);
-            if let Err(err) = rebuild_menu(app) {
-                log::warn!("tray rebuild failed: {err}");
-            }
-        }
-        Err(err) => log::warn!("could not toggle dictation polish: {err}"),
-    }
-}
-
-fn set_active_mode(app: &AppHandle, mode_id: &str) {
-    let state = app.state::<AppState>();
-    let mut settings = state.settings.get();
-    settings.active_mode_id = mode_id.to_string();
-    match state.settings.set(settings) {
-        Ok(saved) => {
-            let _ = tauri::Emitter::emit(app, SETTINGS_CHANGED_EVENT, &saved);
-            if let Err(err) = rebuild_menu(app) {
-                log::warn!("tray rebuild failed: {err}");
-            }
-        }
-        Err(err) => log::warn!("could not switch mode: {err}"),
+        _ => {}
     }
 }
 
 /// Shows the App window from the tray and startup paths, bringing the app out
 /// of Accessory mode so it appears in the Dock and can take focus while open.
-pub fn show_settings_window(app: &AppHandle) {
+pub fn show_main_window(app: &AppHandle) {
     commands::show_window(app, commands::MAIN_WINDOW_LABEL);
 }
