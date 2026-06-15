@@ -1,5 +1,15 @@
 # Velata v2 — product design package
 
+> **Superseded (feat/UX-redesign).** This set predates the shipped redesign and several of its
+> central decisions changed. What ships now: **two windows** (an App window — Home · Library ·
+> Transform · Scratchpad · ⚙ Settings — and a separate Settings window — Dictation · Speech ·
+> AI · General · About), not the seven-page single sidebar in 03/D2. **Modes are deleted**: the
+> "one switchable concept" (03 D1) and the persona "profiles → Mode v2" (07) collapse into the
+> **Prompt** (a named instruction + shortcut; one built-in, Polish), with an optional
+> post-dictation transform chosen via the HUD circle. Insights is **always-on** counts/dates
+> (no opt-in, no reset). The research and rationale below stay useful; treat the IA, modes, and
+> insights specifics as historical and check each doc's own banner.
+
 Status: complete design set. Written 2026-06-11 against `main` (cd63494) plus the in-flight
 Refine work (`docs/REFINE.md`). Eleven documents: a factual baseline, two research documents,
 seven implementation-ready designs, and a prioritized roadmap. Mission: make Velata the most

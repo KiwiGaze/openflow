@@ -1,5 +1,12 @@
 # 05 — Discoverability and feature education
 
+> **Superseded in part (feat/UX-redesign).** The teaching mechanisms (empty states, hint lines,
+> example prompts, one-time local-state tips, the HUD flash, "no telemetry") still hold, but the
+> concepts they teach changed: **Modes are deleted** — the one customizable concept is the
+> **Prompt** (Polish is the single built-in), and "where modes live" is now the App's Transform
+> page. The post-dictation transform is chosen via the **HUD circle**, not a mode. Insights is
+> always-on (counts/dates only), not an opt-in surface. Read concept names below as historical.
+
 Status: design proposal. Written 2026-06-11 against `main` (cd63494) + the in-flight Refine
 work (`docs/REFINE.md`). Baseline facts and vocabulary: `00-current-state.md`. Structure and
 flows (F1–F12): `03-information-architecture.md`. This document owns everything that teaches a

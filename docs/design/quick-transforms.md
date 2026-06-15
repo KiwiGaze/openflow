@@ -1,5 +1,12 @@
 # Quick transforms — Polish, generalized
 
+> **Renamed (feat/UX-redesign).** This concept shipped and is current, but the names changed:
+> a transform is now a **Prompt** (settings field `transforms` → `prompts`; the per-item
+> `hotkey` field → `shortcut`), managed on the App's Transform page. **Polish** is the one
+> built-in (id `"polish"`, default `⌥⇧P`). The same Prompt can also run automatically after
+> dictation when selected as the **post-dictation transform** via the HUD circle
+> (`postDictationTransformId`). Read "transform"/"hotkey" below as "Prompt"/"shortcut".
+
 Status: **shipped** (settings v3). Began as a brainstorm sketch; this doc now records what was
 built, with the original reasoning intact. Preview and a deterministic register (below) remain
 follow-ups.

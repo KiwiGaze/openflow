@@ -1,5 +1,11 @@
 # Dictating code and identifiers
 
+> **Superseded (feat/UX-redesign).** This shipped as a built-in **Code mode**, but **modes are
+> deleted** and `text.rs` no longer carries the code-identifier path. The dictation baseline is
+> now artifact-strip + dictionary replacements only; any further shaping is an optional Prompt
+> (an LLM instruction over the transcript), not a deterministic code-identifier mode. Read the
+> design below as a removed feature, kept for its rationale.
+
 Status: **shipped** (a focused first slice). A built-in **Code** mode turns each spoken utterance
 into one source-code identifier. The key design choice that made this clean: the _utterance_ is
 the identifier boundary, which sidesteps the "where does the name end" ambiguity a mid-sentence
