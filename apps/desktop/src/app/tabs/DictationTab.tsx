@@ -1,43 +1,31 @@
 import { useEffect, useState, type JSX } from 'react';
-import {
-  formatAcceleratorMac,
-  formatHotkey,
-  HANDS_FREE_FALLBACK,
-  LANGUAGES,
-  PUSH_TO_TALK_FALLBACK,
-  type Hotkey,
-} from '@velata/core';
-import type { ModelsApi, SettingsApi } from '../hooks.js';
+import { formatAcceleratorMac, LANGUAGES, PUSH_TO_TALK_FALLBACK, type Hotkey } from '@velata/core';
+import { usePermissions, type ModelsApi, type SettingsApi } from '../hooks.js';
 import { ipc } from '../ipc.js';
+import { Callout } from '../components/Callout.js';
 import { HotkeyRecorder } from '../components/HotkeyRecorder.js';
 import { Row } from '../components/Row.js';
 
+const FN_PUSH_TO_TALK: Hotkey = { kind: 'hold', key: 'fn' };
+
 /**
- * Edits a dictation gesture trigger (push-to-talk / hands-free). The `fn`-key
- * gesture defaults can't be observed yet (Phase 3), so a gesture trigger is
- * shown read-only with its fallback note, plus a way to record an accelerator
- * instead; an accelerator trigger is editable and clearable to disable it.
+ * Push-to-talk trigger control (the right-hand column of its row). The fn-key
+ * gesture is the default; a user can instead bind a literal accelerator, and
+ * restore the fn gesture from one (the gesture→accelerator transition used to be
+ * one-way). The Input-Monitoring grant flow lives in a section-level callout, not
+ * here, because that is how callouts read across the settings tabs.
  */
-function GestureHotkey({
-  label,
+function PushToTalkHotkey({
   hotkey,
-  fallbackHint,
   onChange,
 }: {
-  label: string;
   hotkey: Hotkey;
-  /** What works today while the gesture can't be observed, e.g. "⌥ Space". */
-  fallbackHint: string;
   onChange: (next: Hotkey) => void;
 }): JSX.Element {
-  const isGesture = hotkey.kind !== 'accelerator';
-  if (isGesture) {
+  if (hotkey.kind !== 'accelerator') {
     return (
       <div className="hotkey-gesture">
-        <span className="hotkey-gesture-current">{formatHotkey(hotkey)}</span>
-        <p className="row-hint">
-          The fn key needs Input Monitoring (coming soon). For now, {fallbackHint} works.
-        </p>
+        <span className="hotkey-gesture-current">Hold 🌐 fn</span>
         <button
           type="button"
           className="btn btn-quiet"
@@ -54,8 +42,46 @@ function GestureHotkey({
     <div className="hotkey-gesture">
       <HotkeyRecorder
         value={hotkey.key}
-        label={label}
+        label="Push to talk"
         emptyLabel="Set…"
+        onChange={(accelerator) => {
+          onChange({ kind: 'accelerator', key: accelerator });
+        }}
+      />
+      {/* Push-to-talk should stay bound, so the way back is "use the fn key",
+          not a Clear. Setting the fn gesture surfaces the Input-Monitoring
+          callout below when the permission is not granted. */}
+      <button
+        type="button"
+        className="btn btn-quiet"
+        onClick={() => {
+          onChange(FN_PUSH_TO_TALK);
+        }}
+      >
+        Use the fn key
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Optional separate accelerator to toggle hands-free. The primary way to latch
+ * hands-free is a quick tap of the push-to-talk key (see the row hint); this is
+ * an extra, always-disable-able shortcut, so it offers a Clear that PTT does not.
+ */
+function HandsFreeHotkey({
+  hotkey,
+  onChange,
+}: {
+  hotkey: Hotkey;
+  onChange: (next: Hotkey) => void;
+}): JSX.Element {
+  return (
+    <div className="hotkey-gesture">
+      <HotkeyRecorder
+        value={hotkey.key}
+        label="Hands-free mode"
+        emptyLabel="Not set"
         onChange={(accelerator) => {
           onChange({ kind: 'accelerator', key: accelerator });
         }}
@@ -64,7 +90,7 @@ function GestureHotkey({
         <button
           type="button"
           className="btn btn-quiet"
-          aria-label={`Clear ${label} shortcut`}
+          aria-label="Clear hands-free shortcut"
           onClick={() => {
             onChange({ kind: 'accelerator', key: '' });
           }}
@@ -88,6 +114,18 @@ export function DictationTab({
   const activeModel = models.find((m) => m.id === settings.sttModelId);
   const englishOnly = (activeModel && !activeModel.multilingual) ?? false;
 
+  // Poll permissions so the Input-Monitoring callout clears once the user grants
+  // it in System Settings (same pattern Onboarding uses). The grant still needs
+  // a relaunch to take effect, which the callout copy states.
+  const permissions = usePermissions();
+  // Show the grant flow only when push-to-talk actually relies on observing fn
+  // (the gesture trigger) and the permission is not yet granted. An accelerator
+  // push-to-talk does not need Input Monitoring.
+  const needsInputMonitoring =
+    settings.pushToTalkHotkey.kind !== 'accelerator' &&
+    permissions !== null &&
+    permissions.inputMonitoring !== 'granted';
+
   // Enumerate input devices once when the tab mounts (local hardware; no
   // polling). An empty list disables the picker with "System default" only.
   const [inputDevices, setInputDevices] = useState<string[]>([]);
@@ -108,18 +146,30 @@ export function DictationTab({
           title="Push to talk"
           hint="Hold to talk; release to insert. Tip: a quick tap keeps recording hands-free until you tap again."
         >
-          <GestureHotkey
-            label="Push to talk"
+          <PushToTalkHotkey
             hotkey={settings.pushToTalkHotkey}
-            fallbackHint={formatAcceleratorMac(PUSH_TO_TALK_FALLBACK)}
             onChange={(pushToTalkHotkey) => void update({ pushToTalkHotkey })}
           />
         </Row>
-        <Row title="Hands-free mode" hint="Press once to start, press again to stop — no holding.">
-          <GestureHotkey
-            label="Hands-free mode"
+        {needsInputMonitoring && (
+          <Callout
+            variant="warn"
+            action={{
+              label: 'Grant Input Monitoring',
+              onClick: () => void ipc.requestInputMonitoring(),
+            }}
+          >
+            The fn key needs Input Monitoring. Until you grant it, push-to-talk uses{' '}
+            {formatAcceleratorMac(PUSH_TO_TALK_FALLBACK)}. The grant takes effect after you relaunch
+            Velata.
+          </Callout>
+        )}
+        <Row
+          title="Hands-free mode"
+          hint="Quick-tap your push-to-talk key to latch hands-free (tap again to stop). Or set a separate shortcut."
+        >
+          <HandsFreeHotkey
             hotkey={settings.handsFreeHotkey}
-            fallbackHint={formatAcceleratorMac(HANDS_FREE_FALLBACK)}
             onChange={(handsFreeHotkey) => void update({ handsFreeHotkey })}
           />
         </Row>
