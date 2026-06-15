@@ -30,16 +30,18 @@ export interface PipelineState {
 }
 
 /**
- * How a hotkey is triggered. `hold`/`doubleTap` describe an `fn`-key gesture
- * (observation lands in Phase 3; until then the Rust side falls them back to an
- * accelerator); `accelerator` is a literal combo like `Alt+O`.
+ * How a hotkey is triggered. `hold`/`doubleTap` describe an `fn`-key gesture,
+ * observed by a listen-only event tap when Input Monitoring is granted (else the
+ * Rust side falls a `hold` trigger back to an accelerator); `accelerator` is a
+ * literal combo like `Alt+O`. Only push-to-talk uses a gesture today.
  */
 export type HotkeyKind = 'hold' | 'doubleTap' | 'accelerator';
 
 /**
- * A gesture trigger: a `kind` plus its `key`. `key` is `'fn'` for the gesture
- * defaults, or an accelerator string (e.g. `'Alt+O'`) when `kind` is
- * `'accelerator'`. Mirrors `Hotkey` in `settings.rs`.
+ * A gesture trigger: a `kind` plus its `key`. `key` is `'fn'` for the
+ * push-to-talk gesture default, or an accelerator string (e.g. `'Alt+O'`, or
+ * `''` to disable) when `kind` is `'accelerator'`. Mirrors `Hotkey` in
+ * `settings.rs`.
  */
 export interface Hotkey {
   kind: HotkeyKind;
@@ -171,7 +173,11 @@ export interface Settings {
   version: number;
   /** Hold-to-talk trigger: press starts, release inserts (default `fn` hold). */
   pushToTalkHotkey: Hotkey;
-  /** Hands-free trigger: one press starts, the next stops (default `fn` double-tap). */
+  /**
+   * Optional accelerator that toggles hands-free (one press starts, the next
+   * stops); empty `key` = disabled (the default). Hands-free's primary
+   * mechanism is the tap-latch on the push-to-talk key, not this.
+   */
   handsFreeHotkey: Hotkey;
   /** Reveals the word-level diff of the last result. Empty `key` disables it. */
   seeChangesHotkey: Hotkey;
@@ -343,9 +349,9 @@ export interface PermissionsState {
   microphone: MicrophonePermission;
   accessibility: boolean;
   /**
-   * Required only for the `fn`-key push-to-talk/hands-free gestures (a
-   * listen-only event tap). When not `granted`, dictation still works via the
-   * accelerator fallback — this permission is additive.
+   * Required only for the `fn`-key push-to-talk gesture (a listen-only event
+   * tap). When not `granted`, dictation still works via the accelerator
+   * fallback — this permission is additive.
    */
   inputMonitoring: InputMonitoringPermission;
 }

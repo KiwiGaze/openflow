@@ -21,10 +21,12 @@ pub const MAX_RECORDING_SECS: u64 = 300;
 /// `EVENTS.settingsChanged` in `@velata/core`.
 pub const SETTINGS_CHANGED_EVENT: &str = "settings-changed";
 
-/// How a hotkey is triggered. `Hold`/`DoubleTap` describe an `fn`-key gesture
-/// whose observation lands in Phase 3; until then `shortcuts.rs` falls them back
-/// to an accelerator so dictation stays usable. `Accelerator` is a literal combo
-/// like `Alt+O`.
+/// How a hotkey is triggered. `Hold`/`DoubleTap` describe an `fn`-key gesture,
+/// observed by a listen-only CGEventTap when Input Monitoring is granted
+/// (`fn_gesture.rs`); without the grant `shortcuts.rs` falls a `Hold` trigger
+/// back to an accelerator so dictation stays usable. `Accelerator` is a literal
+/// combo like `Alt+O`. Only push-to-talk uses a gesture today; hands-free is the
+/// tap-latch on the push-to-talk key plus an optional `Accelerator`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum HotkeyKind {
@@ -33,9 +35,10 @@ pub enum HotkeyKind {
     Accelerator,
 }
 
-/// A gesture trigger: a `kind` plus its `key`. `key` is `"fn"` for the gesture
-/// defaults, or an accelerator string (e.g. `"Alt+O"`) when `kind` is
-/// `Accelerator`. Mirrored as `Hotkey` in `@velata/core`.
+/// A gesture trigger: a `kind` plus its `key`. `key` is `"fn"` for the
+/// push-to-talk gesture default, or an accelerator string (e.g. `"Alt+O"`, or
+/// `""` to disable) when `kind` is `Accelerator`. Mirrored as `Hotkey` in
+/// `@velata/core`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Hotkey {
@@ -194,9 +197,13 @@ impl Default for Settings {
                 kind: HotkeyKind::Hold,
                 key: "fn".into(),
             },
+            // Hands-free is the tap-latch on the push-to-talk key (a quick tap of
+            // `fn` starts a recording that stays on until the next tap), so it
+            // needs no key of its own by default. This optional accelerator is a
+            // separate way to toggle hands-free; empty = disabled.
             hands_free_hotkey: Hotkey {
-                kind: HotkeyKind::DoubleTap,
-                key: "fn".into(),
+                kind: HotkeyKind::Accelerator,
+                key: String::new(),
             },
             see_changes_hotkey: Hotkey {
                 kind: HotkeyKind::Accelerator,
@@ -428,7 +435,7 @@ mod tests {
     fn serializes_with_camel_case_contract() {
         let json = serde_json::to_string(&Settings::default()).unwrap();
         assert!(json.contains("\"pushToTalkHotkey\":{\"kind\":\"hold\",\"key\":\"fn\"}"));
-        assert!(json.contains("\"handsFreeHotkey\":{\"kind\":\"doubleTap\",\"key\":\"fn\"}"));
+        assert!(json.contains("\"handsFreeHotkey\":{\"kind\":\"accelerator\",\"key\":\"\"}"));
         assert!(json.contains("\"seeChangesHotkey\":{\"kind\":\"accelerator\",\"key\":\"Alt+O\"}"));
         assert!(json.contains("\"activeLlmProfileId\":\"\""));
         assert!(json.contains("\"appearance\":\"system\""));

@@ -15,18 +15,18 @@ use crate::pipeline::Job;
 use crate::settings::{Hotkey, HotkeyKind, Settings};
 use crate::state::AppState;
 
-/// Accelerator stand-ins used while the `fn`-key gesture defaults cannot yet be
-/// observed (Input Monitoring + Phase 3). A `Hold`/`DoubleTap` push-to-talk or
-/// hands-free trigger resolves to its fallback so dictation stays usable; once
-/// `fn` observation lands these are bypassed for the real gesture.
+/// Accelerator stand-in for the `fn`-key push-to-talk gesture when Input
+/// Monitoring is not granted (so the tap can't observe `fn`). A held `Alt+Space`
+/// is push-to-talk; a quick tap of it latches hands-free via the same pipeline
+/// path — so the fallback keeps both behaviors the `fn` key would give. Bypassed
+/// when the `fn` monitor is live.
 const PUSH_TO_TALK_FALLBACK: &str = "Alt+Space";
-const HANDS_FREE_FALLBACK: &str = "Alt+Shift+Space";
 
 /// Whether a hotkey is the observable `fn`-key gesture: a `Hold`/`DoubleTap`
-/// whose key is `fn`. When the `fn` monitor is live, such a trigger is driven by
-/// the [`crate::fn_gesture`] CGEventTap, not by an accelerator fallback. A
-/// `Hold`/`DoubleTap` with any other key is not a thing the UI can produce, but
-/// would still fall back rather than feed the tap.
+/// whose key is `fn`. Only push-to-talk uses this; when the `fn` monitor is live
+/// such a trigger is driven by the [`crate::fn_gesture`] CGEventTap, not by an
+/// accelerator fallback. A `Hold`/`DoubleTap` with any other key is not a thing
+/// the UI can produce, but would still fall back rather than feed the tap.
 pub fn is_fn_gesture(hotkey: &Hotkey) -> bool {
     matches!(hotkey.kind, HotkeyKind::Hold | HotkeyKind::DoubleTap) && hotkey.key == "fn"
 }
@@ -68,9 +68,9 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     // started once and routes by live settings (`fn_gesture::route_gesture`).
     let fn_active = fn_gesture::ensure_monitor(app);
 
-    // Resolve each gesture trigger to the accelerator to register. An `fn`
-    // gesture driven by the live tap registers nothing here; otherwise it falls
-    // back so dictation stays usable. An empty accelerator disables it (None).
+    // Push-to-talk: the `fn` gesture driven by the live tap registers nothing
+    // here; otherwise it falls back to Alt+Space so dictation stays usable
+    // (held = push-to-talk, tapped = hands-free latch). Empty disables it.
     let push_to_talk = if fn_active && is_fn_gesture(&settings.push_to_talk_hotkey) {
         None
     } else {
@@ -78,12 +78,18 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
             .map(|a| Shortcut::from_str(&a).map_err(|e| format!("push-to-talk hotkey “{a}”: {e}")))
             .transpose()?
     };
-    let hands_free = if fn_active && is_fn_gesture(&settings.hands_free_hotkey) {
+    // Hands-free's primary mechanism is the tap-latch on the push-to-talk key
+    // (see `fn_gesture::route_gesture`); this is the OPTIONAL separate
+    // accelerator to toggle it, disabled (empty) by default. Always an
+    // accelerator — no `fn` gesture, no fallback.
+    let hands_free_key = settings.hands_free_hotkey.key.trim();
+    let hands_free = if hands_free_key.is_empty() {
         None
     } else {
-        resolve(&settings.hands_free_hotkey, HANDS_FREE_FALLBACK)
-            .map(|a| Shortcut::from_str(&a).map_err(|e| format!("hands-free hotkey “{a}”: {e}")))
-            .transpose()?
+        Some(
+            Shortcut::from_str(hands_free_key)
+                .map_err(|e| format!("hands-free hotkey “{hands_free_key}”: {e}"))?,
+        )
     };
     // See-changes is an accelerator trigger; a stray gesture here falls back to
     // the historical default rather than disabling it.
@@ -131,9 +137,11 @@ pub fn apply(app: &AppHandle, settings: &Settings) -> Result<(), String> {
             .map_err(|e| format!("push-to-talk hotkey: {e}"))?;
     }
 
-    // Hands-free toggles via press only: a press starts, the next press finishes
-    // (the existing "press while recording → finish" path). Release is ignored.
-    // Offloaded like the prompt handler — start/finish block on worker replies.
+    // The optional hands-free accelerator toggles via press only: a press
+    // starts, the next press finishes (the existing "press while recording →
+    // finish" path). Release is ignored. (The primary hands-free is the tap-latch
+    // on the push-to-talk key.) Offloaded like the prompt handler — start/finish
+    // block on worker replies.
     if let Some(hands_free) = hands_free {
         if let Err(e) = shortcuts.on_shortcut(hands_free, move |app, _shortcut, event| {
             if event.state() == ShortcutState::Pressed {
@@ -259,7 +267,7 @@ mod tests {
             None
         );
         assert_eq!(
-            resolve(&hk(HotkeyKind::Accelerator, "   "), HANDS_FREE_FALLBACK),
+            resolve(&hk(HotkeyKind::Accelerator, "   "), PUSH_TO_TALK_FALLBACK),
             None
         );
     }
@@ -267,22 +275,12 @@ mod tests {
     #[test]
     fn gesture_kinds_resolve_to_their_fallback() {
         // `resolve` always yields the fallback for a gesture; `apply` decides
-        // whether to register it (skipped when the `fn` tap is live).
+        // whether to register it (skipped when the `fn` tap is live). Only
+        // push-to-talk uses a gesture today.
         assert_eq!(
             resolve(&hk(HotkeyKind::Hold, "fn"), PUSH_TO_TALK_FALLBACK),
             Some(PUSH_TO_TALK_FALLBACK.to_string())
         );
-        assert_eq!(
-            resolve(&hk(HotkeyKind::DoubleTap, "fn"), HANDS_FREE_FALLBACK),
-            Some(HANDS_FREE_FALLBACK.to_string())
-        );
-    }
-
-    #[test]
-    fn default_gestures_resolve_to_distinct_fallbacks() {
-        // The push-to-talk and hands-free defaults must not collide, so both
-        // register under the gesture defaults when the `fn` tap is not live.
-        assert_ne!(PUSH_TO_TALK_FALLBACK, HANDS_FREE_FALLBACK);
     }
 
     #[test]

@@ -174,24 +174,24 @@ mod macos {
     /// contention; the run-loop/consumer threads never lock it.
     static FN_MONITOR: Mutex<Option<FnMonitor>> = Mutex::new(None);
 
-    /// Starts the `fn` monitor once if either trigger is an `fn` gesture and
-    /// Input Monitoring is granted; returns whether the tap is now live. Called
-    /// from `shortcuts::apply` on every settings save: a no-op once started, and
-    /// a no-op (returning `false`) while ungranted or while neither trigger is an
-    /// `fn` gesture, so `apply` keeps the accelerator fallback. Idempotent — the
-    /// monitor is never torn down or double-started; routing follows live
-    /// settings instead (see `route_gesture`).
+    /// Starts the `fn` monitor once if push-to-talk is an `fn` gesture and Input
+    /// Monitoring is granted; returns whether the tap is now live. (Push-to-talk
+    /// is the only `fn`-gesture trigger — hands-free is the tap-latch on that key
+    /// plus an optional accelerator.) Called from `shortcuts::apply` on every
+    /// settings save: a no-op once started, and a no-op (returning `false`) while
+    /// ungranted or while push-to-talk is an accelerator, so `apply` keeps the
+    /// accelerator fallback. Idempotent — the monitor is never torn down or
+    /// double-started; routing follows live settings instead (see
+    /// `route_gesture`).
     pub fn ensure_monitor(app: &AppHandle) -> bool {
         let mut guard = FN_MONITOR.lock().expect("fn monitor poisoned");
         if guard.is_some() {
             return true;
         }
         let settings = app.state::<AppState>().settings.get();
-        if !is_fn_gesture(&settings.push_to_talk_hotkey)
-            && !is_fn_gesture(&settings.hands_free_hotkey)
-        {
-            // Nothing to observe yet (both triggers are accelerators); a later
-            // save that switches one to an `fn` gesture will start it.
+        if !is_fn_gesture(&settings.push_to_talk_hotkey) {
+            // Nothing to observe yet (push-to-talk is an accelerator); a later
+            // save that switches it to the `fn` gesture will start it.
             return false;
         }
         let routed = app.clone();
@@ -205,28 +205,29 @@ mod macos {
         }
     }
 
-    /// Maps a recognized gesture onto the pipeline, re-checking live settings so
-    /// no teardown is needed when a trigger changes: Press/Release drive
-    /// push-to-talk only while it is still an `fn` gesture, and DoubleTap drives
-    /// hands-free only while it is. (One `fn` key, one monitor, both triggers.)
-    /// Runs on the consumer thread, so it calls the pipeline directly.
+    /// Maps a recognized gesture onto the pipeline, driving ONLY push-to-talk
+    /// (re-checking live settings so no teardown is needed when the trigger
+    /// changes). Press starts and Release finishes; a quick tap of `fn` is a
+    /// Press with no Release (its sub-threshold Up emits nothing), so the
+    /// pipeline latches into hands-free until the next tap — that tap-latch IS
+    /// hands-free on the `fn` key. DoubleTap is intentionally not routed: with
+    /// the instant hold-Press, a second tap on the same key can't toggle
+    /// hands-free, so a double-tap just latches like a single tap (its second Up
+    /// is swallowed). Hands-free's optional separate accelerator is a Carbon
+    /// hotkey in `shortcuts.rs`. Runs on the consumer thread, so it calls the
+    /// pipeline directly.
     fn route_gesture(app: &AppHandle, gesture: Gesture) {
         let state = app.state::<AppState>();
         let settings = state.settings.get();
         let pipeline = state.pipeline.clone();
+        if !is_fn_gesture(&settings.push_to_talk_hotkey) {
+            return;
+        }
         match gesture {
-            Gesture::Press if is_fn_gesture(&settings.push_to_talk_hotkey) => {
-                pipeline.on_hotkey_pressed(Job::Dictation);
-            }
-            Gesture::Release if is_fn_gesture(&settings.push_to_talk_hotkey) => {
-                pipeline.on_hotkey_released(Job::Dictation);
-            }
-            // Hands-free toggles via the existing press-while-recording → finish
-            // path, exactly like the accelerator hands-free trigger.
-            Gesture::DoubleTap if is_fn_gesture(&settings.hands_free_hotkey) => {
-                pipeline.on_hotkey_pressed(Job::Dictation);
-            }
-            _ => {}
+            Gesture::Press => pipeline.on_hotkey_pressed(Job::Dictation),
+            Gesture::Release => pipeline.on_hotkey_released(Job::Dictation),
+            // A double-tap latches via its first Press; nothing more to do.
+            Gesture::DoubleTap => {}
         }
     }
 

@@ -5,7 +5,7 @@ import { eligibleTip } from './tips.js';
 const base: Settings = {
   version: 6,
   pushToTalkHotkey: { kind: 'hold', key: 'fn' },
-  handsFreeHotkey: { kind: 'doubleTap', key: 'fn' },
+  handsFreeHotkey: { kind: 'accelerator', key: '' },
   seeChangesHotkey: { kind: 'accelerator', key: 'Alt+O' },
   activeLlmProfileId: '',
   dictionary: [],
