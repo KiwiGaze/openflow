@@ -25,7 +25,7 @@ pub struct HistoryEntry {
     /// Recording duration in milliseconds; null for legacy imports.
     pub duration_ms: Option<i64>,
     pub word_count: i64,
-    /// Whether an LLM pass ran (vs rules-based cleanup only).
+    /// Whether a post-dictation LLM transform ran on this dictation.
     pub used_ai: bool,
 }
 

@@ -1,5 +1,5 @@
-//! Deterministic text processing: transcript cleanup, rules-based polishing,
-//! and personal-dictionary replacements. Everything here is pure and fast —
+//! Deterministic text processing: artifact stripping, personal-dictionary
+//! replacements, and snippet expansion. Everything here is pure and fast —
 //! the optional LLM pass lives in `llm.rs`.
 
 use std::collections::HashMap;
@@ -138,8 +138,8 @@ fn utterance_key(text: &str) -> String {
 pub fn apply_snippets(text: &str, snippets: &[Snippet]) -> String {
     // A whole-utterance snippet swallows the whole dictation when it matches,
     // so it is checked first and short-circuits. Trailing sentence punctuation
-    // is ignored so cleanup adding a period ("my email" → "My email.") still
-    // counts as "spoken alone".
+    // is ignored so a transcript ending in "." / "?" / "!" still counts as
+    // "spoken alone".
     let spoken = utterance_key(text);
     for snippet in snippets {
         if snippet.whole_utterance {
