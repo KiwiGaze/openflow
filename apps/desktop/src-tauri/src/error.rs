@@ -30,6 +30,9 @@ pub enum AppError {
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("database error: {0}")]
+    Database(#[from] rusqlite::Error),
+
     #[error("window error: {0}")]
     Tauri(#[from] tauri::Error),
 }
@@ -48,6 +51,7 @@ impl AppError {
             | AppError::Settings(m)
             | AppError::State(m) => m.clone(),
             AppError::Io(e) => e.to_string(),
+            AppError::Database(e) => e.to_string(),
             AppError::Tauri(e) => e.to_string(),
         }
     }

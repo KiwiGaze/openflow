@@ -1,5 +1,11 @@
 # 07 — Persona bundles: Mode v2, overrides, switching, resolution
 
+> **Superseded (feat/UX-redesign).** "Mode v2" never shipped — **modes are deleted**. There is
+> no `Mode` struct, no `activeModeId`, no per-mode `usesLlm`/overrides, and no per-app rules or
+> resolution. The single customizable concept is the **Prompt** (`{id, name, instruction,
+shortcut, builtIn}`); the only built-in is **Polish**. The bundling/override/resolution design
+> below is historical — read it for rationale, not as the current behavior.
+
 Status: design proposal. Written 2026-06-11 against `main` (cd63494) + the in-flight Refine
 work (`docs/REFINE.md`, `apps/desktop/src-tauri/src/profiles.rs`). Baseline facts and vocabulary:
 `00-current-state.md`. Foundation decision: `03-information-architecture.md` D1 (modes are the

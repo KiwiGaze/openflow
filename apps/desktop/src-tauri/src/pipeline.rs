@@ -1,10 +1,9 @@
 //! The dictation pipeline state machine.
 //!
-//! One pipeline instance owns the flow `record → transcribe → (polish) →
-//! insert` for dictation plus the no-recording selection jobs (polish,
-//! transforms), emits progress events to the webviews, and guards against
-//! stale work with a generation counter — cancelling simply bumps the
-//! generation.
+//! One pipeline instance owns the flow `record → transcribe → (transform) →
+//! insert` for dictation plus the no-recording selection jobs (per-prompt
+//! shortcuts), emits progress events to the webviews, and guards against stale
+//! work with a generation counter — cancelling simply bumps the generation.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -16,19 +15,20 @@ use tauri::{AppHandle, Emitter};
 use crate::apps;
 use crate::audio::AudioSystem;
 use crate::cloud_stt;
+use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::history::HistoryStore;
 use crate::hud;
 use crate::llm::LlmClient;
 use crate::models::ModelManager;
-use crate::modes;
 use crate::output::{CopyReason, InsertOutcome, OutputSystem};
 use crate::profiles::{LlmProfile, ProfileManager};
+use crate::prompts;
 use crate::settings::{
-    HotkeyBehavior, Mode, Settings, SettingsManager, MAX_RECORDING_SECS, SETTINGS_CHANGED_EVENT,
+    InsertMethod, Prompt, Settings, SettingsManager, MAX_RECORDING_SECS, SETTINGS_CHANGED_EVENT,
 };
 use crate::shortcuts;
-use crate::stats::{word_count, Insights, Stats};
+use crate::stats::{local_day, word_count};
 use crate::stt::{initial_prompt_from_dictionary, SttEngine};
 use crate::stt_profiles::{SttProfileManager, CLOUD_STT_PREFIX};
 use crate::suggestions::{DictionarySuggestion, Suggestions};
@@ -37,6 +37,14 @@ use crate::text;
 pub const PIPELINE_STATE_EVENT: &str = "pipeline-state";
 pub const AUDIO_LEVEL_EVENT: &str = "audio-level";
 pub const RESULT_EVENT: &str = "transcription-result";
+/// Fired (no payload) once a history append has actually committed to the DB,
+/// so views refresh from durable rows rather than racing the write. Mirrored as
+/// `EVENTS.historyChanged` in `@velata/core`.
+pub const HISTORY_CHANGED_EVENT: &str = "history-changed";
+/// Fired (no payload) once the `insights_daily` upsert has committed, so the
+/// Home header refetches from the durable row rather than racing the off-thread
+/// write. Mirrored as `EVENTS.insightsChanged` in `@velata/core`.
+pub const INSIGHTS_CHANGED_EVENT: &str = "insights-changed";
 
 /// Releases faster than this are treated as a tap, which switches the
 /// hold-to-talk gesture into hands-free mode instead of stopping.
@@ -66,10 +74,8 @@ pub enum Status {
 #[serde(rename_all = "camelCase")]
 pub enum Job {
     Dictation,
-    /// Polish the selection with the built-in instruction — no recording.
-    PolishSelection,
-    /// Apply a user-defined transform's instruction to the selection — no
-    /// recording. Which transform is resolved at dispatch time by id.
+    /// Apply a prompt's instruction to the selection — no recording. The prompt
+    /// (Polish or a custom one) is resolved at dispatch time by id.
     Transform,
 }
 
@@ -89,10 +95,9 @@ pub struct PipelineState {
 pub struct TranscriptionResult {
     pub raw: String,
     /// The "before" the change-overlay diffs against: the transcript for
-    /// dictation, the original selection for polish/transforms.
+    /// dictation, the original selection for a prompt transform.
     pub original: String,
     pub text: String,
-    pub mode_id: String,
     pub polished: bool,
     pub duration_ms: u64,
 }
@@ -101,9 +106,6 @@ struct Session {
     job: Job,
     generation: u64,
     started: Instant,
-    /// Mode id from a per-mode hotkey, used for this job only without changing
-    /// the persistent active mode (one-shot, 07 §4). None = use the active mode.
-    mode_override: Option<String>,
 }
 
 pub struct Pipeline {
@@ -116,22 +118,22 @@ pub struct Pipeline {
     models: Arc<ModelManager>,
     profiles: Arc<ProfileManager>,
     history: Arc<HistoryStore>,
+    /// Direct store handle for the opt-in `insights_daily` upsert at the
+    /// dictation success point; history goes through `history` above.
+    db: Arc<Db>,
     stt_profiles: Arc<SttProfileManager>,
     state: Mutex<PipelineState>,
     state_seq: AtomicU64,
     session: Mutex<Option<Session>>,
     generation: AtomicU64,
     last_result: Mutex<Option<TranscriptionResult>>,
-    /// Frontmost app `(bundle_id, name)` at the last dictation — lets the App
-    /// rules UI offer "add a rule for the app you just dictated into".
+    /// Frontmost app `(bundle_id, name)` at the last dictation — supplies the
+    /// opt-in history row's app name.
     last_app: Mutex<Option<(String, String)>>,
     /// At most one HUD educational tip per app session (05 §2.1).
     tip_shown_session: AtomicBool,
     /// Consecutive empty dictations — drives the one-time accuracy tip (05 §2.3).
     empty_streak: AtomicU64,
-    /// Session-only usage aggregates for the Insights view (in-RAM, never
-    /// persisted or transmitted).
-    stats: Stats,
     /// Session-only candidate-term tally driving dictionary suggestions
     /// (in-RAM, never persisted or transmitted).
     suggestions: Suggestions,
@@ -149,6 +151,7 @@ impl Pipeline {
         models: Arc<ModelManager>,
         profiles: Arc<ProfileManager>,
         history: Arc<HistoryStore>,
+        db: Arc<Db>,
         stt_profiles: Arc<SttProfileManager>,
     ) -> Arc<Self> {
         Arc::new(Self {
@@ -161,6 +164,7 @@ impl Pipeline {
             models,
             profiles,
             history,
+            db,
             stt_profiles,
             state: Mutex::new(PipelineState {
                 status: Status::Idle,
@@ -175,7 +179,6 @@ impl Pipeline {
             last_app: Mutex::new(None),
             tip_shown_session: AtomicBool::new(false),
             empty_streak: AtomicU64::new(0),
-            stats: Stats::new(),
             suggestions: Suggestions::new(),
         })
     }
@@ -185,11 +188,6 @@ impl Pipeline {
             .lock()
             .expect("pipeline state poisoned")
             .clone()
-    }
-
-    /// Snapshot of this session's usage aggregates for the Insights view.
-    pub fn insights(&self) -> Insights {
-        self.stats.snapshot()
     }
 
     /// Top dictionary suggestions seen this session, excluding known terms.
@@ -276,7 +274,10 @@ impl Pipeline {
         if !s.tips_enabled || s.tips_seen.iter().any(|t| t == "tip.latch") {
             return None;
         }
-        if s.dictation_hotkey_behavior != HotkeyBehavior::Hold || s.dictation_count != 3 {
+        // The push-to-talk fallback is still hold-with-tap-latch, so the
+        // hands-free tip stays meaningful regardless of how the trigger is bound;
+        // gate on the dictation count only.
+        if s.dictation_count != 3 {
             return None;
         }
         self.mark_tip_shown("tip.latch", s);
@@ -318,7 +319,7 @@ impl Pipeline {
 
     // ---- Hotkey entry points -------------------------------------------
 
-    pub fn on_hotkey_pressed(self: &Arc<Self>, job: Job, mode_override: Option<String>) {
+    pub fn on_hotkey_pressed(self: &Arc<Self>, job: Job) {
         let status = self.state().status;
         match status {
             Status::Recording => {
@@ -334,7 +335,7 @@ impl Pipeline {
                 }
             }
             Status::Idle | Status::Error | Status::Notice => {
-                if let Err(err) = self.start(job, mode_override) {
+                if let Err(err) = self.start(job) {
                     log::warn!("could not start {job:?}: {err}");
                     self.set_transient(Status::Error, err.user_message());
                 }
@@ -345,11 +346,12 @@ impl Pipeline {
     }
 
     pub fn on_hotkey_released(self: &Arc<Self>, job: Job) {
-        // Polish and transforms are taps; only dictation records.
+        // Prompt transforms are taps; only dictation records. Release is wired up
+        // only for the push-to-talk (hold) trigger — the hands-free trigger is
+        // registered press-only — so this is always the hold path: release
+        // finishes unless the press was a sub-threshold tap (which latches
+        // hands-free instead).
         if job != Job::Dictation {
-            return;
-        }
-        if self.settings.get().dictation_hotkey_behavior == HotkeyBehavior::Toggle {
             return;
         }
         let held_for = {
@@ -368,9 +370,9 @@ impl Pipeline {
 
     // ---- Lifecycle ------------------------------------------------------
 
-    /// Starts a recording job. Only dictation records; polish and transforms
-    /// capture the selection without one and never come through here.
-    pub fn start(self: &Arc<Self>, job: Job, mode_override: Option<String>) -> AppResult<()> {
+    /// Starts a recording job. Only dictation records; prompt transforms capture
+    /// the selection without one and never come through here.
+    pub fn start(self: &Arc<Self>, job: Job) -> AppResult<()> {
         {
             let state = self.state();
             if !matches!(state.status, Status::Idle | Status::Error | Status::Notice) {
@@ -382,63 +384,28 @@ impl Pipeline {
 
         let settings = self.settings.get();
 
-        // Per-app rules (07 §9): for a plain dictation (no explicit mode hotkey),
-        // a frontmost-app rule supplies a one-shot mode override, exactly like a
-        // hotkey. Explicit overrides win; a detection failure just means no rule.
-        let mode_override = match mode_override {
-            Some(id) => Some(id),
-            None => match apps::frontmost_app() {
-                Some((bundle_id, name)) => {
-                    *self.last_app.lock().expect("pipeline state poisoned") =
-                        Some((bundle_id.clone(), name));
-                    settings
-                        .app_rules
-                        .iter()
-                        .find(|r| r.bundle_id == bundle_id)
-                        .map(|r| r.mode_id.clone())
-                }
-                None => {
-                    // Detection failed: clear the stale app so the "add a rule"
-                    // flow can't target whatever was frontmost last time.
-                    *self.last_app.lock().expect("pipeline state poisoned") = None;
-                    None
-                }
-            },
-        };
+        // Capture the frontmost app for the opt-in history row's app name. A
+        // detection failure clears it so stale data can't leak forward.
+        *self.last_app.lock().expect("pipeline state poisoned") = apps::frontmost_app();
 
-        // Preflight the model this job will actually use: a dictation mode can
-        // override the speech model (07 §3), so checking the global default
-        // would wrongly block a valid per-mode override. A cloud engine needs
-        // no local model.
-        let mode = mode_override
-            .as_ref()
-            .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
-            .unwrap_or_else(|| settings.active_mode());
-        let effective_stt = match &mode.stt_model_id {
-            Some(id) if self.stt_model_valid(&settings, id) => id.clone(),
-            _ => settings.stt_model_id.clone(),
-        };
-        if !effective_stt.starts_with(CLOUD_STT_PREFIX) && !self.models.is_installed(&effective_stt)
+        // Preflight the global speech model: a cloud engine needs no local file.
+        if !settings.stt_model_id.starts_with(CLOUD_STT_PREFIX)
+            && !self.models.is_installed(&settings.stt_model_id)
         {
             return Err(AppError::Model(
                 "No speech model yet — open Settings to download one.".into(),
             ));
         }
 
-        // Name the mode in the listening label so the user sees which mode will
-        // write before speaking (07 §5) — the override mode for a mode hotkey,
-        // else the active mode.
-        let recording_label = Some(truncate_mode_name(&mode.name));
-
-        self.audio.start()?;
+        self.audio.start(settings.input_device_name.as_deref())?;
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         *self.session.lock().expect("pipeline state poisoned") = Some(Session {
             job,
             generation,
             started: Instant::now(),
-            mode_override,
         });
-        self.set_state(Status::Recording, Some(job), recording_label);
+        // No per-mode label any more; the HUD shows a generic "Listening…".
+        self.set_state(Status::Recording, Some(job), None);
         // Bind Esc so a recording started by mistake has a "never mind".
         shortcuts::set_cancel_key(&self.app, true);
         hud::position_on_cursor_monitor(&self.app);
@@ -529,47 +496,31 @@ impl Pipeline {
         }
     }
 
-    /// Tap entry point: polish the current selection with the built-in
-    /// fix-grammar instruction — no recording, no Session.
-    pub fn polish(self: &Arc<Self>) {
-        self.polish_selection(Job::PolishSelection, String::new(), "polish", None);
-    }
-
-    /// Tap entry point: apply a user-defined transform to the selection. The
-    /// transform is resolved by id at dispatch time so edits take effect
-    /// without re-binding the hotkey; a transform deleted between keypress and
-    /// dispatch is a silent no-op (its hotkey is already being unregistered).
-    pub fn run_transform(self: &Arc<Self>, transform_id: &str) {
-        let Some(transform) = self
+    /// Tap entry point: apply a prompt's instruction to the selection. The
+    /// prompt (Polish or a custom one) is resolved by id at dispatch time so
+    /// edits take effect without re-binding the shortcut; a prompt deleted
+    /// between keypress and dispatch is a silent no-op (its shortcut is already
+    /// being unregistered).
+    pub fn run_prompt(self: &Arc<Self>, prompt_id: &str) {
+        let Some(prompt) = self
             .settings
             .get()
-            .transforms
+            .prompts
             .into_iter()
-            .find(|t| t.id == transform_id)
+            .find(|p| p.id == prompt_id)
         else {
             return;
         };
-        self.polish_selection(
-            Job::Transform,
-            transform.instruction,
-            "transform",
-            Some(transform.name),
-        );
+        self.run_selection_prompt(prompt.instruction, prompt.name);
     }
 
-    /// Shared body for the no-recording selection jobs (Polish, Transform):
-    /// resolve the active profile, capture the selection, then polish it with
-    /// `instruction` and insert. Runs under the same busy-state and generation
-    /// contract as every other job; errors surface as transient HUD states.
-    /// Blocks on selection capture, so callers must stay off the main thread
-    /// (capture round-trips keystrokes through it).
-    fn polish_selection(
-        self: &Arc<Self>,
-        job: Job,
-        instruction: String,
-        mode_id: &'static str,
-        hud_label: Option<String>,
-    ) {
+    /// Shared body for the no-recording prompt-transform job: resolve the active
+    /// profile, capture the selection, then rewrite it with `instruction` and
+    /// insert. Runs under the same busy-state and generation contract as every
+    /// other job; errors surface as transient HUD states. Blocks on selection
+    /// capture, so callers must stay off the main thread (capture round-trips
+    /// keystrokes through it).
+    fn run_selection_prompt(self: &Arc<Self>, instruction: String, hud_label: String) {
         if !matches!(
             self.state().status,
             Status::Idle | Status::Error | Status::Notice
@@ -578,40 +529,30 @@ impl Pipeline {
         }
         let settings = self.settings.get();
         let Some(profile) = self.profiles.active(&settings.active_llm_profile_id) else {
-            let what = if job == Job::PolishSelection {
-                "Polishing"
-            } else {
-                "This transform"
-            };
             self.set_transient(
                 Status::Error,
-                format!("{what} needs an AI profile — add one in Settings."),
+                "This prompt needs an AI profile — add one in Settings.".into(),
             );
             return;
         };
 
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
-        // The transform name rides in the message so the HUD can read
-        // "Concise…" instead of a generic label.
-        self.set_state(Status::Polishing, Some(job), hud_label);
+        // The prompt name rides in the message so the HUD can read "Polish…"
+        // instead of a generic label.
+        self.set_state(Status::Polishing, Some(Job::Transform), Some(hud_label));
         hud::position_on_cursor_monitor(&self.app);
 
         let selection = match self.output.capture_selection() {
             Ok(Some(text)) => text,
             Ok(None) => {
-                let key = if job == Job::PolishSelection {
-                    "the polish hotkey"
-                } else {
-                    "the transform's hotkey"
-                };
                 self.set_transient(
                     Status::Error,
-                    format!("Select some text first, then press {key}."),
+                    "Select some text first, then press the prompt's shortcut.".into(),
                 );
                 return;
             }
             Err(err) => {
-                log::warn!("polish selection capture failed: {err}");
+                log::warn!("prompt selection capture failed: {err}");
                 self.set_transient(Status::Error, err.user_message());
                 return;
             }
@@ -624,14 +565,7 @@ impl Pipeline {
         let pipeline = Arc::clone(self);
         tauri::async_runtime::spawn(async move {
             let result = pipeline
-                .finish_selection_polish(
-                    &settings,
-                    &profile,
-                    selection,
-                    &instruction,
-                    mode_id,
-                    started,
-                )
+                .finish_selection_prompt(&profile, selection, &instruction, started)
                 .await;
             if pipeline.generation.load(Ordering::SeqCst) != generation {
                 return; // cancelled mid-flight; a newer job owns the UI now
@@ -641,75 +575,6 @@ impl Pipeline {
     }
 
     // ---- Processing -----------------------------------------------------
-
-    /// Resolves a dictation mode's overrides once, at job start (07 §3). Each
-    /// field falls back `mode override (set AND valid) → global → default`; a
-    /// dangling override never fails the job — it falls through and the first
-    /// dangling field (AI profile → STT → language) yields one informational
-    /// notice that names the mode.
-    fn resolve_dictation(&self, settings: &Settings, mode: &Mode) -> ResolvedDictation {
-        let mut notice: Option<String> = None;
-        let name = truncate_mode_name(&mode.name);
-
-        // AI profile is only resolved when the mode wants AI and the master
-        // switch is on, so a no-AI mode never notices a dangling profile.
-        let profile = if mode.uses_llm && settings.polish_after_dictation {
-            match &mode.ai_profile_id {
-                Some(id) => self.profiles.get(id).or_else(|| {
-                    notice.get_or_insert(format!(
-                        "{name}: its AI profile is missing — used your active profile instead."
-                    ));
-                    self.profiles.active(&settings.active_llm_profile_id)
-                }),
-                None => self.profiles.active(&settings.active_llm_profile_id),
-            }
-        } else {
-            None
-        };
-
-        let stt_model_id = match &mode.stt_model_id {
-            Some(id) if self.stt_model_valid(settings, id) => id.clone(),
-            Some(_) => {
-                notice.get_or_insert(format!(
-                    "{name}: its speech model isn’t available — used your default model instead."
-                ));
-                settings.stt_model_id.clone()
-            }
-            None => settings.stt_model_id.clone(),
-        };
-
-        let language = match &mode.language {
-            Some(lang) if is_known_language(lang) => lang.clone(),
-            Some(_) => {
-                notice.get_or_insert(format!(
-                    "{name}: its language setting was invalid — used your default."
-                ));
-                settings.language.clone()
-            }
-            None => settings.language.clone(),
-        };
-
-        ResolvedDictation {
-            mode: mode.clone(),
-            stt_model_id,
-            language,
-            profile,
-            notice,
-        }
-    }
-
-    /// Whether a resolved STT model id is usable: a `cloud:<profileId>` id needs
-    /// the profile present AND its consent confirmed (08 §3); a bare id needs the
-    /// whisper model installed.
-    fn stt_model_valid(&self, settings: &Settings, id: &str) -> bool {
-        match id.strip_prefix(CLOUD_STT_PREFIX) {
-            Some(pid) => {
-                self.stt_profiles.get(pid).is_some()
-                    && settings.confirmed_stt_profiles.iter().any(|c| c == pid)
-            }
-            None => self.models.is_installed(id),
-        }
-    }
 
     /// An installed local whisper model to fall back to (08 §4.3) — the global
     /// if it is local and installed, else any installed model.
@@ -754,23 +619,14 @@ impl Pipeline {
         let job = session.job;
         let started = session.started;
 
-        // Resolve mode overrides once, up front. A per-mode hotkey resolves its
-        // own mode for this job only; otherwise the active mode.
-        let mode = session
-            .mode_override
-            .as_ref()
-            .and_then(|id| settings.modes.iter().find(|m| &m.id == id).cloned())
-            .unwrap_or_else(|| settings.active_mode());
-        let resolved = self.resolve_dictation(&settings, &mode);
-
         // Stop capture and get 16 kHz samples (resampled on the audio thread).
         let audio = Arc::clone(&self.audio);
         let recorded = tauri::async_runtime::spawn_blocking(move || audio.stop())
             .await
             .map_err(|e| AppError::State(format!("audio join failed: {e}")))??;
 
-        let model_id = resolved.stt_model_id.clone();
-        let language = resolved.language.clone();
+        let model_id = settings.stt_model_id.clone();
+        let language = settings.language.clone();
         let prompt = initial_prompt_from_dictionary(&settings.dictionary);
         log::info!(
             "recorded {:.1}s of audio ({} samples at 16 kHz)",
@@ -830,17 +686,17 @@ impl Pipeline {
             return Ok(ProcessOutcome::Notice(self.empty_dictation_notice(streak)));
         }
         self.empty_streak.store(0, Ordering::SeqCst);
-        let with_dictionary = text::apply_dictionary(&cleaned, &settings.dictionary);
+        let (with_dictionary, dict_fixes) = text::apply_dictionary(&cleaned, &settings.dictionary);
 
         match job {
             Job::Dictation => {
-                self.finish_dictation(&settings, resolved, with_dictionary, started, record_ms)
+                self.finish_dictation(&settings, with_dictionary, dict_fixes, started, record_ms)
                     .await
             }
-            // Sessions are only created for recording jobs; polish and
-            // transforms run through `polish_selection()` without one.
-            Job::PolishSelection | Job::Transform => Err(AppError::State(
-                "selection polish does not use a recording session".into(),
+            // Sessions are only created for recording jobs; prompt transforms
+            // run through `run_selection_prompt()` without one.
+            Job::Transform => Err(AppError::State(
+                "a prompt transform does not use a recording session".into(),
             )),
         }
     }
@@ -848,66 +704,60 @@ impl Pipeline {
     async fn finish_dictation(
         self: &Arc<Self>,
         settings: &Settings,
-        resolved: ResolvedDictation,
         transcript: String,
+        dict_fixes: usize,
         started: Instant,
         record_ms: u64,
     ) -> AppResult<ProcessOutcome> {
         // Watch for distinctive terms worth suggesting for the dictionary.
         self.suggestions.observe(&transcript);
-        // Mode, profile, and language were resolved once at job start (07 §3).
-        let ResolvedDictation {
-            mode,
-            profile,
-            notice,
-            ..
-        } = resolved;
+
+        // The optional post-dictation transform runs the selected prompt over
+        // the transcript — but only when the prompt still exists AND an active
+        // profile can run it. Anything else inserts the plain transcript
+        // (artifact-stripped + dictionary-replaced upstream); there is no tidy.
+        let transform = post_dictation_prompt(settings);
+        let profile = transform.and(self.profiles.active(&settings.active_llm_profile_id));
 
         let mut polished = false;
         let mut llm_warning: Option<String> = None;
-        let final_text = if let Some(profile) = profile {
-            self.set_state(Status::Polishing, Some(Job::Dictation), None);
-            let system = modes::dictation_system_prompt(&mode, &settings.dictionary);
-            match self.llm.chat(&profile, &system, &transcript).await {
-                Ok(text) => {
-                    polished = true;
-                    text
-                }
-                Err(err) => {
-                    // Never lose a dictation to a flaky provider: fall back to
-                    // the rules-based cleanup and tell the user.
-                    log::warn!("AI polish failed, falling back to rules: {err}");
-                    llm_warning =
-                        Some("AI cleanup unavailable — inserted the plain transcript.".into());
-                    text::apply_rules_cleanup(&transcript)
+        let final_text = match (transform, profile) {
+            (Some(prompt), Some(profile)) => {
+                self.set_state(Status::Polishing, Some(Job::Dictation), None);
+                let system = prompts::selection_system_prompt();
+                let user = prompts::selection_user_prompt(&transcript, &prompt.instruction);
+                match self.llm.chat(&profile, &system, &user).await {
+                    Ok(text) => {
+                        polished = true;
+                        text
+                    }
+                    Err(err) => {
+                        // Never lose a dictation to a flaky provider: fall back to
+                        // the plain transcript and tell the user.
+                        log::warn!("post-dictation transform failed, inserting plain: {err}");
+                        llm_warning =
+                            Some("AI unavailable — inserted the plain transcript.".into());
+                        transcript.clone()
+                    }
                 }
             }
-        } else {
-            modes::no_ai_output(&mode.id, &transcript)
+            // No transform, a deleted prompt, or no profile → plain transcript.
+            _ => transcript.clone(),
         };
 
-        // Snippets expand on the final text only: dictation-only, verbatim,
-        // and after any LLM pass so the expansion is never reworded. Selection
-        // jobs (polish, transforms) edit existing text and deliberately skip this.
+        // Snippets expand on the final text only: dictation-only, verbatim, and
+        // after any transform pass so the expansion is never reworded. Prompt
+        // transforms edit existing text and deliberately skip this.
         let final_text = text::apply_snippets(&final_text, &settings.snippets);
 
         let words = word_count(&final_text);
+        // Frontmost-app display name at dictation time, for the opt-in history
+        // row (never any dictated content).
+        let app_name = self.last_app().map(|(_, name)| name);
         // Clone only when the opt-in history will consume it below — `insert`
         // takes the text by move.
         let history_text = settings.history_enabled.then(|| final_text.clone());
-        let outcome = self.insert(
-            settings,
-            &transcript,
-            &transcript,
-            final_text,
-            &mode.id,
-            polished,
-            started,
-        )?;
-        // Record the session aggregate only once the text actually reached the
-        // user (insert returns Ok even on the clipboard fallback).
-        self.stats
-            .record_dictation(words, record_ms, &mode.id, polished);
+        let outcome = self.insert(&transcript, &transcript, final_text, polished, started)?;
         // Count this successful dictation — the only tip-system counter (05); a
         // count, never a log. Emit so an open settings webview re-evaluates tips.
         let mut counted = self.settings.get();
@@ -915,23 +765,54 @@ impl Pipeline {
         if let Ok(saved) = self.settings.set(counted) {
             let _ = self.app.emit(SETTINGS_CHANGED_EVENT, &saved);
         }
-        // Opt-in history: log the text (never audio) when the user turned it
-        // on. Uses the in-scope values rather than re-reading `last_result` —
-        // `insert` stores the same text verbatim, so these are identical.
-        if let Some(text) = history_text {
-            self.history
-                .append(transcript.clone(), text, mode.id.clone(), polished);
-        }
+        // Persistence at the success point, off the async executor (convention:
+        // file/DB I/O blocks). Two writes, different policies:
+        //   • `insights_daily` is ALWAYS written (counts/dates only, never words
+        //     or audio) for the LOCAL calendar day — lifetime insights are
+        //     always kept, with no enable toggle and no reset;
+        //   • history (text, never audio) is written only when `history_enabled`.
+        // insights emits only after its upsert commits (the Ok arm); history
+        // emits after the append attempt (errors are swallowed inside `append`).
+        // Either way the event follows the write, so views refetch durable rows
+        // instead of racing the off-thread write.
+        let app = self.app.clone();
+        let history = Arc::clone(&self.history);
+        let db = Arc::clone(&self.db);
+        let raw = transcript.clone();
+        let retention_days = settings.history_retention_days;
+        tauri::async_runtime::spawn_blocking(move || {
+            match db.insights_upsert_daily(
+                &local_day(),
+                words as i64,
+                polished,
+                dict_fixes as i64,
+                record_ms as i64,
+            ) {
+                Ok(()) => {
+                    let _ = app.emit(INSIGHTS_CHANGED_EVENT, ());
+                }
+                Err(err) => log::warn!("could not persist insights: {err}"),
+            }
+            if let Some(text) = history_text {
+                history.append(
+                    raw,
+                    text,
+                    app_name,
+                    Some(record_ms as i64),
+                    words as i64,
+                    polished,
+                    retention_days,
+                );
+                let _ = app.emit(HISTORY_CHANGED_EVENT, ());
+            }
+        });
         // A clipboard fallback (paste failed / no Accessibility) is the
-        // highest-priority message — the user must know to press ⌘V to get
-        // their text. AI/override notes only matter once the text auto-pasted;
-        // between those two a flaky-LLM warning beats a dangling-override note.
+        // highest-priority message — the user must know to press ⌘V to get their
+        // text. The flaky-AI warning only matters once the text auto-pasted.
         match outcome {
             ProcessOutcome::Inserted(preview, _) => {
                 if let Some(warning) = llm_warning {
                     Ok(ProcessOutcome::Notice(warning))
-                } else if let Some(notice) = notice {
-                    Ok(ProcessOutcome::Notice(notice))
                 } else {
                     Ok(ProcessOutcome::Inserted(preview, self.dictation_hud_tip()))
                 }
@@ -941,51 +822,44 @@ impl Pipeline {
         }
     }
 
-    async fn finish_selection_polish(
+    async fn finish_selection_prompt(
         self: &Arc<Self>,
-        settings: &Settings,
         profile: &LlmProfile,
         selection: String,
         instruction: &str,
-        mode_id: &str,
         started: Instant,
     ) -> AppResult<ProcessOutcome> {
-        let system = modes::selection_system_prompt();
-        // An empty instruction selects the built-in fix-grammar default
-        // (Polish); a transform passes its own instruction.
-        let user = modes::selection_user_prompt(&selection, instruction);
+        let system = prompts::selection_system_prompt();
+        // The prompt passes its own instruction; an empty one still falls back
+        // to the fix-grammar default inside `selection_user_prompt`.
+        let user = prompts::selection_user_prompt(&selection, instruction);
         // No fallback — wrong text over the user's selection is worse than
         // nothing.
         let result = self.llm.chat(profile, &system, &user).await?;
         // `original` is the text the diff is measured against — the selection.
-        self.insert(
-            settings, &selection, &selection, result, mode_id, true, started,
-        )
+        self.insert(&selection, &selection, result, true, started)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn insert(
         self: &Arc<Self>,
-        settings: &Settings,
         raw: &str,
         original: &str,
         final_text: String,
-        mode_id: &str,
         polished: bool,
         started: Instant,
     ) -> AppResult<ProcessOutcome> {
         self.set_state(Status::Inserting, None, None);
-        let outcome = self.output.insert(
-            final_text.clone(),
-            settings.insert_method,
-            settings.restore_clipboard,
-        )?;
+        // Paste is the fixed insert behavior; the clipboard is always restored
+        // afterward. A degrade to clipboard-only happens only without
+        // Accessibility, or if the paste keystroke fails.
+        let outcome = self
+            .output
+            .insert(final_text.clone(), InsertMethod::Paste, true)?;
 
         let result = TranscriptionResult {
             raw: raw.to_string(),
             original: original.to_string(),
             text: final_text,
-            mode_id: mode_id.to_string(),
             polished,
             duration_ms: started.elapsed().as_millis() as u64,
         };
@@ -1011,34 +885,6 @@ impl Pipeline {
     }
 }
 
-/// A dictation mode's overrides resolved against the globals (07 §3).
-struct ResolvedDictation {
-    mode: Mode,
-    stt_model_id: String,
-    language: String,
-    profile: Option<LlmProfile>,
-    /// First dangling-override notice, if any; informational, never fatal.
-    notice: Option<String>,
-}
-
-/// Mode names render up to 16 chars in the HUD and dangling notices (07 §5);
-/// the pill must not resize.
-fn truncate_mode_name(name: &str) -> String {
-    const MAX: usize = 16;
-    if name.chars().count() > MAX {
-        let head: String = name.chars().take(MAX - 1).collect();
-        format!("{head}…")
-    } else {
-        name.to_string()
-    }
-}
-
-/// A mode language override is valid if it is `auto` or a 2-letter code; a
-/// hand-edited garbage value falls back to the global language (07 §3).
-fn is_known_language(lang: &str) -> bool {
-    lang == "auto" || (lang.len() == 2 && lang.chars().all(|c| c.is_ascii_lowercase()))
-}
-
 enum ProcessOutcome {
     /// Inserted cleanly; carries the text for the success flash and an optional
     /// one-time HUD tip.
@@ -1046,24 +892,63 @@ enum ProcessOutcome {
     Notice(String),
 }
 
+/// The prompt the post-dictation transform should run, or None to insert the
+/// plain transcript. `None` covers no transform set AND a dangling id (a prompt
+/// deleted after it was chosen) — both mean "insert the plain transcript". Pure,
+/// so the routing decision is unit-tested without the pipeline. The profile gate
+/// (no active profile → also plain) lives in `finish_dictation`, which needs the
+/// live profile manager.
+fn post_dictation_prompt(settings: &Settings) -> Option<&Prompt> {
+    let id = settings.post_dictation_transform_id.as_deref()?;
+    settings.prompts.iter().find(|p| p.id == id)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{is_known_language, truncate_mode_name};
+    use super::post_dictation_prompt;
+    use crate::settings::{Prompt, Settings};
 
-    #[test]
-    fn truncates_long_mode_names_to_16_chars() {
-        assert_eq!(truncate_mode_name("Notes"), "Notes");
-        let long = truncate_mode_name("Quarterly Board Update");
-        assert_eq!(long.chars().count(), 16);
-        assert!(long.ends_with('…'));
+    fn prompt(id: &str) -> Prompt {
+        Prompt {
+            id: id.into(),
+            name: id.into(),
+            instruction: "do the thing".into(),
+            shortcut: String::new(),
+            built_in: false,
+        }
     }
 
     #[test]
-    fn language_override_validity() {
-        assert!(is_known_language("auto"));
-        assert!(is_known_language("de"));
-        assert!(!is_known_language("English"));
-        assert!(!is_known_language("EN"));
-        assert!(!is_known_language(""));
+    fn no_post_dictation_transform_inserts_plain() {
+        let settings = Settings {
+            post_dictation_transform_id: None,
+            ..Default::default()
+        };
+        assert!(post_dictation_prompt(&settings).is_none());
+    }
+
+    #[test]
+    fn a_set_existing_id_selects_that_prompt() {
+        let settings = Settings {
+            prompts: vec![prompt("concise"), prompt("formal")],
+            post_dictation_transform_id: Some("formal".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            post_dictation_prompt(&settings).map(|p| p.id.as_str()),
+            Some("formal")
+        );
+    }
+
+    #[test]
+    fn a_dangling_id_inserts_plain() {
+        // A prompt chosen then deleted leaves a dangling id; routing must fall
+        // back to the plain transcript rather than treating it as a transform.
+        let settings = Settings {
+            prompts: vec![prompt("concise")],
+            post_dictation_transform_id: Some("deleted".into()),
+            ..Default::default()
+        };
+        assert!(post_dictation_prompt(&settings).is_none());
     }
 }

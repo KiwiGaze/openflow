@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "IPC capabilities for the Velata settings window and overlays.",
-  "windows": ["main", "hud", "changes"],
+  "windows": ["main", "settings", "hud", "changes", "scratchpad"],
   "permissions": ["core:default"]
 }

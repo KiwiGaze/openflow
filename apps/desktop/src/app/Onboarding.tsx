@@ -1,13 +1,19 @@
 import { useState, type JSX } from 'react';
-import { formatAcceleratorMac, formatBytes, formatProgress } from '@velata/core';
+import {
+  effectiveAccelerator,
+  formatAcceleratorMac,
+  formatBytes,
+  formatProgress,
+  PUSH_TO_TALK_FALLBACK,
+} from '@velata/core';
 import type { ModelsApi, SettingsApi } from './hooks.js';
 import { usePermissions, usePipeline } from './hooks.js';
 import { ipc } from './ipc.js';
 import { downloadFailed, DOWNLOAD_FAILED_HINT, isDownloading } from './modelStatus.js';
 
-const STEPS = ['Welcome', 'Microphone', 'Accessibility', 'Try it', "You're set"] as const;
+const STEPS = ['Welcome', 'Microphone', 'Try dictation', 'Done'] as const;
 
-/** Models offered on first run; everything else lives in Settings → Models. */
+/** Models offered on first run; everything else lives in Settings → Speech. */
 const STARTER_MODELS = ['base.en', 'small.en', 'large-v3-turbo-q5_0'];
 const DEFAULT_MODEL = 'base.en';
 
@@ -23,13 +29,17 @@ export function Onboarding({
   const [skipping, setSkipping] = useState(false);
   const [showOtherModels, setShowOtherModels] = useState(false);
   const permissions = usePermissions();
-  const { state, lastResult } = usePipeline();
+  const { lastResult } = usePipeline();
   const { models, progress, download } = modelsApi;
 
   const starterModels = models.filter((m) => STARTER_MODELS.includes(m.id));
   const baseModel = models.find((m) => m.id === DEFAULT_MODEL);
-  const hotkey = formatAcceleratorMac(settings.dictationHotkey);
-  const polishHotkey = formatAcceleratorMac(settings.polishHotkey);
+  // Show the shortcut push-to-talk effectively fires under today: the fn gesture
+  // default can't be observed yet, so onboarding teaches the fallback accelerator
+  // that actually works (Phase 3 adds real fn observation).
+  const hotkey = formatAcceleratorMac(
+    effectiveAccelerator(settings.pushToTalkHotkey, PUSH_TO_TALK_FALLBACK) ?? PUSH_TO_TALK_FALLBACK,
+  );
 
   const micGranted = permissions?.microphone === 'granted';
   const micDenied = permissions?.microphone === 'denied';
@@ -49,7 +59,7 @@ export function Onboarding({
       ? '✓ Speech model: ready'
       : activeProgress && !activeProgress.done
         ? '• Speech model: still downloading — it will finish in the background'
-        : '✗ Speech model: not downloaded — dictation won’t work until you download one in Settings → General.';
+        : '✗ Speech model: not downloaded — dictation won’t work until you download one in Settings → Speech.';
     return (
       <div className="onboarding">
         <div className="onboarding-pane">
@@ -64,9 +74,6 @@ export function Onboarding({
                 : '• Accessibility: off — text will go to your clipboard (⌘V)'}
             </li>
           </ul>
-          <p className="row-hint">
-            You can run this tour again anytime: Settings → General → Welcome tour → Show again.
-          </p>
         </div>
         <div className="onboarding-nav">
           <button
@@ -112,7 +119,7 @@ export function Onboarding({
           </ul>
           <p>
             To transcribe, Velata needs a speech model (148 MB, one time). It downloads from Hugging
-            Face, then runs offline.
+            Face, then runs on this Mac. You can manage models later in Settings → Speech.
           </p>
           <div className="row-actions">
             <DownloadConsent baseModel={baseModel} progress={progress} download={download} />
@@ -206,45 +213,10 @@ export function Onboarding({
               </button>
             </>
           )}
-          <p className="row-hint">
-            Running from a dev build? The permission attaches to your terminal app.
-          </p>
         </div>
       )}
 
       {step === 2 && (
-        <div className="onboarding-pane">
-          <h1>Paste straight into your apps (optional)</h1>
-          <p>
-            With Accessibility on, Velata types your text into the active app for you. Without it,
-            Velata copies the text to your clipboard and you press ⌘V — that works too.
-          </p>
-          <div className="perm-status">
-            Accessibility:{' '}
-            <span className={axGranted ? 'badge badge-ok' : 'badge'}>
-              {permissions ? (axGranted ? 'granted' : 'not granted') : 'checking…'}
-            </span>
-          </div>
-          {!axGranted && (
-            <div className="row-actions">
-              <button
-                className="btn btn-primary"
-                onClick={() => void ipc.promptAccessibilityPermission()}
-              >
-                Grant access
-              </button>
-              <button className="btn" onClick={() => void ipc.openAccessibilitySettings()}>
-                Open System Settings
-              </button>
-            </div>
-          )}
-          <p className="row-hint">
-            Skip → Velata uses the clipboard. You can turn this on later in System Settings.
-          </p>
-        </div>
-      )}
-
-      {step === 3 && (
         <div className="onboarding-pane">
           <h1>Try your first dictation</h1>
           {micDenied ? (
@@ -263,7 +235,7 @@ export function Onboarding({
             <>
               <p>
                 Click the box below, then hold <strong>{hotkey}</strong> and say:{' '}
-                <em>“hey open flow this is my first note”</em>
+                <em>“this is my first note with Velata”</em>
               </p>
               <textarea
                 className="tryit-field"
@@ -271,12 +243,7 @@ export function Onboarding({
                 placeholder="(your dictation appears here)"
                 defaultValue=""
               />
-              <div className="perm-status">
-                <span className="badge">{state.status}</span>
-                {state.status === 'notice' && state.message && (
-                  <span className="row-hint"> {state.message}</span>
-                )}
-              </div>
+              {lastResult && <p className="result-text">{lastResult.text}</p>}
               {lastResult && !axGranted && (
                 <p className="row-hint">
                   Copied to your clipboard. Click the box and press ⌘V to drop it in.
@@ -287,7 +254,7 @@ export function Onboarding({
         </div>
       )}
 
-      {step === 4 && (
+      {step === 3 && (
         <div className="onboarding-pane">
           <div className="youre-set-head">
             <h1>That’s dictation.</h1>
@@ -303,7 +270,7 @@ export function Onboarding({
               <div>
                 <p className="result-text">{lastResult.text}</p>
                 <div className="row-hint">
-                  {lastResult.polished ? 'polished with AI' : 'cleaned with Standard mode'}
+                  {lastResult.polished ? 'polished with AI' : 'cleaned up'}
                 </div>
               </div>
             </div>
@@ -312,16 +279,16 @@ export function Onboarding({
               Hold <strong>{hotkey}</strong> in any app to dictate.
             </p>
           )}
-          <p className="row-title">Three things worth knowing:</p>
+          <p className="row-title">A couple of things worth knowing:</p>
           <ul className="privacy-list">
             <li>
               Tap <strong>{hotkey}</strong> (don’t hold) to keep recording hands-free.
             </li>
             <li>
-              Select text and tap <strong>{polishHotkey}</strong> to fix grammar in place — no
-              voice.
+              {axGranted
+                ? 'Velata pastes straight into the active app for you.'
+                : 'Grant Accessibility in System Settings later and Velata will paste for you — until then your text waits on the clipboard for ⌘V.'}
             </li>
-            <li>Switch the writing style anytime from the menu-bar Mode list.</li>
           </ul>
         </div>
       )}

@@ -54,6 +54,23 @@ export function validateDictionaryEntry(
 }
 
 /**
+ * Returns an error message, or null when the term is valid as a vocabulary
+ * entry (`from === to`: bias recognition toward the term, rewrite nothing).
+ * `validateDictionaryEntry` rejects such no-op replacements, so vocabulary
+ * adds and edits validate here instead.
+ */
+export function validateVocabularyTerm(
+  term: string,
+  others: readonly DictionaryEntry[],
+): string | null {
+  const trimmed = term.trim();
+  if (trimmed.length === 0) return 'The word or phrase cannot be empty.';
+  if (trimmed.length > 100) return 'Entries are limited to 100 characters.';
+  if (hasDictionaryEntry(trimmed, others)) return `“${trimmed}” is already in the dictionary.`;
+  return null;
+}
+
+/**
  * Request-timeout seconds from form input: not a number (or 0) falls back to
  * the 30 s default, and anything lower than 5 s becomes 5 s. Shared by the
  * LLM and STT profile editors so the rule cannot drift.

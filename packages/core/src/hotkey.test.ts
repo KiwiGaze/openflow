@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   acceleratorFromKeyboardEvent,
+  effectiveAccelerator,
   formatAcceleratorMac,
+  formatHotkey,
+  HANDS_FREE_FALLBACK,
   isValidAccelerator,
   parseAccelerator,
+  PUSH_TO_TALK_FALLBACK,
 } from './hotkey.js';
 
 describe('parseAccelerator', () => {
@@ -75,5 +79,38 @@ describe('acceleratorFromKeyboardEvent', () => {
     expect(acceleratorFromKeyboardEvent({ ...base, code: 'KeyA' })).toBeNull();
     expect(acceleratorFromKeyboardEvent({ ...base, code: 'Escape', altKey: true })).toBeNull();
     expect(acceleratorFromKeyboardEvent({ ...base, code: 'AltLeft', altKey: true })).toBeNull();
+  });
+});
+
+describe('formatHotkey', () => {
+  it('labels the fn gesture defaults', () => {
+    expect(formatHotkey({ kind: 'hold', key: 'fn' })).toBe('Hold fn');
+    expect(formatHotkey({ kind: 'doubleTap', key: 'fn' })).toBe('Double-tap fn');
+  });
+
+  it('renders an accelerator with macOS glyphs, empty as "Not set"', () => {
+    expect(formatHotkey({ kind: 'accelerator', key: 'Alt+O' })).toBe('⌥ O');
+    expect(formatHotkey({ kind: 'accelerator', key: '' })).toBe('Not set');
+    expect(formatHotkey({ kind: 'accelerator', key: '  ' })).toBe('Not set');
+  });
+});
+
+describe('effectiveAccelerator', () => {
+  it('uses the gesture fallback for an unobservable fn trigger', () => {
+    expect(effectiveAccelerator({ kind: 'hold', key: 'fn' }, PUSH_TO_TALK_FALLBACK)).toBe(
+      'Alt+Space',
+    );
+    expect(effectiveAccelerator({ kind: 'doubleTap', key: 'fn' }, HANDS_FREE_FALLBACK)).toBe(
+      'Alt+Shift+Space',
+    );
+  });
+
+  it('uses an accelerator trigger as-is, and reports an empty key as disabled', () => {
+    expect(effectiveAccelerator({ kind: 'accelerator', key: 'Alt+O' }, PUSH_TO_TALK_FALLBACK)).toBe(
+      'Alt+O',
+    );
+    expect(
+      effectiveAccelerator({ kind: 'accelerator', key: '' }, PUSH_TO_TALK_FALLBACK),
+    ).toBeNull();
   });
 });

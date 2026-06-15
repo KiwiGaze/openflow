@@ -1,5 +1,12 @@
 # Insights without surveillance
 
+> **Superseded (feat/UX-redesign).** Insights now ships as **always-on, durable** lifetime
+> totals in the SQLite `insights_daily` table (per-local-day counts and dates only — words,
+> dictations, AI dictations, fixes, duration; never the text, never audio). There is no enable
+> toggle (the old `appStatsEnabled` opt-in is gone) and no reset; the Home header shows lifetime
+> words/dictations/wpm/streak, hidden at zero. The aggregate-not-content principle below is
+> exactly what keeps that private — the status note just below is stale.
+
 Status: **Tier 1 shipped** (session-only, in-memory). Began as a brainstorm sketch; the
 no-disk version is built. Tier 2 (opt-in `stats.json` for cross-session streaks) remains a
 deliberate follow-up.

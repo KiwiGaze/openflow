@@ -11,12 +11,13 @@ heavy compute:** audio capture (`audio.rs`), resampling (`resample.rs`),
 whisper STT (`stt.rs`) and the opt-in cloud STT upload (`cloud_stt.rs`), LLM
 HTTP (`llm.rs`), model downloads (`models.rs`), clipboard/paste (`output.rs`),
 global hotkeys (`shortcuts.rs`), permissions (`permissions.rs`), tray
-(`tray.rs`), windows (`hud.rs`, `changes.rs`), frontmost-app identity
-(`apps.rs`), persistence (`settings.rs`, `profiles.rs`, `stt_profiles.rs`,
-`history.rs`), the pipeline state machine (`pipeline.rs`), session stats
-(`stats.rs`, `suggestions.rs`), text cleanup (`text.rs`), prompts
-(`modes.rs`), and the IPC surface (`commands.rs`, wired in `main.rs`,
-shared state in `state.rs`, errors in `error.rs`).
+(`tray.rs`), windows (`hud.rs`, `changes.rs`, `scratchpad.rs`), frontmost-app
+identity (`apps.rs`), persistence (`settings.rs`, `profiles.rs`,
+`stt_profiles.rs`, the SQLite store `db.rs`, history over it `history.rs`,
+Scratchpad notes over it `notes.rs`), the pipeline state machine
+(`pipeline.rs`), session stats (`stats.rs`, `suggestions.rs`), text cleanup
+(`text.rs`), prompts (`modes.rs`), and the IPC surface (`commands.rs`, wired
+in `main.rs`, shared state in `state.rs`, errors in `error.rs`).
 
 **React (`apps/desktop/src/`) is pure UI over IPC.** It renders state, calls
 `ipc.*` wrappers, and subscribes to events. It must not duplicate backend
@@ -93,6 +94,35 @@ type-level guard. Check this list before touching the named files.
    profile; the Ollama-native API is used for model listing only. New
    providers are presets/profiles, not new code paths. Prompts wrap
    transcripts as data — keep them injection-resistant.
+8. **One SQLite connection (`db.rs`).** `db.rs` owns the only `Connection`,
+   behind a `Mutex` (rusqlite's `Connection` is not `Sync`); it is shared as
+   `Arc<Db>`. Keep all `velata.db` access in `db.rs` — no second connection.
+   File/DB I/O blocks, so on the async runtime it goes through
+   `spawn_blocking` (as the pipeline's history/insights writes do); the
+   synchronous note commands run on Tauri's own command thread pool.
+9. **Migrations are append-only (`db.rs`).** Schema is gated by
+   `PRAGMA user_version`; each step and its version bump commit as one
+   transaction. Never edit a shipped migration — a DB already past it will
+   not re-run it. Add a new numbered version and bump `SCHEMA_VERSION`. A
+   corrupt or unopenable db is renamed aside to `velata.db.corrupt-<ts>` and
+   never deleted; preserve that — losing the user's bytes is not an option.
+10. **Opt-in stores write nothing when off.** `history`, `insights_daily`,
+    and the Scratchpad's `notes`/`note_versions` are each gated by their own
+    flag — `historyEnabled`, `appStatsEnabled`, `scratchpadEnabled`, all
+    default off. Writing to any of them while its flag is off is a privacy
+    regression. The pipeline checks the flags before persisting; every note
+    command refuses while the Scratchpad is off (`ensure_scratchpad_on`).
+11. **Notes are soft-deleted only (`db.rs`).** `note_soft_delete` sets
+    `deleted_at`; the row and its versions stay on disk. Never add a hard
+    `DELETE` of a note or its versions — user content is never destroyed (an
+    oversize body is rejected, never truncated).
+12. **The Scratchpad is a regular window (`scratchpad.rs`).** It is created on
+    demand and destroyed on close — the HUD's never-hide/show invariant
+    (constraint 3) does **not** apply to it, and it needs no `NSPanel`
+    reclass or cursor-event flips. Do not copy the HUD/changes-overlay
+    workarounds here. After a note DB write, the command emits
+    `notes-changed` (and `history-changed` follows a history append) so open
+    views read after the write, not racing it — keep that order.
 
 ## macOS-only assumptions
 
@@ -123,7 +153,10 @@ naming the constraint (and the Tauri/macOS issue number when one exists).
   `cloud_stt.rs` — enforced by `check-privacy.mjs`. A fourth network module
   is a privacy-policy change: update PRIVACY.md and the script's allowlist in
   the same PR, and expect the review to focus on it.
-- Transcripts persist only behind `historyEnabled` (default off). Counters
+- The three SQLite stores are each opt-in and default off: transcripts/history
+  behind `historyEnabled`, all-time `insights_daily` behind `appStatsEnabled`
+  (counts and dates only — never the text), Scratchpad notes behind
+  `scratchpadEnabled`. With the defaults nothing is stored. Session counters
   and aggregates (`stats.rs`, `suggestions.rs`, tip counters) are in-memory
   and reset on quit — keep them counts, never logs.
 - No telemetry. Not "anonymized telemetry", not "crash reporting we'll remove

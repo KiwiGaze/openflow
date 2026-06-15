@@ -1,5 +1,6 @@
-//! Frontmost-app detection for per-app mode rules (07 §9). Best-effort: a read
-//! failure just means no per-app rule applies — dictation never blocks.
+//! Frontmost-app detection for the opt-in history row's app name. Best-effort:
+//! a read failure just means the history row has no app name — dictation never
+//! blocks.
 
 /// The frontmost application's `(bundle_id, display_name)`, or None.
 #[cfg(target_os = "macos")]

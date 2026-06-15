@@ -82,8 +82,8 @@ impl OutputSystem {
 
     /// Pastes (or copies) `text` into the frontmost app and blocks until the
     /// worker replies. Never call on the main thread: the paste round-trips
-    /// keystrokes through it and would deadlock — offload first, as
-    /// `commands::start_polish_selection` does.
+    /// keystrokes through it and would deadlock — offload first, as the
+    /// pipeline's selection-prompt path does.
     pub fn insert(
         &self,
         text: String,

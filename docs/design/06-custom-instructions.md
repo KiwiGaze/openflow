@@ -1,5 +1,11 @@
 # 06 — Custom instructions: modes, templates, variables, sharing
 
+> **Superseded (feat/UX-redesign).** Modes are deleted and "Mode v2" never shipped; the one
+> instruction concept is the **Prompt** (`{id, name, instruction, shortcut, builtIn}`), settings
+> field `prompts`, managed on the App's Transform page as uniform cards — **no templates, no
+> reorder, no variables** (creation order; the one built-in is Polish). The injection-resistant
+> prompt fencing still holds. Read the templates/variables/sharing design below as historical.
+
 Status: design proposal. Written 2026-06-11 against `main` (cd63494) + the in-flight Refine
 work (`docs/REFINE.md`). Baseline facts and vocabulary: `00-current-state.md`. Page placement
 and the Mode v2 shape: `03-information-architecture.md` (§D1, Modes sitemap). This document

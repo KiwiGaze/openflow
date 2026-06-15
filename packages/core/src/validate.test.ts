@@ -6,6 +6,7 @@ import {
   normalizeBaseUrl,
   validateDictionaryEntry,
   validateSnippet,
+  validateVocabularyTerm,
 } from './validate.js';
 
 describe('clampTimeoutSecs', () => {
@@ -64,6 +65,27 @@ describe('validateDictionaryEntry', () => {
 
   it('rejects no-op replacements', () => {
     expect(validateDictionaryEntry({ from: 'same', to: 'Same' }, existing)).toMatch(/identical/);
+  });
+});
+
+describe('validateVocabularyTerm', () => {
+  const existing = [{ from: 'open flow', to: 'Velata' }];
+
+  it('accepts a new term, ignoring surrounding whitespace', () => {
+    expect(validateVocabularyTerm('Tauri', existing)).toBeNull();
+    expect(validateVocabularyTerm('  Tauri  ', existing)).toBeNull();
+  });
+
+  it('rejects an empty term', () => {
+    expect(validateVocabularyTerm('   ', existing)).toMatch(/cannot be empty/);
+  });
+
+  it('rejects an over-long term', () => {
+    expect(validateVocabularyTerm('a'.repeat(101), existing)).toMatch(/limited to 100 characters/);
+  });
+
+  it('rejects a term already used as heard-as text, case-insensitively', () => {
+    expect(validateVocabularyTerm('Open Flow', existing)).toMatch(/already in the dictionary/);
   });
 });
 

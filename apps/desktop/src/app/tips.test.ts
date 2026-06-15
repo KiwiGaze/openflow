@@ -1,43 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import type { Mode, Settings } from '@velata/core';
+import type { Settings } from '@velata/core';
 import { eligibleTip } from './tips.js';
 
-const standardMode: Mode = {
-  id: 'standard',
-  name: 'Standard',
-  builtIn: true,
-  usesLlm: true,
-  transforms: false,
-  prompt: '',
-  aiProfileId: null,
-  sttModelId: null,
-  language: null,
-  hotkey: null,
-};
-
 const base: Settings = {
-  version: 4,
-  dictationHotkey: 'Alt+Space',
-  dictationHotkeyBehavior: 'hold',
-  polishHotkey: 'Alt+Shift+P',
-  changeOverlayHotkey: 'Alt+O',
-  polishAfterDictation: true,
+  version: 6,
+  pushToTalkHotkey: { kind: 'hold', key: 'fn' },
+  handsFreeHotkey: { kind: 'accelerator', key: '' },
+  seeChangesHotkey: { kind: 'accelerator', key: 'Alt+O' },
   activeLlmProfileId: '',
-  activeModeId: 'standard',
-  modes: [standardMode],
   dictionary: [],
+  snippets: [],
+  prompts: [],
+  postDictationTransformId: null,
   sttModelId: 'base.en',
   language: 'auto',
-  insertMethod: 'paste',
-  restoreClipboard: true,
+  inputDeviceName: null,
   launchAtLogin: false,
   appearance: 'system',
   historyEnabled: false,
-  appRules: [],
+  historyRetentionDays: 0,
   confirmedSttProfiles: [],
-  snippets: [],
-  transforms: [],
   showInDock: false,
+  scratchpadEnabled: false,
   tipsEnabled: true,
   tipsSeen: [],
   dictationCount: 0,
@@ -46,26 +30,19 @@ const base: Settings = {
 };
 
 describe('eligibleTip', () => {
-  it('shows tip.modes after 3 dictations with only built-in modes', () => {
-    expect(eligibleTip('dictation', { ...base, dictationCount: 3 }, '2026-06-11')?.id).toBe(
-      'tip.modes',
-    );
-  });
-
   it('shows nothing on a non-dictation page', () => {
-    expect(eligibleTip('models', { ...base, dictationCount: 4 }, '2026-06-11')).toBeNull();
+    expect(eligibleTip('ai', { ...base, dictationCount: 4 }, '2026-06-11')).toBeNull();
   });
 
   it('respects tipsEnabled, the daily cap, and tipsSeen', () => {
-    const s = { ...base, dictationCount: 3 };
+    const s = { ...base, dictationCount: 4 };
     expect(eligibleTip('dictation', { ...s, tipsEnabled: false }, 'd')).toBeNull();
     expect(eligibleTip('dictation', { ...s, lastTipShownAt: 'd' }, 'd')).toBeNull();
-    expect(eligibleTip('dictation', { ...s, tipsSeen: ['tip.modes'] }, 'd')).toBeNull();
+    expect(eligibleTip('dictation', { ...s, tipsSeen: ['tip.ai'] }, 'd')).toBeNull();
   });
 
-  it('shows tip.ai once a custom mode exists but no AI profile is set', () => {
-    const custom: Mode = { ...standardMode, id: 'custom', builtIn: false };
-    const s = { ...base, dictationCount: 4, modes: [standardMode, custom] };
+  it('shows tip.ai after 4 dictations when no AI profile is set', () => {
+    const s = { ...base, dictationCount: 4 };
     expect(eligibleTip('dictation', s, 'd')?.id).toBe('tip.ai');
   });
 });

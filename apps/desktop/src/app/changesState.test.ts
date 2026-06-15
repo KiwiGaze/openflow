@@ -6,7 +6,6 @@ const result: TranscriptionResult = {
   raw: 'the quick fox',
   original: 'the quick fox',
   text: 'the slow fox',
-  modeId: 'polish',
   polished: true,
   durationMs: 100,
 };

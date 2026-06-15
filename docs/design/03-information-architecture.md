@@ -1,5 +1,21 @@
 # 03 — Information architecture for v2
 
+> **Superseded (feat/UX-redesign).** The shipped app splits into **two windows**, not one
+> sidebar: an **App window** (Home · Library · Transform · Scratchpad · ⚙ Settings) and a
+> separate **Settings window** (Dictation · Speech · AI · General · About · ‹ Velata). The
+> "one switchable concept" below is no longer the **Mode** — modes are deleted; the single
+> concept is the **Prompt** (a named instruction + shortcut; the one built-in is Polish),
+> managed on the App's Transform page. Insights is no longer a sidebar page or an opt-in — it
+> is always-on counts/dates surfaced in the Home header (never words or audio). The grouped-card
+> page-anatomy rules in §4 still apply. The rest is kept for its rationale.
+>
+> **Update 2026-06-13 (Wispr-parity build).** A two-section sidebar now supersedes the
+> seven-page IA defined below: **Features** (Home · Insights · Dictionary · Snippets · Style ·
+> Transforms · Scratchpad) and **Settings** (Dictation · Modes · Models · Output · General ·
+> About). The page-anatomy rules in §4 (grouped cards; one flat row per feature; one control
+> and at most one hint line) still apply to every page. This grouping was decided during the
+> Wispr-parity build; the rest of this document is kept for its rationale.
+
 Status: design proposal. Written 2026-06-11 against `main` (cd63494) + the in-flight Refine
 work (`docs/REFINE.md`). Baseline facts and vocabulary: `00-current-state.md`. This document
 is the keystone: 04–09 follow its structure and naming. Companion docs: 01 (competitive

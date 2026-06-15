@@ -182,20 +182,32 @@ export function useSttProfiles(): SttProfilesApi {
   };
 }
 
-/** Session usage aggregates; refetched after each completed dictation. */
-export function useInsights(): Insights | null {
+export interface InsightsApi {
+  insights: Insights | null;
+  /** Re-fetch on demand. */
+  refresh: () => void;
+}
+
+/**
+ * Lifetime usage aggregates from `insights_daily`. Refetches on
+ * `insights-changed`, which the pipeline emits only AFTER the upsert commits —
+ * so this reads the durable row instead of racing the off-thread write (the
+ * same pattern history uses with `history-changed`). `transcription-result`
+ * fires before that write, so subscribing to it would read one dictation behind.
+ */
+export function useInsights(): InsightsApi {
   const [insights, setInsights] = useState<Insights | null>(null);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     void ipc.getInsights().then(setInsights);
-    return subscribe(
-      events.onResult(() => {
-        void ipc.getInsights().then(setInsights);
-      }),
-    );
   }, []);
 
-  return insights;
+  useEffect(() => {
+    refresh();
+    return subscribe(events.onInsightsChanged(refresh));
+  }, [refresh]);
+
+  return { insights, refresh };
 }
 
 export interface DictionarySuggestionsApi {

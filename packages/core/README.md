@@ -9,8 +9,8 @@ Rust IPC contract plus pure utilities used by the webviews.
   changing this file in the same PR; `pnpm check:ipc` enforces the name-level
   half of that. Rules: [docs/engineering/ipc-contract-conventions.md](../../docs/engineering/ipc-contract-conventions.md).
 - Everything else (`hotkey`, `format`, `validate`, `diff`, `presets`,
-  `templates`, `languages`, `modeio`, `dictionaryio`) — pure, dependency-free
-  functions with colocated `*.test.ts`.
+  `languages`, `dictionaryio`) — pure, dependency-free functions with colocated
+  `*.test.ts`.
 
 Ground rules: no `@tauri-apps/*`, no React, no I/O — if it isn't pure or
 isn't shared, it belongs in `apps/desktop`. The package is workspace-internal

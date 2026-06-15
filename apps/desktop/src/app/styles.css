@@ -225,6 +225,15 @@ button:focus-visible,
   gap: 2px;
 }
 
+.sidebar-section-label {
+  padding: var(--space-2) var(--space-5);
+  margin-top: var(--space-3);
+  font-size: var(--text-badge);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-h2);
+  color: var(--text-faint);
+}
+
 .sidebar-item {
   display: flex;
   align-items: center;
@@ -252,6 +261,17 @@ button:focus-visible,
 .sidebar-active:hover {
   background: var(--accent);
   color: var(--accent-text);
+}
+
+/* Pin the window-switch action to the bottom of the column sidebar. */
+.sidebar-bottom {
+  margin-top: auto;
+}
+
+.sidebar-bottom-glyph {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .content {
@@ -453,6 +473,13 @@ button:focus-visible,
   opacity: 0.7;
 }
 
+/* "On this Mac" locality marker: reuses the green that signals a safe/local
+   state (like badge-ok), at hint size so it clears AA on --chip. */
+.badge-local {
+  color: var(--ok);
+  font-size: var(--text-hint);
+}
+
 .chip {
   background: var(--chip);
   border: 1px solid var(--border);
@@ -466,6 +493,11 @@ button:focus-visible,
   background: var(--accent);
   color: var(--accent-text);
   border-color: var(--accent);
+}
+
+.library-switch {
+  display: flex;
+  gap: 6px;
 }
 
 .form-error {
@@ -569,6 +601,19 @@ button:focus-visible,
   border-color: var(--accent);
   color: var(--accent);
   animation: pulse 1.2s ease-in-out infinite;
+}
+
+.hotkey-gesture {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  text-align: right;
+}
+
+.hotkey-gesture-current {
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 @keyframes pulse {
@@ -710,6 +755,12 @@ button:focus-visible,
 
 /* ---- Dictionary ---- */
 
+.dict-views {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
 .dict-form {
   display: flex;
   gap: 8px;
@@ -720,6 +771,19 @@ button:focus-visible,
 .dict-form input {
   flex: 1;
   min-width: 0;
+}
+
+.dict-correction-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: var(--text-hint);
+}
+
+.dict-search {
+  width: 100%;
+  margin: 12px 0 4px;
 }
 
 .dict-arrow {
@@ -779,6 +843,11 @@ button:focus-visible,
 .dict-to {
   font-weight: 600;
   flex: 1;
+}
+
+.dict-row-editing input {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ---- Snippets ---- */
@@ -854,44 +923,138 @@ button:focus-visible,
   padding: 1px 5px;
 }
 
+.snippet-row-editing {
+  align-items: flex-start;
+}
+
+.snippet-row-editing .snippet-row-text {
+  gap: 8px;
+}
+
+.snippet-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* ---- Transforms ---- */
+
+.transform-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.transform-header-text {
+  min-width: 0;
+}
+
+.transform-title {
+  margin: 0;
+  font-size: var(--text-h1);
+  font-weight: var(--weight-semibold);
+}
+
+.transform-see-changes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+}
+
+.transform-toolbar {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.transform-search {
+  flex: 1;
+  min-width: 0;
+}
 
 .transform-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 10px 0;
+  gap: var(--space-5);
 }
 
 .transform-card {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.transform-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6) var(--space-7);
 }
 
-.transform-name {
+.transform-card-main {
   flex: 1;
   min-width: 0;
-  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.transform-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.transform-card-name {
+  font-weight: var(--weight-semibold);
+}
+
+.transform-builtin {
+  color: var(--accent);
+  margin-right: var(--space-2);
+}
+
+.transform-preview {
+  color: var(--text-dim);
+  font-size: var(--text-hint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transform-card-actions {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.transform-card-editing {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.transform-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.transform-field-label {
+  color: var(--text-dim);
+  font-size: var(--text-hint);
 }
 
 .transform-instruction {
   resize: vertical;
   min-height: 48px;
-  font-size: 13px;
+  font-size: var(--text-body);
 }
 
-.transform-templates {
-  flex-wrap: wrap;
+.transform-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) 0;
+  text-align: center;
 }
 
 /* ---- Insights ---- */
@@ -933,6 +1096,186 @@ button:focus-visible,
   border-top: 1px solid var(--border);
 }
 
+/* Five stats fit a three-up grid better than the default two-up. */
+.insights-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.insight-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.insight-app-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.insight-app-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insight-bar-track {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--chip);
+  overflow: hidden;
+}
+
+.insight-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+}
+
+/* ---- Home ---- */
+
+.home-greeting {
+  margin-bottom: var(--space-2);
+}
+
+.home-greeting h1 {
+  margin: 0;
+  font-size: var(--text-h1);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.home-greeting .row-hint {
+  margin-top: var(--space-2);
+}
+
+/* Full-width activity summary above the grid; collapses to two-up on narrow windows. */
+.home-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-5);
+  margin: var(--space-7) 0;
+}
+
+@media (max-width: 620px) {
+  .home-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.home-stat {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-7);
+  text-align: center;
+}
+
+.home-stat-number {
+  font-size: 28px;
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+}
+
+.home-stat-label {
+  margin-top: var(--space-2);
+  font-size: var(--text-hint);
+  color: var(--text-dim);
+}
+
+/* Single column by default; a wide window splits into history + a fixed aside. */
+.home-grid {
+  display: grid;
+  gap: var(--space-7);
+  align-items: start;
+}
+
+@media (min-width: 1080px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+}
+
+.home-main,
+.home-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  min-width: 0;
+}
+
+.home-day + .home-day {
+  margin-top: var(--space-6);
+}
+
+.home-day-label {
+  font-size: var(--text-hint);
+  font-weight: var(--weight-medium);
+  color: var(--text-dim);
+  padding: var(--space-2) 0;
+}
+
+.home-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border);
+}
+
+.home-entry:first-of-type {
+  border-top: none;
+}
+
+.home-entry-preview {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-entry-meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.home-entry-time {
+  color: var(--text-faint);
+  font-size: var(--text-hint);
+}
+
+.home-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}
+
+.home-stat-row:first-of-type {
+  border-top: none;
+}
+
+.home-stat-value {
+  font-weight: var(--weight-semibold);
+}
+
+.home-setup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border);
+}
+
+.home-setup-row:first-of-type {
+  border-top: none;
+}
+
 /* ---- Misc ---- */
 
 .result-text {
@@ -941,22 +1284,6 @@ button:focus-visible,
   border-radius: 6px;
   padding: 8px 10px;
   margin: 6px 0;
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin: var(--space-4) 0;
-}
-
-.history-row {
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-3);
-}
-
-.history-row:first-child {
-  border-top: none;
 }
 
 .about-list {
@@ -985,6 +1312,17 @@ button:focus-visible,
   margin: 6px 0 0;
   padding-left: 18px;
   line-height: 1.6;
+}
+
+.whats-new-entry + .whats-new-entry {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.whats-new-meta {
+  color: var(--text-dim);
+  font-size: 12px;
 }
 
 .ollama-models {
@@ -1081,15 +1419,30 @@ button:focus-visible,
 
 /* ---- HUD ---- */
 
+/* No overflow clipping: the circle's dropdown opens above the pill. */
 .hud-body {
   background: transparent;
-  overflow: hidden;
 }
 
-.hud-pill {
+/* Spans the whole frame so a click on empty HUD space lands on the root and
+ * dismisses an open menu. Its children are all `position: fixed` (out of flow),
+ * so without this the block collapses to zero height and the click-away never
+ * fires. Keep default pointer-events: the OS-level `ignore_cursor_events` makes
+ * the frame click-through while the menu is closed, so the root only receives
+ * clicks when the menu is open — exactly when click-away should fire. */
+.hud-root {
   position: fixed;
   inset: 0;
-  margin: 8px auto;
+}
+
+/* Bottom-anchored so its on-screen position survives the taller window
+ * (the dropdown grows the window upward, not the pill). */
+.hud-pill {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  margin: 0 auto;
   width: fit-content;
   max-width: 92%;
   height: 40px;
@@ -1116,6 +1469,87 @@ button:focus-visible,
 .hud-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* Persistent transform control, pinned bottom-right. Never gets
+ * `.hud-visible`, so it stays at full opacity even when the pill fades at idle;
+ * the Rust cursor poll anchors its hit-test to this fixed corner. Button chrome
+ * is reset so it reads as the circle, not an OS button. */
+.hud-circle {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  box-shadow: var(--shadow-hud);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+  opacity: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* The post-dictation radio menu. Opens upward from just above the circle —
+ * the window was enlarged (height 280) so this transparent space exists above
+ * the bottom-anchored pill. Bottom-anchored to the same corner as the circle. */
+.hud-menu {
+  position: fixed;
+  right: 12px;
+  bottom: 48px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 200px;
+  max-width: 88%;
+  max-height: 220px;
+  overflow-y: auto;
+  border-radius: var(--radius-md);
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  box-shadow: var(--shadow-hud);
+  pointer-events: auto;
+}
+
+.hud-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.hud-menu-item:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+/* Leading radio dot, drawn with ::before so the label text stays the a11y name. */
+.hud-menu-item::before {
+  content: '○';
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.hud-menu-checked::before {
+  content: '●';
+  opacity: 1;
 }
 
 .hud-error {
@@ -1315,4 +1749,339 @@ button:focus-visible,
   .changes-card {
     transition: none;
   }
+}
+
+/* ---- Scratchpad window (09): opt-in notes surface ---- */
+
+.scratchpad-gate {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  padding: var(--space-8);
+  box-sizing: border-box;
+}
+
+.scratchpad-gate-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  align-items: center;
+  text-align: center;
+  max-width: 380px;
+  padding: var(--space-10) var(--space-9);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.scratchpad-gate-title {
+  margin: 0;
+  font-size: var(--text-h1);
+}
+
+.scratchpad-gate-copy {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-hint);
+  line-height: var(--leading-body);
+}
+
+.scratchpad {
+  display: flex;
+  height: 100vh;
+}
+
+/* The single-note window has no list pane: the editor fills the window. */
+.scratchpad-single {
+  flex-direction: column;
+}
+
+.scratchpad-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
+.scratchpad-editor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-8) var(--space-9);
+  gap: var(--space-6);
+}
+
+.scratchpad-title {
+  border: none;
+  padding: 0;
+  min-width: 0;
+  background: transparent;
+  font-size: var(--text-h1);
+  font-weight: var(--weight-semibold);
+}
+
+.scratchpad-title:focus-visible {
+  outline: none;
+}
+
+.scratchpad-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.scratchpad-tool {
+  min-width: 28px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--chip);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-hint);
+  cursor: pointer;
+}
+
+.scratchpad-tool:hover {
+  filter: brightness(0.96);
+}
+
+.scratchpad-tool-on {
+  color: var(--accent);
+}
+
+.scratchpad-toolbar-spacer {
+  flex: 1;
+}
+
+.scratchpad-body-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-6);
+}
+
+.scratchpad-body {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--space-2) 0;
+  line-height: var(--leading-body);
+  user-select: text;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.scratchpad-body:focus-visible {
+  outline: none;
+}
+
+.scratchpad-body code {
+  background: var(--chip);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-2);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: var(--text-badge);
+}
+
+.scratchpad-versions {
+  width: 240px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: var(--space-6);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.scratchpad-versions-head {
+  font-size: var(--text-h2);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-h2);
+  color: var(--text-dim);
+  margin-bottom: var(--space-4);
+}
+
+.scratchpad-versions-empty {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-hint);
+}
+
+.scratchpad-version {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border);
+}
+
+.scratchpad-version-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.scratchpad-version-label {
+  font-size: var(--text-hint);
+}
+
+.scratchpad-version-time {
+  color: var(--text-faint);
+  font-size: var(--text-badge);
+}
+
+.scratchpad-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-hint);
+}
+
+.scratchpad-transforms {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.scratchpad-chip {
+  padding: var(--space-2) var(--space-6);
+  background: var(--chip);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-hint);
+  cursor: pointer;
+}
+
+.scratchpad-chip:hover {
+  filter: brightness(0.96);
+}
+
+.scratchpad-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.scratchpad-more {
+  position: relative;
+}
+
+/* The overflow menu opens upward: the transform bar sits at the window bottom. */
+.scratchpad-more-menu {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sheet);
+}
+
+.scratchpad-more-item {
+  padding: var(--space-2) var(--space-4);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-hint);
+  cursor: pointer;
+}
+
+.scratchpad-more-item:hover {
+  background: var(--chip);
+}
+
+.scratchpad-more-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.scratchpad-actions-spacer {
+  flex: 1;
+}
+
+.scratchpad-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.scratchpad-confirm-label {
+  font-size: var(--text-hint);
+  color: var(--text-dim);
+}
+
+/* ---- Scratchpad note cards (App window tab) ---- */
+
+.note-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-5);
+}
+
+.note-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-6) var(--space-7);
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.note-card:hover {
+  border-color: var(--accent);
+}
+
+.note-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.note-card-pin {
+  flex-shrink: 0;
+  font-size: var(--text-hint);
+}
+
+.note-card-title {
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-card-preview {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--text-hint);
+  line-height: var(--leading-body);
+  /* Clamp the preview to a few lines so cards stay a uniform height. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-card-date {
+  margin-top: auto;
+  color: var(--text-faint);
+  font-size: var(--text-badge);
 }

@@ -18,7 +18,7 @@ export type PipelineStatus =
   | 'error';
 
 /** What kind of job the pipeline is currently running. */
-export type PipelineJob = 'dictation' | 'polishSelection' | 'transform';
+export type PipelineJob = 'dictation' | 'transform';
 
 export interface PipelineState {
   status: PipelineStatus;
@@ -29,11 +29,24 @@ export interface PipelineState {
   hudTip: string | null;
 }
 
-/** Hold the hotkey to talk, or tap once to start and again to stop. */
-export type HotkeyBehavior = 'hold' | 'toggle';
+/**
+ * How a hotkey is triggered. `hold`/`doubleTap` describe an `fn`-key gesture,
+ * observed by a listen-only event tap when Input Monitoring is granted (else the
+ * Rust side falls a `hold` trigger back to an accelerator); `accelerator` is a
+ * literal combo like `Alt+O`. Only push-to-talk uses a gesture today.
+ */
+export type HotkeyKind = 'hold' | 'doubleTap' | 'accelerator';
 
-/** `paste` simulates Cmd+V into the active app; `clipboard` only copies. */
-export type InsertMethod = 'paste' | 'clipboard';
+/**
+ * A gesture trigger: a `kind` plus its `key`. `key` is `'fn'` for the
+ * push-to-talk gesture default, or an accelerator string (e.g. `'Alt+O'`, or
+ * `''` to disable) when `kind` is `'accelerator'`. Mirrors `Hotkey` in
+ * `settings.rs`.
+ */
+export interface Hotkey {
+  kind: HotkeyKind;
+  key: string;
+}
 
 /** Window theme. `system` follows macOS; `light`/`dark` force it for Velata. */
 export type Appearance = 'system' | 'light' | 'dark';
@@ -98,53 +111,12 @@ export interface SttProfile {
   timeoutSecs: number;
 }
 
-export interface Mode {
-  id: string;
-  name: string;
-  builtIn: boolean;
-  /**
-   * When true the mode wants LLM polish and falls back to rules-based
-   * cleanup if no provider is configured. When false, output is the cleaned
-   * transcript only (dictionary still applies).
-   */
-  usesLlm: boolean;
-  /**
-   * When true the appended "preserve the language" default is dropped so the
-   * mode may translate/re-cast (still fenced by the invariant safety rules).
-   */
-  transforms: boolean;
-  /** System prompt used for LLM polish (the user text only; safety rules
-   * are appended at call time). */
-  prompt: string;
-  // ---- Mode v2 overrides (07); null = inherit the global setting ----
-  /** AI profile id, or null to use the active profile. */
-  aiProfileId: string | null;
-  /** Whisper model id, or null to use the global speech model. */
-  sttModelId: string | null;
-  /** ISO 639-1 code or `auto`, or null to use the global language. */
-  language: string | null;
-  /** Accelerator string (e.g. `Alt+Ctrl+N`), or null for no mode hotkey. */
-  hotkey: string | null;
-}
-
 export interface DictionaryEntry {
   /** What the transcriber tends to produce, e.g. "open flow". */
   from: string;
   /** The replacement, e.g. "Velata". When equal to `from`, the entry is a
    * pure vocabulary hint (preserve this spelling) rather than a replacement. */
   to: string;
-}
-
-/** A per-app rule: dictate in `modeId` when the app `bundleId` is frontmost. */
-export interface AppRule {
-  bundleId: string;
-  modeId: string;
-}
-
-/** A frontmost application's identity, for building app rules. */
-export interface FrontmostApp {
-  bundleId: string;
-  name: string;
 }
 
 /**
@@ -175,52 +147,68 @@ export interface Snippet {
 }
 
 /**
- * A named, one-tap text operation applied to the current selection — a saved
- * polish instruction with its own hotkey. The built-in Polish is the same
- * shape with a fixed instruction.
+ * A named, one-tap text operation applied to a selection — a saved instruction
+ * with its own shortcut (Transforms page). The built-in Polish is the same
+ * shape with a fixed instruction; the same instruction also drives the
+ * post-dictation transform and Scratchpad transforms.
  */
-export interface Transform {
-  /** Stable identity (a UUID); the hotkey resolves the instruction by this. */
+export interface Prompt {
+  /** Stable identity (a UUID); the shortcut resolves the instruction by this. */
   id: string;
   name: string;
   /** Instruction sent to the active profile alongside the selection. */
   instruction: string;
   /** Accelerator that applies it; empty = not yet bound (can't fire). */
-  hotkey: string;
+  shortcut: string;
+  /**
+   * Shipped by Velata and restored if deleted. User edits to its
+   * instruction/shortcut persist; only deletion is undone. Existing custom
+   * prompts are user-owned (false).
+   */
+  builtIn: boolean;
 }
 
 export interface Settings {
   /** Schema version for forward migrations. */
   version: number;
-  dictationHotkey: string;
-  dictationHotkeyBehavior: HotkeyBehavior;
-  polishHotkey: string;
-  /** Reveals the word-level diff of the last result. Empty disables it. */
-  changeOverlayHotkey: string;
-  /** Master switch: may dictation transcripts go to the active profile. */
-  polishAfterDictation: boolean;
+  /** Hold-to-talk trigger: press starts, release inserts (default `fn` hold). */
+  pushToTalkHotkey: Hotkey;
+  /**
+   * Optional accelerator that toggles hands-free (one press starts, the next
+   * stops); empty `key` = disabled (the default). Hands-free's primary
+   * mechanism is the tap-latch on the push-to-talk key, not this.
+   */
+  handsFreeHotkey: Hotkey;
+  /** Reveals the word-level diff of the last result. Empty `key` disables it. */
+  seeChangesHotkey: Hotkey;
   /** Active profile id (a file under `<app-data>/profiles/`); "" = no AI. */
   activeLlmProfileId: string;
-  activeModeId: string;
-  modes: Mode[];
   dictionary: DictionaryEntry[];
   /** Spoken shorthands expanded into longer blocks on insert (dictation only). */
   snippets: Snippet[];
-  /** Named, hotkey-bound text operations applied to a selection. */
-  transforms: Transform[];
+  /** Named, shortcut-bound prompts applied to a selection; includes Polish. */
+  prompts: Prompt[];
+  /**
+   * Id of the prompt to run automatically on the transcript after dictation, or
+   * null for no post-dictation transform (insert the plain transcript).
+   */
+  postDictationTransformId: string | null;
   /** Whisper model id from the model registry, e.g. `base.en`. */
   sttModelId: string;
   /** ISO 639-1 code or `auto`. */
   language: string;
-  insertMethod: InsertMethod;
-  restoreClipboard: boolean;
+  /**
+   * Input device to record from, matched by exact name; null = system default.
+   * A saved name no longer present falls back to the default.
+   */
+  inputDeviceName: string | null;
   launchAtLogin: boolean;
   /** Window theme override; `system` defers to macOS. */
   appearance: Appearance;
   /** Opt-in: keep a local, searchable log of past dictations (default off). */
   historyEnabled: boolean;
-  /** Per-app rules: dictate in a chosen mode when an app is frontmost. */
-  appRules: AppRule[];
+  /** Days a history entry is kept before purge; 0 = keep forever. */
+  historyRetentionDays: number;
   /** STT profile ids whose 'audio leaves the Mac' consent the user confirmed. */
   confirmedSttProfiles: string[];
   /** Master switch for one-time feature tips. */
@@ -233,6 +221,11 @@ export interface Settings {
   lastTipShownAt: string;
   /** Keep a Dock icon (vs menu-bar-only). */
   showInDock: boolean;
+  /**
+   * Opt-in: the Scratchpad notes surface (default off). Off, no note is
+   * written and every note command refuses — notes are stored only when on.
+   */
+  scratchpadEnabled: boolean;
   onboardingCompleted: boolean;
 }
 
@@ -262,13 +255,12 @@ export interface TranscriptionResult {
   raw: string;
   /**
    * The text the change is measured against for the "see changes" diff:
-   * the transcript for dictation, the original selection for polish/transforms.
+   * the transcript for dictation, the original selection for a prompt transform.
    */
   original: string;
   /** Final text that was inserted. */
   text: string;
-  modeId: string;
-  /** Whether an LLM pass ran (false means rules-based cleanup only). */
+  /** Whether a prompt transform ran (false means the plain transcript). */
   polished: boolean;
   durationMs: number;
 }
@@ -276,40 +268,92 @@ export interface TranscriptionResult {
 /** One entry in the opt-in local dictation history (text only, never audio). */
 export interface HistoryEntry {
   id: string;
-  raw: string;
-  text: string;
-  modeId: string;
-  polished: boolean;
   /** Unix epoch milliseconds. */
   at: number;
-}
-
-export interface ModeCount {
-  modeId: string;
-  count: number;
+  text: string;
+  rawText: string;
+  /** Frontmost app's display name at dictation time; null for legacy imports. */
+  appName: string | null;
+  /** Recording duration in milliseconds; null for legacy imports. */
+  durationMs: number | null;
+  wordCount: number;
+  /** Whether an LLM pass ran (vs rules-based cleanup only). */
+  usedAi: boolean;
 }
 
 /**
- * Session-only usage aggregates for the Insights view. Counts and sums only —
- * never transcripts or audio — held in memory and reset on quit. Mirrors the
+ * One Scratchpad note (text only, never audio). The body is the minimal HTML
+ * the editor toolbar produces; paste is forced to plain text so stored markup
+ * is bounded to our own tags. Mirrors `Note` in `notes.rs`.
+ */
+export interface Note {
+  id: string;
+  title: string;
+  /** Body as minimal HTML (`<p>`, `<b>`, `<i>`, `<u>`, `<code>`, lists). */
+  content: string;
+  /** Unix epoch milliseconds. */
+  createdAt: number;
+  updatedAt: number;
+  pinned: boolean;
+}
+
+/** A note row for the list view. Mirrors `NoteSummary` in `notes.rs`. */
+export interface NoteSummary {
+  id: string;
+  title: string;
+  /** First ~120 characters of the body with tags stripped. */
+  preview: string;
+  updatedAt: number;
+  pinned: boolean;
+}
+
+/**
+ * An immutable snapshot of a note's body, taken before a destructive edit
+ * (transform or restore). Mirrors `NoteVersion` in `notes.rs`.
+ */
+export interface NoteVersion {
+  id: string;
+  noteId: string;
+  content: string;
+  /** Why it exists: 'created', 'transform', or 'restore'. */
+  source: string;
+  /** The settings transform applied (when `source` is 'transform'); else null. */
+  transformId: string | null;
+  createdAt: number;
+}
+
+/**
+ * Lifetime usage aggregates for the Home header, always kept (counts and dates
+ * only, never transcripts or audio) and derived from `insights_daily`. There is
+ * no enable toggle and no reset; an empty store reads as all-zero. Mirrors the
  * Rust `Insights` in `stats.rs`.
  */
 export interface Insights {
-  totalWords: number;
+  words: number;
   dictations: number;
-  /** Average speaking pace this session; 0 until some speech is recorded. */
+  /** Lifetime speaking pace (words ÷ minutes spoken); 0 with no duration. */
   wordsPerMinute: number;
-  /** Percent of dictations that went through the LLM (vs rules cleanup). */
-  polishedPercent: number;
-  /** Most-used modes, highest first (up to 3). */
-  topModes: ModeCount[];
+  /** Current consecutive-day dictation streak, in days. */
+  streak: number;
 }
 
 export type MicrophonePermission = 'granted' | 'denied' | 'undetermined' | 'unknown';
 
+/**
+ * Input Monitoring status. `CGPreflightListenEventAccess` is a bool, so there is
+ * no `undetermined`; `unknown` is the non-macOS stub.
+ */
+export type InputMonitoringPermission = 'granted' | 'denied' | 'unknown';
+
 export interface PermissionsState {
   microphone: MicrophonePermission;
   accessibility: boolean;
+  /**
+   * Required only for the `fn`-key push-to-talk gesture (a listen-only event
+   * tap). When not `granted`, dictation still works via the accelerator
+   * fallback — this permission is additive.
+   */
+  inputMonitoring: InputMonitoringPermission;
 }
 
 export interface LlmTestResult {
@@ -331,6 +375,16 @@ export const EVENTS = {
   settingsChanged: 'settings-changed',
   result: 'transcription-result',
   changesToggle: 'changes-toggle',
+  /** Fired once a history append has committed; views refresh from durable rows. */
+  historyChanged: 'history-changed',
+  /** Fired once the insights_daily upsert has committed; the Home header refetches. */
+  insightsChanged: 'insights-changed',
+  /** A note was created/updated/pinned/deleted/restored/transformed; refresh the list. */
+  notesChanged: 'notes-changed',
+  /** Ask an open Scratchpad to switch to a note; payload is the note id. */
+  scratchpadOpenNote: 'scratchpad-open-note',
+  /** Ask the open Settings window to switch to a tab; payload is the tab id. */
+  settingsNavigate: 'settings-navigate',
 } as const;
 
 /** Tauri command names callable via `invoke`. */
@@ -345,19 +399,18 @@ export const COMMANDS = {
   startDictation: 'start_dictation',
   stopDictation: 'stop_dictation',
   cancelDictation: 'cancel_dictation',
-  startPolishSelection: 'start_polish_selection',
+  setPostDictationTransform: 'set_post_dictation_transform',
   getLastResult: 'get_last_result',
-  getLastDictationApp: 'get_last_dictation_app',
   getHistory: 'get_history',
   clearHistory: 'clear_history',
-  reprocessHistory: 'reprocess_history',
+  deleteHistoryEntry: 'delete_history_entry',
   getInsights: 'get_insights',
   listDictionarySuggestions: 'list_dictionary_suggestions',
   dismissDictionarySuggestion: 'dismiss_dictionary_suggestion',
   copyText: 'copy_text',
   setChangesInteractive: 'set_changes_interactive',
+  setHudMenuOpen: 'set_hud_menu_open',
   testLlm: 'test_llm',
-  testMode: 'test_mode',
   listLlmProfiles: 'list_llm_profiles',
   saveLlmProfile: 'save_llm_profile',
   deleteLlmProfile: 'delete_llm_profile',
@@ -366,13 +419,26 @@ export const COMMANDS = {
   saveSttProfile: 'save_stt_profile',
   deleteSttProfile: 'delete_stt_profile',
   revealSttProfiles: 'reveal_stt_profiles',
-  exportMode: 'export_mode',
   exportDictionary: 'export_dictionary',
   listOllamaModels: 'list_ollama_models',
+  listInputDevices: 'list_input_devices',
   checkPermissions: 'check_permissions',
   requestMicrophonePermission: 'request_microphone_permission',
   promptAccessibilityPermission: 'prompt_accessibility_permission',
   openAccessibilitySettings: 'open_accessibility_settings',
   openMicrophoneSettings: 'open_microphone_settings',
+  requestInputMonitoring: 'request_input_monitoring',
   getAppInfo: 'get_app_info',
+  listNotes: 'list_notes',
+  getNote: 'get_note',
+  createNote: 'create_note',
+  updateNote: 'update_note',
+  setNotePinned: 'set_note_pinned',
+  deleteNote: 'delete_note',
+  listNoteVersions: 'list_note_versions',
+  restoreNoteVersion: 'restore_note_version',
+  transformNoteText: 'transform_note_text',
+  openScratchpadWindow: 'open_scratchpad_window',
+  openMainWindow: 'open_main_window',
+  openSettingsWindow: 'open_settings_window',
 } as const;

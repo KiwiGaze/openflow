@@ -6,7 +6,7 @@ export const DOWNLOAD_FAILED_HINT = 'Download failed — check your connection.'
 /**
  * True while a model download is in flight: the registry flag covers
  * downloads the backend already knows about, live progress covers the one
- * started in this session. ModelsTab and Onboarding must agree on this.
+ * started in this session. SpeechTab and Onboarding must agree on this.
  */
 export function isDownloading(
   model: Pick<ModelInfo, 'downloading'> | undefined,

@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import type { TabId } from '../sidebarTabs.js';
 
 /**
  * One inline SVG per sidebar page (09 §5.7). Decorative (aria-hidden); the
@@ -22,7 +23,35 @@ function Icon({ children }: { children: JSX.Element }): JSX.Element {
   );
 }
 
-export const TAB_ICONS: Record<string, JSX.Element> = {
+export const TAB_ICONS: Record<TabId, JSX.Element> = {
+  // house
+  home: (
+    <Icon>
+      <>
+        <path d="M2.5 7.5 8 3l5.5 4.5" />
+        <path d="M3.5 6.8V13a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5V6.8" />
+        <path d="M6.5 13.5V9.5h3v4" />
+      </>
+    </Icon>
+  ),
+  // wand with sparks
+  transforms: (
+    <Icon>
+      <>
+        <path d="M4 12 11 5" />
+        <path d="M10 3.5 11 4.5M12.5 6l1 1M3 6.5l.7.7M5.5 3l.5.7M5.5 8l.7.5" />
+      </>
+    </Icon>
+  ),
+  // note with pencil
+  scratchpad: (
+    <Icon>
+      <>
+        <path d="M11 8.5V12a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 3 12V4.5A.5.5 0 0 1 3.5 4H7" />
+        <path d="M9 3.5 12.5 7 8 11.5H5.5V9z" />
+      </>
+    </Icon>
+  ),
   // microphone
   dictation: (
     <Icon>
@@ -32,54 +61,28 @@ export const TAB_ICONS: Record<string, JSX.Element> = {
       </>
     </Icon>
   ),
-  // sliders
-  modes: (
+  // sound waveform
+  speech: (
+    <Icon>
+      <path d="M2 8h1.5M5 5v6M7.5 2.5v11M10 5v6M12.5 8H14" />
+    </Icon>
+  ),
+  // sparkle
+  ai: (
     <Icon>
       <>
-        <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
-        <circle cx="5.5" cy="4.5" r="1.4" fill="currentColor" stroke="none" />
-        <circle cx="10.5" cy="8" r="1.4" fill="currentColor" stroke="none" />
-        <circle cx="6.5" cy="11.5" r="1.4" fill="currentColor" stroke="none" />
+        <path d="M8 2.5c.4 2.4 1.1 3.1 3.5 3.5-2.4.4-3.1 1.1-3.5 3.5-.4-2.4-1.1-3.1-3.5-3.5C6.9 5.6 7.6 4.9 8 2.5z" />
+        <path d="M12.5 9.5c.2 1.1.5 1.4 1.6 1.6-1.1.2-1.4.5-1.6 1.6-.2-1.1-.5-1.4-1.6-1.6 1.1-.2 1.4-.5 1.6-1.6z" />
       </>
     </Icon>
   ),
-  // chip
-  models: (
+  // stacked cards
+  library: (
     <Icon>
       <>
-        <rect x="4.5" y="4.5" width="7" height="7" rx="1" />
-        <path d="M6.5 2.5v2M9.5 2.5v2M6.5 11.5v2M9.5 11.5v2M2.5 6.5h2M2.5 9.5h2M11.5 6.5h2M11.5 9.5h2" />
+        <rect x="2.5" y="5.5" width="11" height="8" rx="1" />
+        <path d="M4 3.5h8M5.5 1.5h5" />
       </>
-    </Icon>
-  ),
-  // arrow leaving a box
-  output: (
-    <Icon>
-      <>
-        <path d="M8.5 3.5H4.5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V7.5" />
-        <path d="M8 8l5-5M9.5 3H13v3.5" />
-      </>
-    </Icon>
-  ),
-  // book
-  dictionary: (
-    <Icon>
-      <>
-        <path d="M3.5 3a1 1 0 0 1 1-1H12a.5.5 0 0 1 .5.5v10a.5.5 0 0 1-.5.5H4.5a1 1 0 0 1-1-1z" />
-        <path d="M3.5 11.5a1 1 0 0 1 1-1h8" />
-      </>
-    </Icon>
-  ),
-  // lightning (expansion)
-  snippets: (
-    <Icon>
-      <path d="M8.5 1.5 3.5 9h3.5l-1 5.5 5.5-7.5H8z" />
-    </Icon>
-  ),
-  // bar chart
-  insights: (
-    <Icon>
-      <path d="M3 13.5V9M7 13.5V5.5M11 13.5V7.5M14 13.5H2" />
     </Icon>
   ),
   // gear

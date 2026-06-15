@@ -6,10 +6,17 @@ interface Props {
   onChange: (accelerator: string) => void;
   /** What this shortcut controls, for the accessible name, e.g. "Dictation". */
   label?: string;
+  /** Chip text when no shortcut is set. Defaults to "Set…". */
+  emptyLabel?: string;
 }
 
 /** Click, then press the desired combo. Esc or Tab cancels (no focus trap). */
-export function HotkeyRecorder({ value, onChange, label }: Props): JSX.Element {
+export function HotkeyRecorder({
+  value,
+  onChange,
+  label,
+  emptyLabel = 'Set…',
+}: Props): JSX.Element {
   const [recording, setRecording] = useState(false);
   const [announce, setAnnounce] = useState('');
   const helperId = useId();
@@ -51,7 +58,7 @@ export function HotkeyRecorder({ value, onChange, label }: Props): JSX.Element {
 
   const name = label ? `${label} shortcut` : 'Shortcut';
   const formatted = formatAcceleratorMac(value);
-  const display = recording ? 'Press shortcut…' : formatted === '' ? 'Set…' : formatted;
+  const display = recording ? 'Press shortcut…' : formatted === '' ? emptyLabel : formatted;
 
   return (
     <div className="hotkey-recorder">
